@@ -967,6 +967,8 @@ jobs:
           arch: ${{ matrix.arch }}
           profile: Nexus 6
           disable-animations: true
+          # the debug APK for 4 ABIs is over 500 MB, more than the default data partition holds
+          disk-size: 4096M
           script: |
             # Display available space
             df -h
@@ -2220,7 +2222,8 @@ jobs:
   nordictrack-build:
     # The type of runner that the job will run on
     runs-on: ubuntu-22.04
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # builds a branch or pull request of the upstream repository, which a fork does not have
+    if: github.repository == 'cagnulein/qdomyos-zwift' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     
     strategy:
       matrix:
@@ -2390,7 +2393,8 @@ jobs:
   fitpro-build:
     # The type of runner that the job will run on
     runs-on: ubuntu-22.04
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # builds a branch or pull request of the upstream repository, which a fork does not have
+    if: github.repository == 'cagnulein/qdomyos-zwift' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
 
     strategy:
       matrix:
