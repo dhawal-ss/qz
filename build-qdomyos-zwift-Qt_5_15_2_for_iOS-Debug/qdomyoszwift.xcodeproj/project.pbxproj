@@ -65,6 +65,8 @@
 		47E45EE0BB22C1E4332F1D1D /* trxappgateusbtreadmill.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 6CAA4E912DD5732B087D9A96 /* trxappgateusbtreadmill.cpp */; settings = {ATTRIBUTES = (); }; };
 		48BA9CE9D6F256A15E8FB25D /* fit_mesg.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = B413A3CBEE9F25FBF8B9C9C7 /* fit_mesg.cpp */; settings = {ATTRIBUTES = (); }; };
 		4AAA7380490CBDBAA8587CFA /* qmlsettingsplugin in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 7B244F450C6BD59DEF4FB3C5 /* qmlsettingsplugin */; };
+		871D3E6D125A1229B399E4CD /* Qt5QuickShapes in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 87073D437BA9084109BCEA1D /* Qt5QuickShapes */; };
+		8780C9E780318E65962E0760 /* qmlshapesplugin in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 87E55845A112622F08D0C670 /* qmlshapesplugin */; };
 		4AD2C93A2B8FD5855E521630 /* fit_encode.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = C6C43A7A65ED8071348F5A4E /* fit_encode.cpp */; settings = {ATTRIBUTES = (); }; };
 		4B457EBD757B30AEB87115EA /* qgif in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 1667B2FAB36080B6C86C00BC /* qgif */; };
 		4EB68D0C8182BCE33529C421 /* AudioToolbox.framework in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 3C44131FDCFEF4396B9EA2BA /* AudioToolbox.framework */; };
@@ -1005,6 +1007,8 @@
 		7A3FA4569540D446E8FA4CF2 /* Qt5QuickTemplates2 */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = Qt5QuickTemplates2; path = "$(QZ_QT_ROOT)/lib/libQt5QuickTemplates2$(QT_LIBRARY_SUFFIX).a"; sourceTree = "<absolute>"; };
 		7ADAEE5BCA8194CC2A85A633 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = "/Users/cagnulein/qdomyos-zwift/build-qdomyos-zwift-Qt_5_15_2_for_iOS-Debug/qdomyoszwift.xcodeproj/LaunchScreen.storyboard"; sourceTree = "<absolute>"; };
 		7B244F450C6BD59DEF4FB3C5 /* qmlsettingsplugin */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = qmlsettingsplugin; path = "$(QZ_QT_ROOT)/qml/Qt/labs/settings/libqmlsettingsplugin$(QT_LIBRARY_SUFFIX).a"; sourceTree = "<absolute>"; };
+		87073D437BA9084109BCEA1D /* Qt5QuickShapes */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = Qt5QuickShapes; path = "$(QZ_QT_ROOT)/lib/libQt5QuickShapes$(QT_LIBRARY_SUFFIX).a"; sourceTree = "<absolute>"; };
+		87E55845A112622F08D0C670 /* qmlshapesplugin */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = qmlshapesplugin; path = "$(QZ_QT_ROOT)/qml/QtQuick/Shapes/libqmlshapesplugin$(QT_LIBRARY_SUFFIX).a"; sourceTree = "<absolute>"; };
 		7B2A802E2CCC6065718866E2 /* fit_ohr_settings_mesg.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fit_ohr_settings_mesg.hpp; path = "/Users/cagnulein/qdomyos-zwift/src/fit-sdk/fit_ohr_settings_mesg.hpp"; sourceTree = "<absolute>"; };
 		7D1C99A1199AAA9B00A4F4BE /* fit_video_mesg.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = fit_video_mesg.hpp; path = "/Users/cagnulein/qdomyos-zwift/src/fit-sdk/fit_video_mesg.hpp"; sourceTree = "<absolute>"; };
 		7D7B02101166B76FD2D4F8B4 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = /System/Library/Frameworks/CoreText.framework; sourceTree = "<absolute>"; };
@@ -2211,6 +2215,8 @@
 				023642106C14651D2E1F4D5D /* dialogplugin in Link Binary With Libraries */,
 				133CA0345CD2BFB03079A655 /* qmlfolderlistmodelplugin in Link Binary With Libraries */,
 				4AAA7380490CBDBAA8587CFA /* qmlsettingsplugin in Link Binary With Libraries */,
+				871D3E6D125A1229B399E4CD /* Qt5QuickShapes in Link Binary With Libraries */,
+				8780C9E780318E65962E0760 /* qmlshapesplugin in Link Binary With Libraries */,
 				873D388B29B0D745006A2611 /* ConnectIQ.xcframework in Link Binary With Libraries */,
 				3BD5A5F95DF5239184791B58 /* dialogsprivateplugin in Link Binary With Libraries */,
 				EF98F8C34BE322582E9B73D7 /* qtquickcontrolsplugin in Link Binary With Libraries */,
@@ -3359,6 +3365,8 @@
 				B9CCC4658EA620ABBD832E71 /* dialogplugin */,
 				4D77E0181941BE76CD4887BD /* qmlfolderlistmodelplugin */,
 				7B244F450C6BD59DEF4FB3C5 /* qmlsettingsplugin */,
+				87073D437BA9084109BCEA1D /* Qt5QuickShapes */,
+				87E55845A112622F08D0C670 /* qmlshapesplugin */,
 				0843667DD0EDF81D0590FC92 /* dialogsprivateplugin */,
 				A0219283E2F99E1F6F92D138 /* qtquickcontrolsplugin */,
 				EE1C9DADE4347A926B026574 /* widgetsplugin */,
