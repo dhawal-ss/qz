@@ -1030,11 +1030,15 @@ int main(int argc, char *argv[]) {
             settings.value(QZSettings::app_language, QZSettings::default_app_language).toString());
 
         QQmlApplicationEngine engine;
-        const QUrl url(QStringLiteral("qrc:/main.qml"));
+        // the Pulse interface (src/ui2) is a second root; the classic one stays the default
+        const bool pulseUi =
+            settings.value(QZSettings::pulse_ui_enabled, QZSettings::default_pulse_ui_enabled).toBool();
+        const QUrl classicUrl(QStringLiteral("qrc:/main.qml"));
+        const QUrl url(pulseUi ? QStringLiteral("qrc:/ui2/main2.qml") : QStringLiteral("qrc:/main.qml"));
         QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreated, qobject_cast<QGuiApplication *>(app.data()),
-            [url](QObject *obj, const QUrl &objUrl) {
-                if (!obj && url == objUrl)
+            [classicUrl](QObject *obj, const QUrl &objUrl) {
+                if (!obj && classicUrl == objUrl)
                     QCoreApplication::exit(-1);
             },
             Qt::QueuedConnection);
@@ -1059,6 +1063,11 @@ int main(int argc, char *argv[]) {
         engine.rootContext()->setContextProperty("fileSearcher", &fileSearcher);
 
         engine.load(url);
+        // homeform needs a root: a Pulse root that does not load falls back to the classic one
+        if (pulseUi && engine.rootObjects().isEmpty()) {
+            qDebug() << "Pulse interface did not load, starting the classic one";
+            engine.load(classicUrl);
+        }
 #ifdef Q_OS_ANDROID
         QTimer::singleShot(0, [] { restoreLostAccessibility(); });
 #endif

@@ -453,6 +453,10 @@ class homeform : public QObject {
                ((virtualtreadmill *)bluetoothManager->device()->VirtualDevice())->autoInclinationEnabled();
     }
 
+    // ride state for the Pulse interface (src/ui2)
+    Q_INVOKABLE bool ridePaused() { return paused; }
+    Q_INVOKABLE bool rideStopped() { return stopped; }
+
     Q_INVOKABLE bool confirmStopEnabled() {
         QSettings settings;
         return settings.value(QZSettings::confirm_stop_workout, QZSettings::default_confirm_stop_workout).toBool();

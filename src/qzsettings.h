@@ -3448,6 +3448,12 @@ class QZSettings {
     static constexpr bool default_moovio_lynx_konect_2_0 = false;
 
     /**
+     * @brief Use the Pulse interface (src/ui2/main2.qml) instead of the classic one. Needs a restart.
+     */
+    static const QString pulse_ui_enabled;
+    static constexpr bool default_pulse_ui_enabled = false;
+
+    /**
      * @brief Write the QSettings values using the constants from this namespace.
      * @param showDefaults Optionally indicates if the default should be shown with the key.
      */

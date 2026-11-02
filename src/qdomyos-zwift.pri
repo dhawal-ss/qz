@@ -271,6 +271,7 @@ gpx.cpp \
 devices/heartratebelt/heartratebelt.cpp \
 homefitnessbuddy.cpp \
 homeform.cpp \
+ridemetrics.cpp \
 mywhooshlink.cpp \
 garminconnect.cpp \
 devices/horizongr7bike/horizongr7bike.cpp \
@@ -814,6 +815,7 @@ devices/ftmsbike/horizon5r_defaults.h \
 devices/ftmsbike/speedracex_defaults.h \
 devices/heartratebelt/heartratebelt.h \
 homeform.h \
+ridemetrics.h \
 mywhooshlink.h \
 garminconnect.h \
 devices/horizontreadmill/horizontreadmill.h \

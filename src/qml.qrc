@@ -147,5 +147,36 @@
         <file>WebPelotonAuth.qml</file>
         <file>inner_templates/floating/hfloating.htm</file>
         <file>WebIntervalsICUAuth.qml</file>
+        <file>ui2/EditSheet.qml</file>
+        <file>ui2/Glow.qml</file>
+        <file>ui2/Icon.qml</file>
+        <file>ui2/LiveSource.qml</file>
+        <file>ui2/MetricRow.qml</file>
+        <file>ui2/Metrics.js</file>
+        <file>ui2/Numeral.qml</file>
+        <file>ui2/PulseButton.qml</file>
+        <file>ui2/PulseShape.qml</file>
+        <file>ui2/RideScreen.qml</file>
+        <file>ui2/RideSim.qml</file>
+        <file>ui2/RideSummary.qml</file>
+        <file>ui2/Sparkline.qml</file>
+        <file>ui2/StartScreen.qml</file>
+        <file>ui2/Theme.qml</file>
+        <file>ui2/main2.qml</file>
+        <file>ui2/qmldir</file>
+        <file>ui2/fonts/OFL.txt</file>
+        <file>ui2/fonts/PulseCelebrate.ttf</file>
+        <file>ui2/fonts/PulseDisplay.ttf</file>
+        <file>ui2/fonts/PulseHero1.ttf</file>
+        <file>ui2/fonts/PulseHero2.ttf</file>
+        <file>ui2/fonts/PulseHero3.ttf</file>
+        <file>ui2/fonts/PulseHero4.ttf</file>
+        <file>ui2/fonts/PulseHero5.ttf</file>
+        <file>ui2/fonts/PulseHero6.ttf</file>
+        <file>ui2/fonts/PulseHero7.ttf</file>
+        <file>ui2/fonts/PulseTall.ttf</file>
+        <file>ui2/fonts/PulseText.ttf</file>
+        <file>ui2/fonts/PulseTextMedium.ttf</file>
+        <file>ui2/fonts/PulseTextSemibold.ttf</file>
     </qresource>
 </RCC>

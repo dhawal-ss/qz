@@ -2389,6 +2389,7 @@ import AndroidStatusBar 1.0
             property real virtual_device_rower_cadence_gain: 1.0
             property real virtual_device_rower_cadence_offset: 0.0
             property bool proform_treadmill_sport_55: false
+            property bool pulse_ui_enabled: false
         }
 
         // The home page has its own Settings copy, read once when it is created: hand it every new
@@ -2827,6 +2828,33 @@ import AndroidStatusBar 1.0
                                 settingsPane.applyAppLanguage(settings.app_language)
                             }
                         }
+                    }
+                    IndicatorOnlySwitch {
+                        id: pulseUiDelegate
+                        text: qsTr("Pulse interface (preview)")
+                        spacing: 0
+                        bottomPadding: 0
+                        topPadding: 0
+                        rightPadding: 0
+                        leftPadding: 0
+                        clip: false
+                        checked: settings.pulse_ui_enabled
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                        Layout.fillWidth: true
+                        onClicked: { settings.pulse_ui_enabled = checked; window.settings_restart_to_apply = true; }
+                    }
+
+                    Label {
+                        text: qsTr("Try the new Pulse interface: a customizable ride screen with zones, trends and the level dock. Turn it off from its start screen. Default is off.")
+                        font.bold: true
+                        font.italic: true
+                        font.pixelSize: window.fontHint
+                        bottomPadding: window.hintGap
+                        textFormat: Text.PlainText
+                        wrapMode: Text.WordWrap
+                        verticalAlignment: Text.AlignVCenter
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+                        Layout.fillWidth: true
                     }
                     Label {
                         text: qsTr("Choose Auto to follow your device language, or pick a specific language for QZ.")
