@@ -154,6 +154,9 @@ Item {
             Theme.reduceMotion = value
         if (key === "accentChoice")
             Theme.accentChoice = value
+        // every week of the app counts from it: Theme tells the bindings and the JavaScript files
+        if (key === "weekStart")
+            Theme.weekStart = Number(value) === 0 ? 0 : 1
         prefStore.sync()
         var next = {}
         for (var k in look)

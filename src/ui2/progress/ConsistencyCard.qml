@@ -4,7 +4,8 @@ import "../sig"
 import "../Format.js" as Format
 import "Hub.js" as Hub
 
-// The last 52 weeks as a strip of days, a column a week from Monday to Sunday, each day stronger
+// The last 52 weeks as a strip of days, a column a week from its first day (Monday, or Sunday:
+// Format.firstDay) to its last, each day stronger
 // the harder it was (Hub.level), today outlined. Over it the weekly goal streak and the active
 // weeks, under it the streak freezes saved (goals/Streak.js, as on Goals). Narrow screens fold
 // the year into two half years, one over the other.
@@ -19,7 +20,7 @@ Column {
 
     property var levels: []          // 364 days, oldest first: 0 to 4
     property int activeWeeks: 0
-    property real firstMonday: 0     // noon of the Monday of the first column
+    property real firstMonday: 0     // noon of the first day of the first column
     property int todayIndex: 0
 
     readonly property int weekCount: 52
@@ -28,12 +29,12 @@ Column {
     readonly property real pitch: (width + gapSize) / blockWeeks
     readonly property int gapSize: blockWeeks === weekCount ? 2 : 3
     readonly property real cellSize: Math.min(16, pitch - gapSize)
-    readonly property var shades: [Qt.rgba(1, 1, 1, 0.06), Qt.rgba(0xc9 / 255, 0xb8 / 255, 1, 0.28),
-                                   Qt.rgba(0xc9 / 255, 0xb8 / 255, 1, 0.52), Qt.rgba(0xc9 / 255, 0xb8 / 255, 1, 0.78), Theme.accent]
+    readonly property var shades: [Qt.rgba(1, 1, 1, 0.06), Theme.accentWash(0.28), Theme.accentWash(0.52),
+                                   Theme.accentWash(0.78), Theme.accent]
 
     function refresh() {
         var t = new Date()
-        var back = (t.getDay() + 6) % 7
+        var back = Format.weekday(t.getTime())
         var first = new Date(t.getFullYear(), t.getMonth(), t.getDate() - back - (weekCount - 1) * 7, 12)
         firstMonday = first.getTime()
         todayIndex = (weekCount - 1) * 7 + back

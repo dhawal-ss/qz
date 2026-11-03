@@ -34,6 +34,7 @@ Item {
     property bool zoneColored: false
     property real ftp: 0
     property var laps: []               // start of each lap, in seconds
+    property var parts: []              // where each part of a merged ride starts (after the first), in seconds
     property bool showAverage: true
     property bool filled: false
     property var overlay: []            // a second metric on the same seconds, e.g. heart rate
@@ -486,6 +487,28 @@ Item {
                 width: 1
                 height: plot.height
                 color: Qt.rgba(1, 1, 1, 0.13)
+            }
+        }
+
+        // where the parts of a merged ride join: faint dashed lines, apart from the solid laps
+        Repeater {
+            model: chart.view ? chart.parts : []
+            Shape {
+                readonly property real partX: chart.xOfFraction(modelData / Math.max(1, chart.view.duration))
+                visible: modelData > 0 && partX > 0 && partX < plot.width
+                x: Math.round(partX)
+                width: 1
+                height: plot.height
+                ShapePath {
+                    strokeColor: Theme.text3
+                    strokeWidth: 1
+                    strokeStyle: ShapePath.DashLine
+                    dashPattern: [3, 3]
+                    fillColor: "transparent"
+                    startX: 0.5
+                    startY: 0
+                    PathLine { x: 0.5; y: plot.height }
+                }
             }
         }
 

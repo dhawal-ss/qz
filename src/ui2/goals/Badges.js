@@ -10,8 +10,11 @@
 // km, kJ, h, weeks, records, percent or months), progress the share done (0 to 1).
 // The rules:
 //   - ride counts, early bird (starts before 7:00), night owl (starts at 21:00 or later), 7 rides
-//     in one Monday to Sunday week: earned on the ride that got there
-//   - 100 km, 1000 kJ or 2 h in one ride: earned on the first ride that did it
+//     in one week (from the first day of the week the rider picked, Streak.js): earned on the ride
+//     that got there
+//   - 100 km, 1000 kJ or 2 h in one ride: earned on the first ride that did it. The distance
+//     stays 100 km for every rider, so switching units never takes the badge away; a rider who
+//     sees miles reads it in miles, as the metric century it is (62 mi)
 //   - week streaks: earned on the last riding day of the week the streak got there (Streak.js)
 //   - power record hat-trick: 3 new power records of 5 s or more in one ride, each beating an
 //     earlier best, from the 11th ride on: the first rides beat each other at almost every
@@ -54,7 +57,7 @@ function recordCounts(histories) {
 
 // input: { rides (oldest first: start, duration, distance, kj, id), recordCounts, streak
 // (Streak.run), journeysDone [{id, date}], journeyId, journeyPercent, challenges
-// (Challenge.history), now }
+// (Challenge.history), now, miles }
 function evaluate(input) {
     var rides = input.rides || []
     var out = []
@@ -95,14 +98,16 @@ function evaluate(input) {
         if (busyDate === 0 && weekCounts[w] >= 7)
             busyDate = r.start
     }
-    out.push(badge("century", qsTr("Century"), qsTr("Ride 100 km in one ride."), 2, 5, "road",
-                   farthest, 100, century, "km"))
+    out.push(badge("century", input.miles ? qsTr("Metric century") : qsTr("Century"),
+                   input.miles ? qsTr("Ride 62 miles in one ride, that is 100 km.") : qsTr("Ride 100 km in one ride."),
+                   2, 5, "road", farthest, 100, century, "km"))
     out.push(badge("kj1000", qsTr("1000 kJ"), qsTr("Do 1000 kJ of work in one ride."), 5, 5, "bolt",
                    most, 1000, work, "kJ"))
     out.push(badge("twoHours", qsTr("Two hours"), qsTr("Ride for 2 hours in one ride."), 3, 4, "clock",
                    longest / 3600, 2, twoHours, "h"))
-    out.push(badge("busyWeek", qsTr("Seven in a week"), qsTr("Ride 7 times in one week, Monday to Sunday."), 2, 5, "week",
-                   busiest, 7, busyDate, "rides"))
+    var weekWords = Format.firstDay === 0 ? qsTr("Ride 7 times in one week, Sunday to Saturday.")
+                                          : qsTr("Ride 7 times in one week, Monday to Sunday.")
+    out.push(badge("busyWeek", qsTr("Seven in a week"), weekWords, 2, 5, "week", busiest, 7, busyDate, "rides"))
 
     var streak = input.streak || { best: 0, reached: {} }
     for (var s = 0; s < streakRungs.length; s++) {

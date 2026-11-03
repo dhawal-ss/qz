@@ -156,9 +156,8 @@ Column {
         }
     }
 
-    // hidden until every week calculation (Streak.js, Today, the calendars) follows it
+    // every week calculation follows it (Theme.weekStart, Format.firstDay, goals/Streak.js)
     YouChoice {
-        visible: false
         title: qsTr("Week starts on")
         detail: qsTr("For the week on Today, your calendar and weekly totals.")
         options: [[1, qsTr("Monday")], [0, qsTr("Sunday")]]

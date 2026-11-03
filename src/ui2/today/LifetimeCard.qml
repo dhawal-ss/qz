@@ -2,6 +2,7 @@ import QtQuick 2.15
 import ".."
 import "../sig"
 import "../Format.js" as Format
+import "../moments/Moments.js" as Moments
 
 // Everything so far, and the next rung of the distance ladder, as a quiet section. A tap opens
 // its Learn sheet (learn()), which leads on to Goals.
@@ -9,7 +10,7 @@ Column {
     id: lifetimeCard
 
     property var lifetime: ({})      // library.totals(0, 0)
-    property var milestone: null     // Insights.nextRung() of the distance ladder
+    property var milestone: null     // Insights.nextRung() of the distance ladder, in km
     property bool miles: false
 
     signal openGoals()
@@ -19,8 +20,9 @@ Column {
                                                                         / Math.max(1, milestone.rung - milestone.from))) : 1
     readonly property real toUnit: miles ? 0.621371 : 1
 
+    // a rung in the rider's unit, a round number (Moments.distanceLadder)
     function rungName(km) {
-        return km === 40075 ? qsTr("around the world") : Format.big(km * toUnit) + (miles ? " mi" : " km")
+        return Moments.isWorldRung(km) ? qsTr("around the world") : Format.big(Moments.rungShown(km, miles)) + (miles ? " mi" : " km")
     }
 
     spacing: 4

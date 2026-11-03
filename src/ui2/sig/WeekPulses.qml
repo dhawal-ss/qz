@@ -1,18 +1,19 @@
 import QtQuick 2.15
 import QtQuick.Shapes 1.15
 import ".."
+import "../Format.js" as Format
 
-// The seven days of a week, Monday first: a day with riding is the Pulse of its main zone,
+// The seven days of a week from its first day (Monday, or Sunday: Theme.weekStart): a day with
+// riding is the Pulse of its main zone,
 // a day without is a small dot, today without a ride yet is a dashed ring in the tint.
 // The shapes stand still: only the hero turns.
 Item {
     id: week
 
-    // [{ zone: 0 for no ride, else 1 to 7, today: bool }], Monday first
+    // [{ zone: 0 for no ride, else 1 to 7, today: bool }], from the first day of the week
     property var days: []
-    property var letters: [qsTr("M"), qsTr("T"), qsTr("W"), qsTr("T"), qsTr("F"), qsTr("S"), qsTr("S")]
-    property var dayNames: [qsTr("Monday"), qsTr("Tuesday"), qsTr("Wednesday"), qsTr("Thursday"),
-                            qsTr("Friday"), qsTr("Saturday"), qsTr("Sunday")]
+    property var letters: Format.weekLetters(Theme.weekStart)
+    property var dayNames: Format.weekDayNames(Theme.weekStart)
     property color tint: Theme.accent
     property real shapeSize: 28
 

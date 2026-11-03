@@ -70,7 +70,10 @@ Column {
     }
 
     function dateText(key, start) {
-        return key === "week" ? qsTr("Week of %1").arg(Progress.shortDate(start)) : Format.day(start)
+        // the biggest week is a Monday to Sunday week of the library (ridelibrary.cpp), its start a
+        // local midnight: read 6 h in, as Qt 5 can read a midnight of the other half of the DST
+        // year as 23:00 of the day before
+        return key === "week" ? qsTr("Week of %1").arg(Progress.shortDate(start + 6 * 3600000)) : Format.day(start)
     }
 
     function steps(key, raw) {

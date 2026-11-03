@@ -23,6 +23,9 @@ Item {
     property bool miles: false
     property string nickname: ""
     property string tab: "today"
+    // a live ride paused and left for the app: Today shows a banner, the Ride button a dot
+    property bool ridePaused: false
+    property real pausedAt: 0
 
     property int insetTop: 0
     property int insetBottom: 0
@@ -30,6 +33,8 @@ Item {
     property int insetRight: 0
 
     signal rideRequested()
+    // End on the paused ride banner of Today
+    signal endRideRequested()
     signal demoRequested()
     signal searchAgain()
     signal restartRequested()
@@ -218,7 +223,10 @@ Item {
             nickname: shell.nickname
             showYou: !shell.rail
             initial: shell.initial
+            ridePaused: shell.ridePaused
+            pausedAt: shell.pausedAt
             onRideRequested: shell.rideRequested()
+            onEndRideRequested: shell.endRideRequested()
             onDemoRequested: shell.demoRequested()
             onSearchAgain: shell.searchAgain()
             onOpenYou: shell.tab = "you"
@@ -317,6 +325,7 @@ Item {
         vertical: shell.rail
         tab: shell.tab
         destinations: shell.destinations
+        ridePaused: shell.ridePaused
         available: shell.rail ? shell.height - shell.insetTop - shell.insetBottom - 24
                               : shell.width - shell.insetLeft - shell.insetRight - 32
         x: shell.rail ? shell.insetLeft + 12

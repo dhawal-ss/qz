@@ -181,7 +181,7 @@ Item {
         }
         histories = found
         challengeHistory = Challenge.history(days, nowMs)
-        var week = weeks[Streak.dayKey(Streak.addWeeks(nowMs, -1))]
+        var week = weeks[Streak.weekKey(Streak.addWeeks(nowMs, -1))]
         lastWeek = week ? { rides: week.rides, seconds: week.seconds } : { rides: 0, seconds: 0 }
 
         // Welcome back: a streak alive, last week covered, nothing ridden yet this week
@@ -210,7 +210,7 @@ Item {
         var percent = journey ? Journeys.progress(journey, journeyRidden).percent : 0
         badges = Badges.evaluate({ rides: ridesAsc, recordCounts: Badges.recordCounts(histories), streak: streakResult,
                                    journeysDone: journeysDone, journeyId: journeyId, journeyPercent: percent,
-                                   challenges: challengeHistory, now: nowMs })
+                                   challenges: challengeHistory, now: nowMs, miles: miles })
     }
 
     // what opens over the page as it shows: the goal setup first, else Welcome back once a week
@@ -259,7 +259,7 @@ Item {
         refresh()
     }
 
-    // Taking a break: from this week, until the Monday of return (a week key) or open
+    // Taking a break: from this week, until the week of return (a week key) or open
     function pauseGoals(reason, until) {
         var started = { from: Streak.weekKey(Date.now()), until: until > 0 ? until : 0, reason: reason }
         uiStore.setValue("goalsPause", JSON.stringify(started))

@@ -27,6 +27,7 @@ import "learn/Learn.js" as Learn
 // (learn/LearnSheet.qml) that says what it is, what the rider's own numbers say, why it matters
 // and one thing to try.
 // On wide windows the hero and the card stay on the left and the rest goes to a right column.
+// A ride paused and left shows as a slim banner under the date: how long ago, Resume and End.
 Item {
     id: todayPage
     objectName: "todayScreen"
@@ -44,8 +45,15 @@ Item {
     // what a sheet keeps free at its end (the bottom inset; the shell binds it, the floating
     // navigation steps aside while a sheet covers the page)
     property real sheetClearance: 0
+    // a live ride paused and left for the app, and when it was paused (ms)
+    property bool ridePaused: false
+    property real pausedAt: 0
+    // now, for "paused 12 min ago": ticks while the banner shows
+    property real pauseClock: Date.now()
 
     signal rideRequested()
+    // End on the paused ride banner
+    signal endRideRequested()
     signal demoRequested()
     signal searchAgain()
     signal openYou()
@@ -210,7 +218,7 @@ Item {
         }
         if (id === "whenbest")
             return { rides: rideCount, sample: rideCount === 0 || !whenData.enough,
-                     dayName: whenData.bestDay >= 0 ? Patterns.dayNames[whenData.bestDay] : "",
+                     dayName: whenData.bestDay >= 0 ? Patterns.dayName(whenData.bestDay) : "",
                      slotName: whenData.bestSlot >= 0 ? Patterns.slotNames[whenData.bestSlot] : "" }
         if (id === "mix")
             return { rides: rideCount, sample: rideCount === 0, easy: mixData.easy, moderate: mixData.moderate, hard: mixData.hard }
@@ -454,6 +462,31 @@ Item {
         category: "ui2"
     }
 
+    Timer {
+        interval: 15000
+        repeat: true
+        running: todayPage.ridePaused && todayPage.visible
+        triggeredOnStart: true
+        onTriggered: todayPage.pauseClock = Date.now()
+    }
+
+    // how long ago the ride was paused, as words: "12 min ago"
+    readonly property int pausedMinutes: pausedAt > 0 ? Math.max(0, Math.floor((pauseClock - pausedAt) / 60000)) : 0
+    readonly property string pausedAgo: {
+        if (pausedMinutes < 1)
+            return qsTr("Just now")
+        if (pausedMinutes < 60)
+            return qsTr("%1 min ago").arg(pausedMinutes)
+        return qsTr("%1 ago").arg(Format.hours(pausedMinutes * 60))
+    }
+    // past the gap after which a new ride would start (ui2/mergeGapMinutes, 0 never merges), Resume
+    // still goes on with this one: the banner says so. Read with value(), You may have changed it.
+    readonly property bool pastMergeGap: {
+        var ticking = pauseClock
+        var gap = Number(uiStore.value("mergeGapMinutes", 10))
+        return ridePaused && pausedMinutes > (isNaN(gap) ? 10 : gap)
+    }
+
     Component {
         id: firstComponent
         FirstRideCard {
@@ -680,10 +713,129 @@ Item {
                 }
             }
 
+            // the ride paused and left: back to it, or end it
+            Item {
+                id: pausedBanner
+                objectName: "pausedBanner"
+                y: header.y + header.height + 8
+                width: content.leftWidth
+                height: todayPage.ridePaused ? bannerBody.height : 0
+                visible: todayPage.ridePaused
+                Rectangle {
+                    id: bannerBody
+                    width: parent.width
+                    height: bannerColumn.height + 24
+                    radius: 24
+                    color: Theme.accentWash(0.10)
+                    Column {
+                        id: bannerColumn
+                        x: 16
+                        y: 12
+                        width: parent.width - 28
+                        spacing: 4
+                        Item {
+                            width: parent.width
+                            height: Math.max(48, bannerWords.height)
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: Theme.recording
+                            }
+                            Column {
+                                id: bannerWords
+                                x: 20
+                                width: Math.max(0, bannerButtons.x - x - 10)
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 1
+                                Accessible.role: Accessible.StaticText
+                                Accessible.name: qsTr("Ride paused %1").arg(todayPage.pausedAgo.toLowerCase())
+                                Text {
+                                    width: parent.width
+                                    text: qsTr("Ride paused")
+                                    color: Theme.text
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 15
+                                    elide: Text.ElideRight
+                                    Accessible.ignored: true
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: todayPage.pausedAgo
+                                    color: Theme.text2
+                                    font.family: Theme.bodyMedium
+                                    font.pixelSize: 13
+                                    elide: Text.ElideRight
+                                    Accessible.ignored: true
+                                }
+                            }
+                            Row {
+                                id: bannerButtons
+                                x: parent.width - width
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 6
+                                PulseButton {
+                                    id: resumeButton
+                                    width: resumeText.implicitWidth + 32
+                                    height: 48
+                                    topInset: 2
+                                    bottomInset: 2
+                                    pressedRadius: 14
+                                    fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
+                                    Accessible.name: qsTr("Resume your paused ride")
+                                    onClicked: todayPage.rideRequested()
+                                    contentItem: Text {
+                                        id: resumeText
+                                        text: qsTr("Resume")
+                                        color: Theme.accentInk
+                                        font.family: Theme.bodySemibold
+                                        font.pixelSize: 14
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                                PulseButton {
+                                    id: endButton
+                                    width: endText.implicitWidth + 32
+                                    height: 48
+                                    topInset: 2
+                                    bottomInset: 2
+                                    pressedRadius: 14
+                                    fill: pressed ? Theme.chip : Theme.control
+                                    Accessible.name: qsTr("End the paused ride and save it")
+                                    onClicked: todayPage.endRideRequested()
+                                    contentItem: Text {
+                                        id: endText
+                                        text: qsTr("End")
+                                        color: Theme.text
+                                        font.family: Theme.bodySemibold
+                                        font.pixelSize: 14
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            visible: todayPage.pastMergeGap
+                            x: 20
+                            width: parent.width - x
+                            text: qsTr("A long pause, but Resume still carries on this same ride.")
+                            color: Theme.text2
+                            font.family: Theme.bodyMedium
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                            bottomPadding: 6
+                        }
+                    }
+                }
+            }
+
             // the hero, the coach and the ride to do now
             Column {
                 id: lead
-                y: header.y + header.height + 8
+                y: pausedBanner.y + pausedBanner.height + (todayPage.ridePaused ? 14 : 0)
                 width: content.leftWidth
 
                 Rise {

@@ -2,9 +2,11 @@ import QtQuick 2.15
 import ".."
 import "../sig"
 import "../Format.js" as Format
+import "../moments/Moments.js" as Moments
 
 // Lifetime ladders for distance and work: the total, the next rung and a bar of every rung.
-// The rungs are the ones of Moments.js, so a rung crossed on a ride is a moment there.
+// The rungs are the ones of Moments.js, so a rung crossed on a ride is a moment there: round
+// numbers of the rider's unit (Moments.distanceLadder), compared in km.
 // A quiet section: a cap label, then each ladder over a hairline.
 Column {
     id: laddersCard
@@ -12,8 +14,8 @@ Column {
     property var lifetime: ({})      // library.totals(0, 0)
     property bool miles: false
 
-    readonly property var distanceRungs: [100, 250, 500, 1000, 2500, 5000, 10000, 20000, 40075]
-    readonly property var workRungs: [1000, 5000, 10000, 25000, 50000, 100000, 250000]
+    readonly property var distanceRungs: Moments.distanceLadder(miles)
+    readonly property var workRungs: Moments.workRungs
 
     function nextRung(rungs, value) {
         for (var i = 0; i < rungs.length; i++)
@@ -42,7 +44,8 @@ Column {
             readonly property real next: laddersCard.nextRung(rungs, value)
             function label(v) {
                 if (modelData.kind === "km")
-                    return v === 40075 ? qsTr("Around the world") : Format.distance(v, laddersCard.miles)
+                    return Moments.isWorldRung(v) ? qsTr("Around the world")
+                                                  : Format.big(Moments.rungShown(v, laddersCard.miles)) + (laddersCard.miles ? " mi" : " km")
                 return Format.big(v) + " kJ"
             }
             function amount(v) {

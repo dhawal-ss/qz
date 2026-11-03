@@ -15,10 +15,15 @@ import "goals/Streak.js" as Streak
 // and the numbers of the ride on hairlines. Share opens the ride fingerprint.
 // The summary shows right away; the power records follow once the library has read the saved
 // ride, a moment later. The same item serves every ride, so a new `ride` starts it over.
+// A ride saved soon after the one before joins it in the library (ui2/mergeGapMinutes): it keeps
+// the id of the ride before and starts with it, so the saved ride is found by its end
+// (Moments.match), and once it shows it was merged the moments are worked out again without the
+// part from before (Moments.earlierPart): the same ride goes on, the count of rides does not grow.
 Item {
     id: summary
 
-    // a copy of the ride source, taken when the ride finished
+    // a copy of the ride source, taken when the ride finished (main2 copyRide: endedAt is when it
+    // was paused for a ride ended while paused, else 0)
     property var ride: ({})
     property bool demo: false
     property var library: null
@@ -39,8 +44,47 @@ Item {
     property var moments: []
     readonly property var hero: moments.length > 0 ? moments[0] : ({})
     property real finishedAt: 0
-    // the newest ride of the library when the summary opened
+    // when the ride ended: its last second is in the saved file then
+    property real endedAt: 0
+    // the newest ride of the library when the summary opened, { id, end }, until this ride is found
     property int knownId: 0
+    property var known: null
+    // the moments know this ride joined the ride before it
+    property bool continuedShown: false
+    // this ride's own numbers, for Moments.earlierPart()
+    function session() {
+        return { elapsed: ride.elapsed || 0, kj: ride.kilojoules || 0, tss: ride.tss || 0,
+                 km: ride.miles ? (ride.distance || 0) / 0.621371 : (ride.distance || 0) }
+    }
+
+    // what Moments.detect() needs: the rides before this one, from the library ride that holds it
+    // when it is there (saved), else from everything the library has
+    function inputFor(saved) {
+        var goal = goalInput()
+        var own = session()
+        var input = {
+            elapsed: own.elapsed, kj: own.kj, tss: own.tss, km: own.km, miles: ride.miles === true,
+            start: endedAt - own.elapsed * 1000, goalKind: goal.kind, goalValue: goal.value, restWeeks: goal.rest,
+            previousStart: 0, longestBefore: 0, continued: null
+        }
+        if (saved !== null) {
+            input.start = saved.start
+            input.continued = Moments.earlierPart(saved, own)
+        }
+        var bound = saved !== null ? saved.start : 0
+        input.before = library.totals(0, bound)
+        input.days = library.days(0, bound)
+        var earlier = library.rides(0, 1000)
+        for (var i = 0; i < earlier.length; i++) {
+            if (saved !== null && earlier[i].start >= saved.start)
+                continue
+            if (input.previousStart === 0)
+                input.previousStart = earlier[i].start
+            input.longestBefore = Math.max(input.longestBefore, earlier[i].duration)
+        }
+        return input
+    }
+
     // the ride in the library once it is read, its power line, and whether its records are in
     property int savedId: 0
     property var spark: []
@@ -114,7 +158,10 @@ Item {
         if (ride.elapsed === undefined)
             return
         finishedAt = Date.now()
+        endedAt = ride.endedAt > 0 ? ride.endedAt : finishedAt
         savedId = 0
+        known = null
+        continuedShown = false
         spark = []
         recordsAdded = false
         sharing = false
@@ -139,30 +186,13 @@ Item {
             entered()
             return
         }
-        var goal = goalInput()
-        var input = {
-            elapsed: ride.elapsed, kj: ride.kilojoules || 0, tss: ride.tss || 0, miles: ride.miles === true,
-            km: ride.miles ? (ride.distance || 0) / 0.621371 : (ride.distance || 0),
-            start: finishedAt - ride.elapsed * 1000, goalKind: goal.kind, goalValue: goal.value, restWeeks: goal.rest,
-            previousStart: 0, longestBefore: 0
-        }
         // the library may have read the ride already: then everything before it is what came before
         var newest = library.rides(0, 3)
         knownId = newest.length > 0 ? newest[0].id : 0
-        var saved = Moments.match(newest, finishedAt, ride.elapsed)
-        if (saved !== null)
-            input.start = saved.start
-        var bound = saved !== null ? saved.start : 0
-        input.before = library.totals(0, bound)
-        input.days = library.days(0, bound)
-        var earlier = library.rides(0, 1000)
-        for (var i = 0; i < earlier.length; i++) {
-            if (saved !== null && earlier[i].start >= saved.start)
-                continue
-            if (input.previousStart === 0)
-                input.previousStart = earlier[i].start
-            input.longestBefore = Math.max(input.longestBefore, earlier[i].duration)
-        }
+        var saved = Moments.match(newest, endedAt, ride.elapsed, null)
+        known = saved === null && newest.length > 0 ? { id: newest[0].id, end: newest[0].end || 0 } : null
+        var input = inputFor(saved)
+        continuedShown = input.continued !== null
         show(Moments.detect(input), true)
         entered()
         // the records may still come: the full-screen moments wait a moment for them
@@ -174,8 +204,25 @@ Item {
     // the ride is in the library: it can be opened, and its records join the moments once
     function takeSaved(saved) {
         savedId = saved.id
+        known = null
         spark = saved.spark || []
         rideName = Format.title(saved)
+        // it joined the ride before it: the moments again, without the part from before
+        if (!continuedShown && Moments.earlierPart(saved, session()) !== null) {
+            continuedShown = true
+            // a Week closed worked out before is dropped unless it is showing: show() queues it
+            // again when the week is still closed with the part from before counted once
+            if (overlay !== "week") {
+                goalMoment = null
+                overlayQueue = overlayQueue.filter(function (k) { return k !== "week" })
+                var seen = {}
+                for (var k in overlaysSeen)
+                    if (k !== "week")
+                        seen[k] = overlaysSeen[k]
+                overlaysSeen = seen
+            }
+            show(Moments.detect(inputFor(saved)), false)
+        }
         // a rescan reads the ride in before it marks the records: until they are there, keep listening
         var records = saved.records || []
         if (recordsAdded || records.length === 0)
@@ -338,9 +385,7 @@ Item {
         ignoreUnknownSignals: true
         function onChanged() {
             var newest = summary.library.rides(0, 3)
-            var saved = Moments.match(newest, summary.finishedAt, summary.ride.elapsed)
-            if (saved === null)
-                saved = Moments.arrived(newest, summary.knownId, summary.finishedAt, summary.ride.elapsed)
+            var saved = Moments.match(newest, summary.endedAt, summary.ride.elapsed, summary.known)
             if (saved !== null)
                 summary.takeSaved(saved)
         }
@@ -394,7 +439,8 @@ Item {
         compact: summary.height < 500
         large: summary.width >= 840 && summary.height >= 600
         estimated: summary.estimated
-        status: summary.demo ? qsTr("Demo ride, not saved") : qsTr("Ride saved")
+        status: summary.demo ? qsTr("Demo ride, not saved")
+                             : (summary.continuedShown ? qsTr("Saved, joined to the ride before") : qsTr("Ride saved"))
         showShare: !summary.demo && summary.library !== null
         badgeHidden: summary.recordMoment !== null && summary.hero === summary.recordMoment
                      && (summary.overlay === "record" || summary.overlayQueue.indexOf("record") >= 0)

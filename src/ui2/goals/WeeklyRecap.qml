@@ -3,7 +3,8 @@ import ".."
 import "../Format.js" as Format
 import "Streak.js" as Streak
 
-// The week in review: a short story of last week, Monday to Sunday, one page at a time. Time and
+// The week in review: a short story of last week (from the first day of the week the rider
+// picked, Streak.js), one page at a time. Time and
 // rides, the biggest ride, records, the zones, the streak and goal, and a kind word to close.
 // Swipe or use the buttons; on a tablet it is a card in the middle with a size it never grows past.
 Item {
@@ -12,7 +13,7 @@ Item {
     property bool open: false
     property var library: null
     property bool miles: false
-    property real monday: 0          // noon of the Monday of the week
+    property real monday: 0          // noon of a day of the week (its first day)
     property var rides: []           // every ride, oldest first
     property var histories: ({})     // recordHistory() per duration
     property var streakResult: null  // Streak.run()
@@ -35,7 +36,7 @@ Item {
     }
 
     function range() {
-        var from = Streak.mondayOf(monday)
+        var from = Streak.weekStartOf(monday)
         var start = new Date(from)
         start.setHours(0, 0, 0, 0)
         var end = new Date(Streak.addWeeks(from, 1))
@@ -125,7 +126,7 @@ Item {
 
         // the streak and goal of that week
         var entry = null
-        var key = Streak.dayKey(Streak.mondayOf(monday))
+        var key = Streak.weekKey(monday)
         var timeline = streakResult ? streakResult.timeline : []
         for (var t = 0; t < timeline.length; t++)
             if (timeline[t].key === key)
@@ -151,7 +152,7 @@ Item {
 
         var closing = [qsTr("See you on the bike."), qsTr("Every ride adds up."), qsTr("Consistency builds fitness."), qsTr("Showing up is the hard part.")]
         out.push({ overline: qsTr("This week"), big: "", unit: "", tone: 2,
-                   title: closing[Streak.dayKey(monday) % closing.length],
+                   title: closing[Streak.weekKey(monday) % closing.length],
                    detail: qsTr("This week's goal: %1. One ride at a time.").arg(nextGoalWords) })
         pages = out
     }

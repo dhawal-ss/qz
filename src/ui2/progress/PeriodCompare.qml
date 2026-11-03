@@ -33,7 +33,8 @@ Column {
         var prevStart
         var prevSame
         if (span === "week") {
-            var back = (t.getDay() + 6) % 7
+            // from the first day of the week (Monday, or Sunday: Format.firstDay)
+            var back = Format.weekday(t.getTime())
             start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - back).getTime()
             prevStart = new Date(t.getFullYear(), t.getMonth(), t.getDate() - back - 7).getTime()
             prevSame = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 7, t.getHours(), t.getMinutes()).getTime()

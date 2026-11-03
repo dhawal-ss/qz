@@ -49,6 +49,15 @@ Item {
     property real paneFade: 1
     property var allRides: []
     property var monthTotals: ({})
+    // the shown ride changes in place (a merge): no grow or fade, the ride just reads anew
+    property bool swapping: false
+
+    // the ride open now became another one (merged into the ride before it)
+    function swapTo(id) {
+        swapping = true
+        selectedId = id
+        swapping = false
+    }
 
     function open(id) {
         if (id === selectedId)
@@ -92,6 +101,10 @@ Item {
     }
 
     onSelectedIdChanged: {
+        if (swapping) {
+            shownId = selectedId
+            return
+        }
         if (twoPane) {
             backAnimation.stop()
             openAnimation.stop()
@@ -413,6 +426,7 @@ Item {
             bottomClearance: rides.bottomClearance
             sheetClearance: rides.sheetClearance
             onBack: rides.goBack()
+            onRideReplaced: rides.swapTo(id)
         }
     }
 }

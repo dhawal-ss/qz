@@ -558,8 +558,8 @@ function entry(id, facts) {
                  qsTr("Last week as a short story: time, rides, your biggest ride, records and your goal."),
                  f.rides > 0 ? (f.rides === 1 ? qsTr("Last week: 1 ride, %1.").arg(hm(f.seconds)) : qsTr("Last week: %1 rides, %2.").arg(f.rides).arg(hm(f.seconds)))
                              : qsTr("Last week was a quiet one. This week is a fresh start."),
-                 qsTr("A look back each Monday helps you plan the week ahead."),
-                 qsTr("Open it every Monday and set one small aim for the week."),
+                 qsTr("A look back each %1 helps you plan the week ahead.").arg(Format.dayNames[Format.firstDay]),
+                 qsTr("Open it every %1 and set one small aim for the week.").arg(Format.dayNames[Format.firstDay]),
                  ["streak", "usual"])
     }
     if (e === null)

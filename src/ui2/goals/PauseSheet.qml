@@ -12,7 +12,7 @@ HabitPage {
 
     property real nowMs: Date.now()
 
-    // reason, and the week key of the Monday of return or 0 when not sure
+    // reason, and the week key of the week of return or 0 when not sure
     signal pauseGoals(string reason, int until)
 
     property string reason: ""
@@ -22,7 +22,8 @@ HabitPage {
     readonly property var options: [["rest", qsTr("Resting"), "moon"], ["sick", qsTr("Unwell"), "thermometer"],
                                     ["injured", qsTr("Injured"), "bandage"], ["travel", qsTr("Traveling"), "suitcase"],
                                     ["other", qsTr("Something else"), "more"]]
-    // the Mondays to come back on: next week to six weeks out
+    // the first days of the weeks to come back on (Monday, or Sunday when weeks start then):
+    // next week to six weeks out
     readonly property var mondays: {
         var list = []
         for (var i = 1; i <= 6; i++)
@@ -33,8 +34,7 @@ HabitPage {
     function mondayWords(key) {
         if (!(key > 0))
             return qsTr("Not sure yet")
-        var d = new Date(Streak.keyDay(key))
-        return qsTr("Monday %1 %2").arg(d.getDate()).arg(Format.monthNames[d.getMonth()])
+        return Streak.weekWords(key)
     }
 
     primaryText: qsTr("Pause goals")
@@ -44,7 +44,7 @@ HabitPage {
     onOpenChanged: {
         if (open) {
             reason = ""
-            until = Streak.dayKey(Streak.addWeeks(nowMs, 2))
+            until = Streak.weekKey(Streak.addWeeks(nowMs, 2))
             choosingDate = false
         }
     }
@@ -271,14 +271,14 @@ HabitPage {
             }
             Hairline { width: parent.width }
 
-            // the Mondays to pick from, and not sure
+            // the weeks to pick from, and not sure
             Flow {
                 visible: pauseSheet.choosingDate
                 width: parent.width
                 topPadding: 12
                 spacing: 8
                 Repeater {
-                    model: pauseSheet.mondays.map(function (m) { return Streak.dayKey(m) }).concat([0])
+                    model: pauseSheet.mondays.map(function (m) { return Streak.weekKey(m) }).concat([0])
                     PulseButton {
                         id: dateChip
                         readonly property bool current: pauseSheet.until === modelData
@@ -294,7 +294,7 @@ HabitPage {
                         }
                         contentItem: Text {
                             id: chipText
-                            text: modelData > 0 ? Format.day(Streak.keyDay(modelData)) : qsTr("Not sure yet")
+                            text: modelData > 0 ? Format.day(Streak.weekStartOf(Streak.keyDay(modelData))) : qsTr("Not sure yet")
                             color: dateChip.current ? Theme.accentInk : Theme.text
                             font.family: Theme.bodySemibold
                             font.pixelSize: 13

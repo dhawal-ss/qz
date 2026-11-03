@@ -424,7 +424,7 @@ Item {
                     radius: 10
                     x: Math.max(0, Math.min(barPlot.width - width, part.x + part.w / 2 - width / 2))
                     y: barTop - height - 4
-                    color: Qt.rgba(201 / 255, 184 / 255, 1, 0.16)
+                    color: Theme.accentWash(0.16)
                     Text {
                         id: bestText
                         anchors.centerIn: parent

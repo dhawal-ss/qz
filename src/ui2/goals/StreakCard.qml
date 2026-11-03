@@ -4,6 +4,7 @@ import "../sig"
 import "../Format.js" as Format
 import "Streak.js" as Streak
 import "../settings"
+import "../learn"
 import "../settings/GoalLimits.js" as GoalLimits
 
 // The hero of Goals: the streak in the breathing Pulse, what a coach would say about it, the
@@ -11,6 +12,8 @@ import "../settings/GoalLimits.js" as GoalLimits
 // ring that fills), and the one raised card: this week against the goal, the freezes, the goal
 // itself as a number to step or type (goalPicked, a moment after the last change), and the ways
 // to change the goal or take a break. The rules are in Streak.js.
+// Tap to learn: the streak in the Pulse and the freezes line open their Learn sheets on the page
+// (cue.openLearn: GoalsScreen), the goal stepper keeps its own taps.
 Column {
     id: streakCard
 
@@ -21,7 +24,7 @@ Column {
     property var reasonsMap: ({})    // week key -> reason
     property real nowMs: Date.now()
     property bool paused: false
-    property int pauseUntil: 0       // week key of the Monday of return, 0 when open
+    property int pauseUntil: 0       // week key of the week of return, 0 when open
     property var cue: null           // the page, for the entrance
     property int weekCount: 12
 
@@ -62,6 +65,12 @@ Column {
                                         qsTr("Six"), qsTr("Seven"), qsTr("Eight"), qsTr("Nine"), qsTr("Ten"),
                                         qsTr("Eleven"), qsTr("Twelve")]
 
+    // a Learn sheet on the page, when it has them
+    function learn(id) {
+        if (cue && typeof cue.openLearn === "function")
+            cue.openLearn(id)
+    }
+
     function countWord(n) {
         return n < numberWords.length ? numberWords[n] : String(n)
     }
@@ -90,9 +99,9 @@ Column {
     readonly property string unitWord: kind === "kj" ? "kJ" : (kind === "km" ? (miles ? "mi" : "km")
                                        : (kind === "rides" ? (Math.round(value) === 1 ? qsTr("ride") : qsTr("rides")) : qsTr("min")))
 
+    // the first day of the week of return, as words (weeks start on Monday or Sunday, Streak.js)
     function mondayWords(key) {
-        var d = new Date(Streak.keyDay(key))
-        return qsTr("Monday %1 %2").arg(d.getDate()).arg(Format.monthNames[d.getMonth()])
+        return Streak.weekWords(key)
     }
 
     // what is left of the week, as words
@@ -139,15 +148,27 @@ Column {
         Item {
             width: parent.width
             height: 136
-            PulseHero {
+            // the streak is the button to its Learn sheet
+            LearnTap {
+                objectName: "streakHeroTap"
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: 136
                 height: 136
-                glow: false
-                zone: streakCard.weekMet ? 3 : 2
-                value: String(streakCard.streak)
-                word: streakCard.streak === 1 ? qsTr("week") : qsTr("weeks")
-                summary: qsTr("Streak, %1 weeks").arg(streakCard.streak)
+                fill: "transparent"
+                pressedScale: 0.96
+                name: streakHero.summary
+                onClicked: streakCard.learn("streak")
+                PulseHero {
+                    id: streakHero
+                    width: 136
+                    height: 136
+                    glow: false
+                    zone: streakCard.weekMet ? 3 : 2
+                    value: String(streakCard.streak)
+                    word: streakCard.streak === 1 ? qsTr("week") : qsTr("weeks")
+                    summary: qsTr("Streak, %1 weeks").arg(streakCard.streak)
+                    Accessible.ignored: true
+                }
             }
         }
     }
@@ -261,7 +282,13 @@ Column {
                             lineHeight: 21
                             wrapMode: Text.WordWrap
                         }
-                        Row {
+                        // the freezes are the button to their Learn sheet
+                        LearnTap {
+                          objectName: "freezesTap"
+                          width: parent.width
+                          name: freezesText.text
+                          onClicked: streakCard.learn("freezes")
+                          Row {
                             width: parent.width
                             spacing: 8
                             GoalGlyph {
@@ -272,6 +299,7 @@ Column {
                                 color: streakCard.freezes > 0 ? Theme.accent : Theme.text3
                             }
                             Text {
+                                id: freezesText
                                 width: parent.width - 24
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: {
@@ -286,7 +314,9 @@ Column {
                                 font.family: Theme.bodyMedium
                                 font.pixelSize: 13
                                 wrapMode: Text.WordWrap
+                                Accessible.ignored: true
                             }
+                          }
                         }
                     }
                 }

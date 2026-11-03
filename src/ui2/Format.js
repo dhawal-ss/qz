@@ -123,13 +123,52 @@ function monthKey(ms) {
     return d.getFullYear() * 12 + d.getMonth()
 }
 
-// 00:00 of the first day of the week holding ms. firstDay is the ui2 setting weekStart: 0 for
-// Sunday, anything else (1, or left out) for Monday
-function weekStart(ms, firstDay) {
+// The first day of the week, the ui2 setting weekStart: 1 for Monday (the default), 0 for Sunday.
+// Theme keeps it in step with the setting (Theme.weekStart, which QML bindings read so they
+// update); every week of the app is counted from it, here and in goals/Streak.js.
+var firstDay = 1
+var dayLetters = [qsTr("S"), qsTr("M"), qsTr("T"), qsTr("W"), qsTr("T"), qsTr("F"), qsTr("S")]
+var dayNames = [qsTr("Sunday"), qsTr("Monday"), qsTr("Tuesday"), qsTr("Wednesday"), qsTr("Thursday"),
+                qsTr("Friday"), qsTr("Saturday")]
+
+function setFirstDay(day) {
+    firstDay = Number(day) === 0 ? 0 : 1
+}
+
+// 0 for Sunday or 1 for Monday: the one asked for, else the setting
+function firstDayOf(day) {
+    if (day === undefined || day === null || day === "")
+        return firstDay
+    return Number(day) === 0 ? 0 : 1
+}
+
+// how many days ms is after the first day of its week, 0 to 6
+function weekday(ms, day) {
+    return (new Date(ms).getDay() - firstDayOf(day) + 7) % 7
+}
+
+// 00:00 of the first day of the week holding ms; day is 0 for Sunday, 1 for Monday, left out for
+// the setting. Stepped back by date from the day's own midnight: the JavaScript engine of Qt 5
+// can read a midnight built with new Date(y, m, d) in summer time as 23:00 of the day before.
+function weekStart(ms, day) {
     var d = new Date(startOfDay(ms))
-    var back = Number(firstDay) === 0 && firstDay !== null && firstDay !== "" ? d.getDay() : (d.getDay() + 6) % 7
-    d.setDate(d.getDate() - back)
+    d.setDate(d.getDate() - (d.getDay() - firstDayOf(day) + 7) % 7)
     return d.getTime()
+}
+
+// the weekday letters and names in the order of the week
+function inWeekOrder(list, day) {
+    var first = firstDayOf(day)
+    var out = []
+    for (var i = 0; i < 7; i++)
+        out.push(list[(i + first) % 7])
+    return out
+}
+function weekLetters(day) {
+    return inWeekOrder(dayLetters, day)
+}
+function weekDayNames(day) {
+    return inWeekOrder(dayNames, day)
 }
 
 // 5 s, 1 min, 20 min, 1 h

@@ -192,11 +192,14 @@ ApplicationWindow {
         miles: qzSettings.miles_unit
     }
 
+    // endedAt: when a ride ended while paused, the time it was paused (its file ends there; the
+    // summary finds the saved ride by its end), else 0
     function copyRide(source) {
         return {
             elapsed: source.elapsed, avgPower: source.avgPower, normalizedPower: source.normalizedPower,
             tss: source.tss, kilojoules: source.kilojoules, calories: source.calories,
-            distance: source.distance, miles: source.miles, powerEstimated: source.powerEstimated
+            distance: source.distance, miles: source.miles, powerEstimated: source.powerEstimated,
+            endedAt: source.paused === true && source.pausedAt > 0 ? source.pausedAt : 0
         }
     }
 
@@ -319,7 +322,11 @@ ApplicationWindow {
             insetBottom: insets.insetBottom
             insetLeft: insets.insetLeft
             insetRight: insets.insetRight
+            // a ride paused and left: Today and the Ride button offer to go back to it
+            ridePaused: live.paused && !live.stopped && live.elapsed > 0 && window.mode === "home"
+            pausedAt: live.pausedAt
             onRideRequested: window.requestRide()
+            onEndRideRequested: window.finishRide()
             onDemoRequested: window.openDemo()
             onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
             onRestartRequested: window.restart()

@@ -4,18 +4,20 @@ import ".."
 
 // The Ride button beside the navigation: a round button in the accent with the Bikemodo mark.
 // Pressed, its corners pull in towards a rounded square and it dips a little, on the fast spring.
+// While a ride is paused and left (paused), a small dot on its edge breathes: the button resumes it.
 AbstractButton {
     id: fab
 
     property int size: 64
+    property bool paused: false
 
     implicitWidth: size
     implicitHeight: size
     padding: 0
     focusPolicy: Qt.StrongFocus
     Accessible.role: Accessible.Button
-    Accessible.name: qsTr("Ride")
-    Accessible.description: qsTr("Start a ride")
+    Accessible.name: paused ? qsTr("Resume your paused ride") : qsTr("Ride")
+    Accessible.description: paused ? qsTr("Go back to the ride you paused") : qsTr("Start a ride")
     Accessible.onPressAction: fab.clicked()
 
     scale: pressed ? 0.94 : 1
@@ -48,6 +50,31 @@ AbstractButton {
             width: Math.round(fab.size * 0.6)
             height: width
             color: Theme.accentInk
+        }
+    }
+
+    // the paused ride: a dot in the recording color on the top right edge, ringed in the
+    // background so it reads on the accent; it breathes once every 2 s, and stays still with reduce motion
+    Rectangle {
+        id: pausedDot
+        readonly property real at: fab.width / 2 + fab.width / 2 * 0.7071
+        visible: fab.paused
+        width: Math.round(fab.size * 0.28)
+        height: width
+        radius: width / 2
+        x: at - width / 2
+        y: fab.height - at - height / 2
+        color: Theme.recording
+        border.width: 3
+        border.color: Theme.bg
+        Accessible.ignored: true
+        property real breath: 1
+        opacity: Theme.reduceMotion ? 1 : breath
+        SequentialAnimation on breath {
+            running: fab.paused && !Theme.reduceMotion
+            loops: Animation.Infinite
+            NumberAnimation { to: 0.4; duration: 1000; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1; duration: 1000; easing.type: Easing.InOutSine }
         }
     }
 }

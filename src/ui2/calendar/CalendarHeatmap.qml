@@ -2,7 +2,8 @@ import QtQuick 2.15
 import ".."
 import "../Format.js" as Format
 
-// A year of riding as a grid of days: a column per week from Monday to Sunday, the newest week
+// A year of riding as a grid of days: a column per week from its first day (Monday, or Sunday
+// when weeks start on Sunday: Theme.weekStart) to its last, the newest week
 // on the right, each day lighter the more was ridden. Narrow screens show the most recent weeks
 // that fit. The grid is one button: a tap picks the day under the finger.
 // Days are worked out at noon: the JavaScript engine of Qt 5 can read local midnight of a DST
@@ -41,8 +42,8 @@ Item {
     readonly property int pitch: cell + gap
 
     readonly property int todayKey: keyOf(today)
-    readonly property int todayRow: (today.getDay() + 6) % 7
-    // noon of the Monday of the first column
+    readonly property int todayRow: (today.getDay() - Theme.weekStart + 7) % 7
+    // noon of the first day of the first column (a Monday, or a Sunday)
     readonly property var firstMonday: new Date(today.getFullYear(), today.getMonth(),
                                                 today.getDate() - todayRow - (shownWeeks - 1) * 7, 12)
 
@@ -182,7 +183,7 @@ Item {
 
     // weekday initials, every other one when the rows are tight
     Repeater {
-        model: ["M", "T", "W", "T", "F", "S", "S"]
+        model: Format.weekLetters(Theme.weekStart)
         Text {
             y: heat.monthHeight + index * heat.pitch + (heat.cell - height) / 2
             width: heat.labelWidth - 4
@@ -254,7 +255,7 @@ Item {
                 border.color: Theme.text
             }
             Rectangle {
-                // days from the first Monday; rounded, as a day next to a DST change is not 24 h
+                // days from the first day of the grid; rounded, as a day next to a DST change is not 24 h
                 readonly property int offset: Math.round((heat.pickedMs - heat.firstMonday.getTime()) / 86400000)
                 visible: heat.pickedMs >= 0 && heat.keyOf(new Date(heat.pickedMs)) !== heat.todayKey
                          && offset >= 0 && offset < heat.shownWeeks * 7

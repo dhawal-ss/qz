@@ -59,8 +59,8 @@ Column {
         var count = Hub.volumeWeeks(period) + lead
         var list = []
         for (var b = 0; b < count; b++) {
-            // Monday of the week, the last one the week before this
-            var start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - (t.getDay() + 6) % 7 - (count - b) * 7, 12)
+            // the first day of the week (Monday, or Sunday: Format.firstDay), the last one the week before this
+            var start = new Date(t.getFullYear(), t.getMonth(), t.getDate() - Format.weekday(t.getTime()) - (count - b) * 7, 12)
             list.push({ start: start.getTime(), seconds: 0, distance: 0, kj: 0, rides: 0 })
         }
         var days = library.days(list[0].start - 13 * 3600000, 0)

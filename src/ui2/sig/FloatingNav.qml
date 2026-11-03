@@ -14,6 +14,8 @@ Item {
     property var destinations: []
     property bool vertical: false
     property real available: 1000
+    // a ride is paused and waits: the Ride button carries a dot and resumes it
+    property bool ridePaused: false
 
     signal picked(string name)
     signal rideRequested()
@@ -111,6 +113,7 @@ Item {
         x: floatingNav.vertical ? (72 - width) / 2 : pill.width + floatingNav.gap
         y: floatingNav.vertical ? 0 : (64 - height) / 2
         size: floatingNav.fabSize
+        paused: floatingNav.ridePaused
         onClicked: floatingNav.rideRequested()
     }
 }

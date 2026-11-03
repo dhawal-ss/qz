@@ -8,13 +8,18 @@
 // a rider with no rides yet: a friendly picture of what it will show, drawn in graphite.
 
 var dayMs = 86400000
-// Monday first
+// Monday first, for older callers; dayName() follows the first day of the week the rider picked
 var dayNames = [qsTr("Monday"), qsTr("Tuesday"), qsTr("Wednesday"), qsTr("Thursday"), qsTr("Friday"), qsTr("Saturday"), qsTr("Sunday")]
 var slotNames = [qsTr("morning"), qsTr("midday"), qsTr("afternoon"), qsTr("evening")]
 
-// the day of the week of ms, Monday 0
+// the day of the week of ms, 0 for the first day of the week (Monday, or Sunday: Format.firstDay)
 function weekday(ms) {
-    return (new Date(ms).getDay() + 6) % 7
+    return Format.weekday(ms)
+}
+
+// the name of a weekday() index
+function dayName(index) {
+    return Format.weekDayNames()[index]
 }
 
 // morning before 11, midday to 14, afternoon to 17, evening after
@@ -29,20 +34,21 @@ function slot(ms) {
     return 3
 }
 
-// the Monday k weeks before the Monday of ms, at local midnight (by date, so DST never shifts it)
+// the first day of the week k weeks before the week of ms, at local midnight (by date, so DST
+// never shifts it)
 function mondayBack(ms, k) {
     var d = new Date(Format.weekStart(ms))
     return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 7 * k).getTime()
 }
 
 // This week so far against the usual week at the same point: the average of the last 8 weeks
-// (fewer when the rider started later), each counted from its Monday to the same weekday and time.
+// (fewer when the rider started later), each counted from its first day to the same weekday and time.
 // { weekSeconds, weekRides, weekLoad, usualSeconds, usualRides, usualLoad, weeks, dayName }
 function usual(rides, now) {
     var monday = Format.weekStart(now)
     var elapsed = now - monday
     var out = { weekSeconds: 0, weekRides: 0, weekLoad: 0, usualSeconds: 0, usualRides: 0, usualLoad: 0, weeks: 0,
-                dayName: dayNames[weekday(now)] }
+                dayName: dayName(weekday(now)) }
     if (!rides || rides.length === 0)
         return out
     var firstStart = rides[rides.length - 1].start
@@ -114,7 +120,8 @@ function usualWords(u) {
 // When the rider rides best, over the last 182 days: per weekday and per time of day, every
 // ride and the strongest third of them by power (normalized power, else average power). It needs
 // 8 rides with power at least ("enough").
-// { days: [{ all, strong }] Monday first, slots: [{ all, strong }], bestDay, bestSlot, enough, rides }
+// { days: [{ all, strong }] from the first day of the week, slots: [{ all, strong }], bestDay, bestSlot,
+// enough, rides }
 function whenBest(rides, now) {
     var out = { days: [], slots: [], bestDay: -1, bestSlot: -1, enough: false, rides: 0 }
     for (var d = 0; d < 7; d++)
@@ -182,7 +189,7 @@ function whenWords(w) {
         return qsTr("After a few more rides this finds your best days.")
     if (w.sample)
         return qsTr("Your best days and times, found for you.")
-    var day = dayNames[w.bestDay]
+    var day = dayName(w.bestDay)
     return w.bestSlot >= 0 ? qsTr("%1s, in the %2.").arg(day).arg(slotNames[w.bestSlot]) : qsTr("%1s.").arg(day)
 }
 

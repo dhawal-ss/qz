@@ -3,6 +3,7 @@ import ".."
 import "../sig"
 import "../learn"
 import "Patterns.js" as Patterns
+import "../Format.js" as Format
 
 // When you ride best (Patterns.whenBest): a column a weekday of every ride of the last half year,
 // its brighter part the strongest third of them, the best day lit in the tint; under it the four
@@ -16,7 +17,8 @@ LearnTap {
     // 0 to 1: how far the columns have grown
     property real grown: 1
 
-    readonly property var letters: [qsTr("M"), qsTr("T"), qsTr("W"), qsTr("T"), qsTr("F"), qsTr("S"), qsTr("S")]
+    // from the first day of the week, as Patterns.whenBest() counts them
+    readonly property var letters: Format.weekLetters(Theme.weekStart)
     readonly property var slotLabels: [qsTr("Morning"), qsTr("Midday"), qsTr("Afternoon"), qsTr("Evening")]
     readonly property real columnTop: {
         var hi = 1

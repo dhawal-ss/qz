@@ -277,6 +277,7 @@
         <file>ui2/sig/CompareBars.qml</file>
         <file>ui2/progress/YearCard.qml</file>
         <file>ui2/rides/RideUsual.qml</file>
+        <file>ui2/rides/JoinSheet.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

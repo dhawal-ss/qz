@@ -2,7 +2,8 @@ import QtQuick 2.15
 import ".."
 import "../Format.js" as Format
 
-// One month as a calendar, Monday first: ride days are tinted, carry a dot and their minutes and
+// One month as a calendar, its weeks from the first day the rider picked (Monday, or Sunday:
+// Theme.weekStart): ride days are tinted, carry a dot and their minutes and
 // open with a tap. Previous and next step through the months, never past the current one.
 // Days are worked out at noon: the JavaScript engine of Qt 5 can read local midnight of a DST
 // change as 23:00 of the day before, noon is never on the wrong day.
@@ -28,7 +29,7 @@ Item {
         var d = new Date(monthMs)
         return new Date(d.getFullYear(), d.getMonth(), 1, 12)
     }
-    readonly property int lead: (first.getDay() + 6) % 7
+    readonly property int lead: (first.getDay() - Theme.weekStart + 7) % 7
     readonly property int length: new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
     readonly property int rows: Math.ceil((lead + length) / 7)
     readonly property bool atCurrent: Format.monthKey(monthMs) >= Format.monthKey(Date.now())
@@ -141,7 +142,7 @@ Item {
         Row {
             width: parent.width
             Repeater {
-                model: ["M", "T", "W", "T", "F", "S", "S"]
+                model: Format.weekLetters(Theme.weekStart)
                 Text {
                     width: month.cellWidth
                     text: modelData
@@ -180,7 +181,7 @@ Item {
                         rightInset: 2
                         enabled: slot.rode
                         radius: 14
-                        fill: slot.rode ? Qt.rgba(201 / 255, 184 / 255, 1, dayButton.pressed ? 0.24 : 0.12) : "transparent"
+                        fill: slot.rode ? Theme.accentWash(dayButton.pressed ? 0.24 : 0.12) : "transparent"
                         Accessible.name: slot.rode
                                          ? Format.day(slot.day.getTime()) + ", " + (slot.entry.rides === 1 ? qsTr("1 ride") : qsTr("%1 rides").arg(slot.entry.rides))
                                            + ", " + Format.hours(slot.entry.seconds)

@@ -201,7 +201,8 @@ function suggest(r, reach, effortName) {
     return { main: main, other: other, otherLabel: main.zone <= 2 ? qsTr("Swap for a longer ride") : qsTr("Swap for an easy spin") }
 }
 
-// This week as Pulse shapes: [{ zone, today }], Monday first. zone is the zone the most time of
+// This week as Pulse shapes: [{ zone, today }] from the first day of the week (Monday, or Sunday:
+// Format.firstDay). zone is the zone the most time of
 // the day was ridden in (from each ride's intensity), 0 for no ride. rides: newest first.
 function weekDays(rides, now) {
     var monday = Format.weekStart(now)

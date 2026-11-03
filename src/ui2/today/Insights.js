@@ -123,7 +123,8 @@ function onThisDay(rides, now) {
     return null
 }
 
-// the next rung of the distance ladder: { rung, remaining, from } or null when every rung is done
+// the next rung of the distance ladder: { rung, remaining, from } or null when every rung is done;
+// for distance, rungs is Moments.distanceLadder(miles) and every value is in km
 function nextRung(rungs, value) {
     var from = 0
     for (var i = 0; i < rungs.length; i++) {
@@ -154,7 +155,7 @@ function build(data, now) {
         onThisDay: null,
         goalStreak: data.goalStreak || 0,
         rideStreak: rideWeekStreak(days, now),
-        milestone: nextRung(Moments.distanceRungs, (data.lifetime || {}).distance || 0)
+        milestone: nextRung(Moments.distanceLadder(data.miles === true), (data.lifetime || {}).distance || 0)
     }
     if (latest === null)
         return out
@@ -307,8 +308,8 @@ function build(data, now) {
 
     // the next rung of the distance ladder
     if (out.milestone !== null && ((data.lifetime || {}).distance || 0) > 0) {
-        var rungText = out.milestone.rung === 40075 ? qsTr("around the world")
-                                                    : Format.big(out.milestone.rung * toUnit) + " " + unit
+        var rungText = Moments.isWorldRung(out.milestone.rung) ? qsTr("around the world")
+                                                               : Format.big(Moments.rungShown(out.milestone.rung, data.miles === true)) + " " + unit
         list.push(insight("milestone", 26, 2, qsTr("Next milestone"),
                           qsTr("%1 %2 to go to %3.").arg(Format.big(out.milestone.remaining * toUnit)).arg(unit).arg(rungText),
                           Format.big(out.milestone.remaining * toUnit), unit, { kind: "tab", tab: "goals" }))

@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick 2.15
 import Qt.labs.settings 1.0
+import "Format.js" as Format
 
 // Colors, type, zones and motion of the Pulse interface (ui2).
 QtObject {
@@ -38,6 +39,7 @@ QtObject {
     readonly property Settings savedLook: Settings {
         category: "ui2"
         property string accentChoice: "lavender"
+        property int weekStart: 1
     }
     property string accentChoice: savedLook.accentChoice
     readonly property var accentEntry: {
@@ -52,6 +54,13 @@ QtObject {
     function accentWash(alpha) {
         return Qt.rgba(accent.r, accent.g, accent.b, alpha)
     }
+
+    // the first day of the week (ui2/weekStart): 1 Monday, 0 Sunday. Read once at start; You sets
+    // weekStart when it changes. Bindings that lay out a week read it here, so they update; the
+    // JavaScript files get it through Format.firstDay, which this keeps in step.
+    property int weekStart: Number(savedLook.weekStart) === 0 ? 0 : 1
+    onWeekStartChanged: Format.setFirstDay(weekStart)
+    Component.onCompleted: Format.setFirstDay(weekStart)
 
     // zones: fill color and the lighter color of the hero numeral
     readonly property var zoneColors: ["#8ab4ff", "#5fd8c6", "#b9e66e", "#ffcb52", "#ff8f52", "#ff5e7e", "#c487ff"]

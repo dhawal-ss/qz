@@ -22,6 +22,10 @@ import "learn/Learn.js" as Learn
 // Tap to learn: the hero number, the charts, every key number and every section opens a Learn
 // sheet (learn/LearnSheet.qml) on what it is and what this ride's number says; holding or
 // dragging a chart still reads it out, a double tap still shows the whole ride.
+// A ride made of parts (ridelibrary.h: saved again after a pause, or merged by hand) says so in a
+// quiet line under its name, with Split; a ride that started soon after the one before offers to
+// merge with it. Both ask first in a small sheet (rides/JoinSheet.qml). The charts mark where the
+// parts join with faint dashed lines, apart from the laps.
 Item {
     id: detail
     objectName: "rideDetail"
@@ -61,8 +65,15 @@ Item {
     readonly property var learnIds: ["ridechart", "rideusual", "record", "effort", "time", "work", "distance", "avgpower", "np", "if",
                                      "tss", "avghr", "cadence", "speed", "level", "zones", "ridecurve", "changes", "decoupling",
                                      "ef", "workblocks"]
+    // merge or split: the change the sheet asks about ("merge", "split" or ""), and the one the
+    // library is working on, with the ride it was asked for
+    property string asking: ""
+    property string working: ""
+    property int workingId: -1
+    // seconds from the end of the ride before to the start of this one, when it can merge
+    property real gapBefore: 0
     // a sheet covers the ride
-    readonly property bool covering: learnOpen
+    readonly property bool covering: learnOpen || asking !== ""
     property var durable: null
     property var changes: []
     property var blocks: ({ blocks: [], work: false })
@@ -85,6 +96,8 @@ Item {
     signal back()
     // each time a ride shows: the blocks rise in
     signal entered()
+    // the ride was merged into the one before it: show that one (the caller owns rideId)
+    signal rideReplaced(int id)
 
     // every 1 Hz sample of the ride, read once when the ride changes, and all that follows from it
     function load() {
@@ -101,7 +114,14 @@ Item {
         readLevel()
         sharing = false
         pickedLap = -1
+        asking = ""
         var r = library.ride(rideId)
+        gapBefore = 0
+        if (r.canMergePrevious === true && r.previousId > 0) {
+            var before = library.ride(r.previousId)
+            if (before.end > 0)
+                gapBefore = Math.max(0, (r.start - before.end) / 1000)
+        }
         var all = library.samples(rideId, 0)
         var seconds = all.seconds || []
         has = { power: hasValues(all.power), heart: hasValues(all.heart), cadence: hasValues(all.cadence),
@@ -138,12 +158,74 @@ Item {
         proCue.entered()
     }
 
+    // where each part after the first starts, in seconds; every part starts a lap too, those
+    // laps are left out of lapStarts so the dashed part line shows
+    readonly property var partStarts: {
+        var list = samples.partStarts || []
+        return list.slice(1).filter(function (s) { return s > 0 })
+    }
     readonly property var lapStarts: {
         var out = []
         var list = ride.laps || []
         for (var i = 0; i < list.length; i++)
-            out.push(list[i].start)
+            if (partStarts.indexOf(list[i].start) < 0)
+                out.push(list[i].start)
         return out
+    }
+
+    // "Merged from 3 parts, 12 min pause"
+    function partsWords() {
+        var parts = ride.parts || 1
+        var gap = ride.gapSeconds || 0
+        if (gap < 30)
+            return qsTr("Merged from %1 parts").arg(parts)
+        return qsTr("Merged from %1 parts, %2 pause").arg(parts).arg(Format.hours(gap))
+    }
+
+    // "Started 6 min after the ride before."
+    function mergeWords() {
+        if (gapBefore < 30)
+            return qsTr("Started right after the ride before.")
+        return qsTr("Started %1 after the ride before.").arg(Format.hours(gapBefore))
+    }
+
+    // the sheet said yes: the library does the work and tells with changed()
+    function confirmJoin() {
+        var change = asking
+        asking = ""
+        if (!library || rideId < 0)
+            return
+        var ok = change === "merge" ? library.mergeWithPrevious(rideId) : library.splitRide(rideId)
+        if (ok) {
+            working = change
+            workingId = rideId
+        }
+    }
+
+    // after changed(): a merged ride lives on under the id of the one before it; a split one
+    // keeps its id and is read again
+    function checkJoin() {
+        if (working === "" || !library)
+            return
+        var now = library.ride(workingId)
+        if (working === "merge") {
+            var into = ride.previousId || 0
+            var merged = into > 0 ? library.ride(into) : ({})
+            var holds = (merged.partIds || []).indexOf(workingId) >= 0
+            if (now.id === undefined || holds) {
+                working = ""
+                if (into > 0) {
+                    loadedId = -1
+                    rideReplaced(into)
+                }
+            }
+            return
+        }
+        if (now.id !== undefined && (now.parts || 1) === 1) {
+            working = ""
+            loadedId = -1
+            load()
+        }
     }
 
     // the Learn entry of the hero number, by what the number is
@@ -219,8 +301,12 @@ Item {
         learnOpen = true
     }
 
-    // Android back closes the Learn sheet first
+    // Android back closes the Learn sheet or the merge question first
     function goBack() {
+        if (asking !== "") {
+            asking = ""
+            return true
+        }
         if (learnOpen) {
             learnOpen = false
             return true
@@ -361,10 +447,32 @@ Item {
     onRideIdChanged: load()
     // You may have changed the level while the ride stayed open (tablets)
     onVisibleChanged: {
-        if (visible)
+        if (visible) {
             readLevel()
-        else
+        } else {
             learnOpen = false
+            asking = ""
+        }
+    }
+    // a merge or split asked here, or the shown ride changed in the library (a ride saved just
+    // now joined it): read it again
+    Connections {
+        target: detail.library
+        ignoreUnknownSignals: true
+        function onChanged() {
+            if (detail.working !== "") {
+                detail.checkJoin()
+                return
+            }
+            if (detail.loadedId < 0)
+                return
+            var now = detail.library.ride(detail.loadedId)
+            if (now.id !== undefined && ((now.parts || 1) !== (detail.ride.parts || 1) || (now.end || 0) !== (detail.ride.end || 0)
+                                         || (now.canMergePrevious === true) !== (detail.ride.canMergePrevious === true))) {
+                detail.loadedId = -1
+                detail.load()
+            }
+        }
     }
     onLibraryChanged: {
         loadedId = -1
@@ -513,6 +621,78 @@ Item {
                         font.pixelSize: 14
                         elide: Text.ElideRight
                     }
+                    // a ride of parts, and Split
+                    Item {
+                        objectName: "partsLine"
+                        visible: (detail.ride.parts || 1) > 1
+                        width: parent.width
+                        height: visible ? 44 : 0
+                        Text {
+                            width: splitButton.x - 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: detail.working === "split" ? qsTr("Splitting the ride") : detail.partsWords()
+                            color: Theme.text2
+                            font.family: Theme.bodyMedium
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
+                        }
+                        PulseButton {
+                            id: splitButton
+                            x: parent.width - width + 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: splitText.implicitWidth + 28
+                            height: 44
+                            enabled: detail.working === ""
+                            fill: pressed ? Theme.pressed : "transparent"
+                            Accessible.name: qsTr("Split this ride into its %1 parts").arg(detail.ride.parts || 1)
+                            onClicked: detail.asking = "split"
+                            contentItem: Text {
+                                id: splitText
+                                text: qsTr("Split")
+                                color: splitButton.enabled ? Theme.accent : Theme.text3
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 14
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
+                    // a ride that started soon after the one before: merge them
+                    Column {
+                        objectName: "mergeOffer"
+                        visible: detail.ride.canMergePrevious === true && (detail.ride.previousId || 0) > 0
+                        width: parent.width
+                        topPadding: 10
+                        spacing: 8
+                        Text {
+                            width: parent.width
+                            text: detail.working === "merge" ? qsTr("Merging with the ride before")
+                                  : detail.mergeWords() + " " + qsTr("Merging makes them one ride, the pause left out.")
+                            color: Theme.text2
+                            font.family: Theme.bodyMedium
+                            font.pixelSize: 13
+                            wrapMode: Text.WordWrap
+                        }
+                        PulseButton {
+                            id: mergeButton
+                            width: mergeText.implicitWidth + 36
+                            height: 44
+                            enabled: detail.working === ""
+                            pressedRadius: 14
+                            fill: pressed ? Theme.chip : Theme.control
+                            Accessible.name: qsTr("Merge with the ride before")
+                            onClicked: detail.asking = "merge"
+                            contentItem: Text {
+                                id: mergeText
+                                text: qsTr("Merge with the ride before")
+                                color: mergeButton.enabled ? Theme.text : Theme.text3
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 14
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                    }
                     Item { width: 1; height: 18 }
                     Text {
                         width: parent.width
@@ -634,6 +814,7 @@ Item {
                         showAverage: false
                         ftp: detail.ride.ftp || 0
                         laps: detail.lapStarts
+                        parts: detail.partStarts
                         overlay: power && detail.has.heart === true ? (detail.samples.heart || []) : []
                         overlayName: power && detail.has.heart === true ? qsTr("Heart rate") : ""
                         overlayShort: qsTr("HR")
@@ -667,6 +848,7 @@ Item {
                         color: Theme.text2
                         average: detail.ride.avgCadence || 0
                         laps: detail.lapStarts
+                        parts: detail.partStarts
                         reveal: detail.reveal
                         learnable: true
                         onLearn: detail.openLearn("cadence")
@@ -681,6 +863,7 @@ Item {
                         name: qsTr("Level")
                         color: Theme.text2
                         laps: detail.lapStarts
+                        parts: detail.partStarts
                         reveal: detail.reveal
                         learnable: true
                         onLearn: detail.openLearn("level")
@@ -698,6 +881,7 @@ Item {
                         decimals: 1
                         color: Theme.text2
                         laps: detail.lapStarts
+                        parts: detail.partStarts
                         reveal: detail.reveal
                         learnable: true
                         onLearn: detail.openLearn("speed")
@@ -1111,6 +1295,21 @@ Item {
         bottomInset: detail.sheetClearance
         onClose: detail.learnOpen = false
         onRelated: detail.openLearn(id)
+    }
+
+    // merge or split, asked first
+    JoinSheet {
+        anchors.fill: parent
+        open: detail.asking !== ""
+        bottomInset: detail.sheetClearance
+        title: detail.asking === "split" ? qsTr("Split this ride?") : qsTr("Merge with the ride before?")
+        words: detail.asking === "split"
+                ? qsTr("Its %1 parts become rides of their own again, and stay apart from now on.").arg(detail.ride.parts || 1)
+                : qsTr("This ride and the one before it become one ride, the %1 pause left out. You can split them again.")
+                  .arg(Format.hours(Math.max(60, detail.gapBefore)))
+        confirmText: detail.asking === "split" ? qsTr("Split") : qsTr("Merge")
+        onConfirm: detail.confirmJoin()
+        onClose: detail.asking = ""
     }
 
     // the share sheet of the moments (moments/ShareSheet.qml), the ride as a fingerprint card;

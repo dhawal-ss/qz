@@ -11,7 +11,10 @@
 
 var dayMs = 86400000
 var rideRungs = [10, 25, 50, 100, 250, 500, 1000]
+// The lifetime distance ladder, in round numbers of the rider's unit; the last rung is the length
+// of the equator. The rungs are compared in km: distanceLadder() gives the ladder of a rider in km.
 var distanceRungs = [100, 250, 500, 1000, 2500, 5000, 10000, 20000, 40075]
+var mileRungs = [50, 100, 250, 500, 1000, 2500, 5000, 10000, 24901]
 var workRungs = [1000, 5000, 10000, 25000, 50000, 100000, 250000]
 var kindWords = [qsTr("Consistency builds fitness."), qsTr("Another one in the bank."),
                  qsTr("Showing up is the hard part. Done."), qsTr("Every ride adds up.")]
@@ -19,6 +22,21 @@ var kindWords = [qsTr("Consistency builds fitness."), qsTr("Another one in the b
 function moment(key, kind, rank, tone, title, detail, value, unit) {
     return { key: key, kind: kind, rank: rank, tone: tone, title: title, detail: detail,
              value: String(value), unit: unit }
+}
+
+// the distance ladder of a rider, in km
+function distanceLadder(miles) {
+    return miles ? mileRungs.map(function (m) { return m / 0.621371 }) : distanceRungs
+}
+
+// a rung of distanceLadder() in the rider's unit, a round number: 500 for 500 mi
+function rungShown(km, miles) {
+    return Math.round(km * (miles ? 0.621371 : 1))
+}
+
+// the last rung, around the world
+function isWorldRung(km) {
+    return km >= distanceRungs[distanceRungs.length - 1] - 1
 }
 
 // the highest rung passed on the way from before to after, or 0
@@ -30,22 +48,25 @@ function rungCrossed(rungs, before, after) {
     return crossed
 }
 
-// Monday of the week of a day, taken at noon so a DST change cannot move it to the day before
+// the first day of the week of a day (Monday, or Sunday when weeks start on Sunday: Format.firstDay),
+// taken at noon so a DST change cannot move it to the day before
 function weekOf(dayMsValue) {
     return Format.weekStart(Format.startOfDay(dayMsValue) + 12 * 3600000)
 }
 
-// seconds ridden per week (keyed by Monday) from library.days()
+// seconds ridden per week (keyed by weekOf()) from library.days()
 function perWeek(days) {
     var weeks = {}
     for (var i = 0; i < days.length; i++) {
-        var w = weekOf(days[i].day)
+        // read 6 h into the day: Qt 5 can read a midnight of the other half of the DST year as
+        // 23:00 of the day before
+        var w = weekOf(days[i].day + 6 * 3600000)
         weeks[w] = (weeks[w] || 0) + days[i].seconds
     }
     return weeks
 }
 
-// weeks in a row meeting the goal, counting back from the week of monday, as GoalsScreen does
+// weeks in a row meeting the goal, counting back from the week of monday (weekOf()), as GoalsScreen does
 function streak(weeks, monday, goalSeconds) {
     var count = 0
     var start = monday
@@ -56,29 +77,66 @@ function streak(weeks, monday, goalSeconds) {
     return count
 }
 
-// the library ride that is this finished ride: started about elapsed seconds before it ended,
-// about as long; rides are newest first
-function match(rides, finishedAt, elapsed) {
-    var expected = finishedAt - elapsed * 1000
+// The library ride that holds this finished ride, rides newest first. A ride saved soon after the
+// one before joins it (ridelibrary.h: ui2/mergeGapMinutes), so the ride may keep the id of a ride
+// that was already there, start well before this session and last longer: only its end (the end
+// of its last second) says it is this one. It is the newest ride that ends within 90 s of endedAt,
+// when the ride ended (when it was paused, for a ride ended while paused: the file holds no
+// second after that). A short ride also cannot be taken for the ride before it: the end has to
+// fall in the second half of this ride at least. known is { id, end } of the newest ride when the
+// summary opened, or null: until the library has read this ride, that ride is not this one, even
+// when it ends close by.
+function match(rides, endedAt, elapsed, known) {
+    var earliest = endedAt - Math.min(90000, (elapsed || 0) * 500)
     for (var i = 0; i < rides.length; i++) {
         var r = rides[i]
-        var startOk = r.start >= expected - 5 * 60000 && r.start <= finishedAt + 60000
-        var durationOk = Math.abs(r.duration - elapsed) <= Math.max(180, elapsed * 0.15)
-        if (startOk && durationOk)
-            return r
+        if (!(r.end > 0) || r.end < earliest || r.end > endedAt + 90000)
+            continue
+        if (known && r.id === known.id && !(r.end > known.end))
+            continue
+        return r
     }
     return null
 }
 
-// the ride the library just read: a newest ride that was not there when the summary opened and
-// started within the ride, with up to 2 h of pauses (the ride time leaves the pauses out)
-function arrived(rides, knownId, finishedAt, elapsed) {
-    if (rides.length === 0 || rides[0].id === knownId)
+// What a library ride holds from before this session, when this session joined it (a merge):
+// the ride without this session, { seconds, km, kj, tss }, or null when the ride is this session
+// alone. session is { elapsed, km, kj, tss } of the finished ride.
+function earlierPart(saved, session) {
+    if (!saved || !((saved.parts || 1) > 1))
         return null
-    var r = rides[0]
-    if (r.start >= finishedAt - elapsed * 1000 - 2 * 3600000 && r.start <= finishedAt + 60000)
-        return r
-    return null
+    var seconds = (saved.duration || 0) - (session.elapsed || 0)
+    // the parts are all this session (saved twice while it lasted)
+    if (seconds < 60)
+        return null
+    return { seconds: seconds, km: Math.max(0, (saved.distance || 0) - (session.km || 0)),
+             kj: Math.max(0, (saved.kj || 0) - (session.kj || 0)), tss: Math.max(0, (saved.tss || 0) - (session.tss || 0)) }
+}
+
+// totals of library.totals() with the earlier part of a merged ride added as the ride it was
+function totalsWith(totals, part) {
+    return { rides: (totals.rides || 0) + 1, seconds: (totals.seconds || 0) + part.seconds,
+             distance: (totals.distance || 0) + part.km, kj: (totals.kj || 0) + part.kj, tss: (totals.tss || 0) + part.tss }
+}
+
+// days of library.days() with the earlier part of a merged ride added on the day it started
+function daysWith(days, startMs, part) {
+    var day = Format.startOfDay(startMs)
+    var out = []
+    var added = false
+    for (var i = 0; i < days.length; i++) {
+        var d = days[i]
+        if (Format.startOfDay(d.day + 12 * 3600000) === day) {
+            out.push({ day: d.day, rides: (d.rides || 0) + 1, seconds: (d.seconds || 0) + part.seconds,
+                       distance: (d.distance || 0) + part.km, kj: (d.kj || 0) + part.kj, tss: (d.tss || 0) + part.tss })
+            added = true
+        } else {
+            out.push(d)
+        }
+    }
+    if (!added)
+        out.push({ day: day, rides: 1, seconds: part.seconds, distance: part.km, kj: part.kj, tss: part.tss })
+    return out
 }
 
 // the color of a power record: short efforts glow hot, long ones calm
@@ -167,7 +225,7 @@ function usual(weeks, monday, measure) {
     var sum = 0
     var n = 0
     for (var i = 1; i <= 4; i++) {
-        var w = weeks[Streak.dayKey(Streak.addWeeks(monday, -i))]
+        var w = weeks[Streak.weekKey(Streak.addWeeks(monday, -i))]
         if (!w || w.rides === 0)
             continue
         sum += measure(w)
@@ -187,21 +245,36 @@ function usual(weeks, monday, measure) {
 //   goalKind, goalValue    the weekly goal (Streak.kinds), as set on Goals
 //   restWeeks              the week keys marked rest (Streak.js)
 //   miles
+//   continued              earlierPart() when this session joined a ride from before (a merge),
+//                          else left out: then before and days leave out the whole merged ride
+//                          (they are of the rides that started before it), and start is its start.
+//                          It is the same ride, so the ride count does not grow.
 function detect(input) {
     var out = []
-    var count = (input.before.rides || 0) + 1
+    var earlier = input.continued || null
+    if (earlier !== null) {
+        var copy = {}
+        for (var field in input)
+            copy[field] = input[field]
+        copy.before = totalsWith(input.before || {}, earlier)
+        copy.days = daysWith(input.days || [], input.start, earlier)
+        input = copy
+    }
+    var count = (input.before.rides || 0) + (earlier !== null ? 0 : 1)
     var history = count > 1
+    var rideSeconds = input.elapsed + (earlier !== null ? earlier.seconds : 0)
 
-    if (count === 1)
+    // the ride count, the first ride and the welcome back belong to the ride a merged one joined
+    if (earlier === null && count === 1)
         out.push(moment("first", "first", 0, 7, qsTr("Your first ride"),
                         qsTr("The first one is the hardest. Welcome to Bikemodo."),
                         Metrics.clock(input.elapsed), ""))
-    else if (rideRungs.indexOf(count) >= 0)
+    else if (earlier === null && rideRungs.indexOf(count) >= 0)
         out.push(moment("rides" + count, "rides", 3, 7, qsTr("Milestone ride"),
                         qsTr("Every single one of them counts."), count, qsTr("rides")))
 
     // a week or more since the last ride: the return is worth a word, and the streak with it
-    if (history && input.previousStart > 0) {
+    if (history && earlier === null && input.previousStart > 0) {
         var away = Math.floor((input.start - input.previousStart) / dayMs)
         if (away >= 7) {
             var kindNow = Streak.kinds.indexOf(input.goalKind) >= 0 ? input.goalKind : "minutes"
@@ -219,11 +292,13 @@ function detect(input) {
 
     // lifetime ladders
     var beforeKm = input.before.distance || 0
-    var km = rungCrossed(distanceRungs, beforeKm, beforeKm + input.km)
+    var ladder = distanceLadder(input.miles)
+    var km = rungCrossed(ladder, beforeKm, beforeKm + input.km)
     if (km > 0) {
-        var world = km === 40075
-        var shown = input.miles ? Math.round(km * 0.621371) : km
-        out.push(moment("km" + km, "distance", km >= 10000 ? 1 : 4, 2,
+        var world = isWorldRung(km)
+        var shown = rungShown(km, input.miles)
+        // the top three rungs are the biggest moments
+        out.push(moment((input.miles ? "mi" : "km") + shown, "distance", ladder.indexOf(km) >= ladder.length - 3 ? 1 : 4, 2,
                         world ? qsTr("Around the world") : qsTr("Lifetime distance"),
                         world ? qsTr("You have ridden the length of the equator.") : qsTr("A new rung on the distance ladder."),
                         Format.big(shown), input.miles ? "mi" : "km"))
@@ -239,10 +314,10 @@ function detect(input) {
     var goalValue = Number(input.goalValue) || 0
     var byWeek = Streak.perWeek(input.days)
     var thisKey = Streak.weekKey(input.start)
-    var thisMonday = Streak.mondayOf(input.start)
+    var thisMonday = Streak.weekStartOf(input.start)
     var was = byWeek[thisKey] || { seconds: 0, kj: 0, km: 0, rides: 0, tss: 0, lastDay: 0 }
     var withThis = { seconds: was.seconds + input.elapsed, kj: was.kj + (input.kj || 0), km: was.km + (input.km || 0),
-                     rides: was.rides + 1, tss: (was.tss || 0) + (input.tss || 0),
+                     rides: was.rides + (earlier !== null ? 0 : 1), tss: (was.tss || 0) + (input.tss || 0),
                      lastDay: Math.max(was.lastDay, Format.startOfDay(input.start)) }
     if (goalValue > 0 && !Streak.met(was, kind, goalValue) && Streak.met(withThis, kind, goalValue)) {
         var withRide = {}
@@ -272,12 +347,12 @@ function detect(input) {
     var weekAfter = weekBefore + input.elapsed
 
     // longest ride and biggest week, once there is a history to beat
-    if (count > 3 && input.longestBefore > 0 && input.elapsed > input.longestBefore) {
-        var longer = input.elapsed - input.longestBefore
+    if (count > 3 && input.longestBefore > 0 && rideSeconds > input.longestBefore) {
+        var longer = rideSeconds - input.longestBefore
         out.push(moment("longest", "longest", 7, 3, qsTr("Your longest ride"),
                         longer >= 60 ? qsTr("%1 longer than ever before.").arg(Format.hours(longer))
                                      : qsTr("Longer than ever before."),
-                        Metrics.clock(input.elapsed), ""))
+                        Metrics.clock(rideSeconds), ""))
     }
     var maxBefore = 0
     var ridden = 0
