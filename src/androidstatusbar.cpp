@@ -20,10 +20,26 @@ AndroidStatusBar* AndroidStatusBar::m_instance = nullptr;
 // activity is paused at that moment (e.g. the screen is off), Qt finishes it only once it is resumed.
 static QBasicMutex instanceMutex;
 
+// The activity sends the insets once, as soon as its window is laid out, which can be before QML
+// creates this singleton. The last values are kept here (under instanceMutex) and a new instance
+// starts from them, so a root that reads AndroidStatusBar late still gets the real insets.
+static int lastInsets[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+static int lastSystemBarSides[2] = {0, 0};
+
 AndroidStatusBar::AndroidStatusBar(QObject *parent) : QObject(parent)
 {
     QMutexLocker locker(&instanceMutex);
     m_instance = this;
+    m_top = lastInsets[0];
+    m_bottom = lastInsets[1];
+    m_left = lastInsets[2];
+    m_right = lastInsets[3];
+    m_waterfallTop = lastInsets[4];
+    m_waterfallBottom = lastInsets[5];
+    m_waterfallLeft = lastInsets[6];
+    m_waterfallRight = lastInsets[7];
+    m_systemBarLeft = lastSystemBarSides[0];
+    m_systemBarRight = lastSystemBarSides[1];
 }
 
 AndroidStatusBar::~AndroidStatusBar()
@@ -135,6 +151,14 @@ Java_org_cagnulen_qdomyoszwift_CustomQtActivity_onInsetsChanged(JNIEnv *env, job
     // The lock keeps the object from being deleted before the call is posted; a deleted object
     // drops its pending calls.
     QMutexLocker locker(&instanceMutex);
+    lastInsets[0] = top;
+    lastInsets[1] = bottom;
+    lastInsets[2] = left;
+    lastInsets[3] = right;
+    lastInsets[4] = waterfallTop;
+    lastInsets[5] = waterfallBottom;
+    lastInsets[6] = waterfallLeft;
+    lastInsets[7] = waterfallRight;
     if (AndroidStatusBar::instance()) {
         QMetaObject::invokeMethod(AndroidStatusBar::instance(), "onInsetsChanged", Qt::QueuedConnection,
                                   Q_ARG(int, top), Q_ARG(int, bottom), Q_ARG(int, left), Q_ARG(int, right),
@@ -150,6 +174,8 @@ Java_org_cagnulen_qdomyoszwift_CustomQtActivity_onSystemBarSideInsetsChanged(JNI
     Q_UNUSED(env);
     Q_UNUSED(thiz);
     QMutexLocker locker(&instanceMutex);
+    lastSystemBarSides[0] = left;
+    lastSystemBarSides[1] = right;
     if (AndroidStatusBar::instance()) {
         QMetaObject::invokeMethod(AndroidStatusBar::instance(), "onSystemBarSideInsetsChanged", Qt::QueuedConnection,
                                   Q_ARG(int, left), Q_ARG(int, right));
