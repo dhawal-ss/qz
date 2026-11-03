@@ -161,14 +161,37 @@ ApplicationWindow {
     readonly property bool rideOpen: live.elapsed > 0 && !live.stopped
     property bool askingToClose: false
 
+    // After a reinstall the rides of the earlier install are still in the QZ folder, hidden from
+    // this one (Android 14+): QZ notices it (a new history database) and offers once to copy them
+    // in, with the folder picker. It waits for its workout page to be open; Bikemodo has none, so
+    // it says so as soon as rootItem is there.
+    property bool askingImport: false
+    onCoreChanged: if (core !== null) core.historyPageOpened()
+    Connections {
+        target: window.core
+        ignoreUnknownSignals: true
+        function onHistoryRecoveryOfferRequested() { window.askingImport = true }
+        // QZ's messages ("12 workouts imported", "No workout files found", ...)
+        function onToastRequestedChanged(value) { if (value !== "") toastHost.show(value) }
+        // imported rides have no power source: the next bike that connects gives them its own
+        function onFitImportRunningChanged() {
+            if (window.core.fitImportRunning)
+                return
+            powerMemory.unknownPowerAssigned = false
+            if (live.connected)
+                assignPower.restart()
+        }
+    }
+
     // Android back: close the launcher or the summary, step back in the app, leave a ride only
     // while it is paused or not started (never a moving one), and on Today ask for a second
     // press within 2 s before closing, as QZ does; with a ride still open, ask about it instead
     onClosing: {
         if (Qt.platform.os !== "android")
             return
-        if (askingToClose) {
+        if (askingToClose || askingImport) {
             askingToClose = false
+            askingImport = false
             close.accepted = false
         } else if (mode === "launcher" || mode === "summary") {
             mode = "home"
@@ -481,6 +504,56 @@ ApplicationWindow {
             font.family: Theme.bodyMedium
             font.pixelSize: 14
         }
+    }
+
+    // a message from QZ, for a few seconds over the navigation
+    Rectangle {
+        id: toastHost
+        function show(text) {
+            toastText.text = text
+            toastTimer.restart()
+        }
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: parent.height - insets.insetBottom - 110 - height
+        width: Math.min(parent.width - 32, toastText.implicitWidth + 36)
+        height: toastText.height + 24
+        radius: 22
+        color: Theme.floating
+        opacity: toastTimer.running && !backToExit.running ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Theme.fast } }
+        Accessible.role: Accessible.AlertMessage
+        Accessible.name: toastText.text
+        Timer {
+            id: toastTimer
+            interval: 3500
+        }
+        Text {
+            id: toastText
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.parent.width - 68)
+            color: Theme.text
+            font.family: Theme.bodyMedium
+            font.pixelSize: 14
+            wrapMode: Text.WordWrap
+            horizontalAlignment: Text.AlignHCenter
+        }
+    }
+
+    // the rides of an earlier install: copy them in through the folder picker, or not now
+    JoinSheet {
+        anchors.fill: parent
+        open: window.askingImport && window.mode === "home"
+        bottomInset: insets.insetBottom
+        title: qsTr("Rides from before")
+        words: qsTr("Rides of an earlier install may still be in the QZ folder, where this one cannot see them. In the next window, allow access to that folder and Bikemodo copies them in.")
+        confirmText: qsTr("Find my rides")
+        onConfirm: {
+            window.askingImport = false
+            if (window.core !== null)
+                window.core.importFitFolder()
+        }
+        onClose: window.askingImport = false
     }
 
     // Back on Today with a ride still open: end and save it, or keep it and stay

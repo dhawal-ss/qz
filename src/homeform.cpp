@@ -9518,6 +9518,10 @@ void homeform::importFitFilesToHistory(const QStringList &files) {
     }
     setFitImportRunning(true);
     QMetaObject::invokeMethod(fitProcessor, "importFiles", Qt::QueuedConnection, Q_ARG(QStringList, files));
+    // the files are in the fit folder now: the ride library reads them too
+    if (rideLibrary) {
+        rideLibrary->rescan();
+    }
 }
 
 bool homeform::deleteTrainingProgramFile(const QString &fileUrl) {

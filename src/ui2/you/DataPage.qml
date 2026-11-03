@@ -7,7 +7,7 @@ YouPage {
     id: page
 
     title: qsTr("Your data")
-    lead: qsTr("Every ride is saved on this device as a FIT file, the format Strava, Garmin and most training apps read. Bikemodo reads every ride saved there, older ones from QZ included.")
+    lead: qsTr("Every ride is saved on this device as a FIT file, the format Strava, Garmin and most training apps read. After a reinstall, or for rides recorded with QZ, Look in the folder again brings them back.")
 
     readonly property string folder: you.core !== null ? you.core.getWritableAppDir() + "fit/" : ""
     readonly property bool importing: you.core !== null && you.core.fitImportRunning === true

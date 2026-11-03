@@ -76,7 +76,9 @@ Column {
         [qsTr("Average power"), Math.round(avgPower(now)) + " W", Math.round(avgPower(before)) + " W", change(avgPower(now), avgPower(before))]
     ]
 
-    readonly property var shownRows: pro ? rows : [rows[0], rows[1], rows[3]]
+    // training load (rows[4]) needs the rider's own FTP (Theme.ftpSet)
+    readonly property var shownRows: pro ? rows.filter(function (r, i) { return i !== 4 || Theme.ftpSet })
+                                         : [rows[0], rows[1], rows[3]]
 
     onSpanChanged: refresh()
 

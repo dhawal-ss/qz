@@ -974,7 +974,7 @@ Item {
                                 id: ftpWords
                                 width: parent.width
                                 text: todayPage.ftpOffer > 0
-                                      ? qsTr("Your best 20 minutes of the last 90 days puts it near %1 W. Your load, form and power zones start from it.").arg(todayPage.ftpOffer)
+                                      ? qsTr("If your best 20 minutes of the last 90 days were ridden hard, it is near %1 W. Easy rides make it read low. Your load, form and power zones start from it.").arg(todayPage.ftpOffer)
                                       : qsTr("Your load, form and power zones start from it. Set it in You, or ride 20 minutes hard and Bikemodo offers one.")
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium

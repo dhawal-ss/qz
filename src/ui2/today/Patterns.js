@@ -91,13 +91,14 @@ function usualSample() {
              dayName: dayNames[3], sample: true }
 }
 
-// The bars of a usual(): time, rides and load, with their words
-function usualRows(u) {
+// The bars of a usual(): time, rides and load, with their words. ftpSet false (Theme.ftpSet) leaves
+// the load out: it is worked out from an FTP that is still a guess.
+function usualRows(u, ftpSet) {
     var rows = [{ label: qsTr("Time"), value: u.weekSeconds, usual: u.usualSeconds,
                   valueText: Format.hours(u.weekSeconds), usualText: Format.hours(u.usualSeconds) },
                 { label: qsTr("Rides"), value: u.weekRides, usual: u.usualRides,
                   valueText: String(u.weekRides), usualText: u.usualRides < 1 ? qsTr("under 1") : String(Math.round(u.usualRides * 2) / 2) }]
-    if (u.weekLoad > 0 || u.usualLoad > 0)
+    if (ftpSet !== false && (u.weekLoad > 0 || u.usualLoad > 0))
         rows.push({ label: qsTr("Training load"), value: u.weekLoad, usual: u.usualLoad,
                     valueText: String(Math.round(u.weekLoad)), usualText: String(Math.round(u.usualLoad)) })
     return rows

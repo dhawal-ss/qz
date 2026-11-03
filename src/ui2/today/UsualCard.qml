@@ -40,7 +40,7 @@ LearnTap {
         CompareBars {
             id: compare
             width: parent.width
-            rows: Patterns.usualRows(usualCard.usual)
+            rows: Patterns.usualRows(usualCard.usual, Theme.ftpSet)
             tint: usualCard.tint
             sample: usualCard.sample
             Accessible.ignored: true
