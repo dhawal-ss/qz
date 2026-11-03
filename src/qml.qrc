@@ -195,6 +195,47 @@
         <file>ui2/progress/ScrubArea.qml</file>
         <file>ui2/progress/StepChart.qml</file>
         <file>ui2/progress/VolumeCard.qml</file>
+        <file>ui2/today/BestsCard.qml</file>
+        <file>ui2/today/FirstRideCard.qml</file>
+        <file>ui2/today/Insights.js</file>
+        <file>ui2/today/InsightsCard.qml</file>
+        <file>ui2/today/LifetimeCard.qml</file>
+        <file>ui2/today/ReachCard.qml</file>
+        <file>ui2/today/RideCard.qml</file>
+        <file>ui2/today/TodaySheet.qml</file>
+        <file>ui2/today/WeekCard.qml</file>
+        <file>ui2/goals/Badges.js</file>
+        <file>ui2/goals/BadgeEmblem.qml</file>
+        <file>ui2/goals/BadgeGrid.qml</file>
+        <file>ui2/goals/BadgeSheet.qml</file>
+        <file>ui2/goals/Challenge.js</file>
+        <file>ui2/goals/ChallengeCard.qml</file>
+        <file>ui2/goals/GoalGlyph.qml</file>
+        <file>ui2/goals/JourneyCard.qml</file>
+        <file>ui2/goals/Journeys.js</file>
+        <file>ui2/goals/LaddersCard.qml</file>
+        <file>ui2/goals/Streak.js</file>
+        <file>ui2/goals/StreakCard.qml</file>
+        <file>ui2/goals/WeeklyRecap.qml</file>
+        <file>ui2/sig/Spring.qml</file>
+        <file>ui2/sig/CapLabel.qml</file>
+        <file>ui2/sig/Hairline.qml</file>
+        <file>ui2/sig/Rise.qml</file>
+        <file>ui2/sig/RollingNumber.qml</file>
+        <file>ui2/sig/Pulse.qml</file>
+        <file>ui2/sig/PulseHero.qml</file>
+        <file>ui2/sig/HeroGlow.qml</file>
+        <file>ui2/sig/WeekPulses.qml</file>
+        <file>ui2/sig/HairlineRow.qml</file>
+        <file>ui2/sig/KeyNumbers.qml</file>
+        <file>ui2/sig/SegmentedToggle.qml</file>
+        <file>ui2/sig/Shadow.qml</file>
+        <file>ui2/sig/RideFab.qml</file>
+        <file>ui2/sig/NavIcon.qml</file>
+        <file>ui2/sig/FloatingNav.qml</file>
+        <file>ui2/today/Coach.js</file>
+        <file>ui2/today/SuggestionCard.qml</file>
+        <file>ui2/today/WorkoutShape.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

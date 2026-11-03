@@ -1,8 +1,10 @@
 import QtQuick 2.15
 import "."
 
-// The top of a section: a back arrow when there is somewhere to go back to, the title, a line
-// under it, and on phones the round You button (tablets reach You from the rail).
+// The top of a section in the Signature language: the title big in the display face on the
+// line of Today's date, a quiet line under it, a back arrow when there is somewhere to go back
+// to, and the round You button where the navigation has no You (phones; tablets have it in
+// the rail).
 Item {
     id: header
 
@@ -15,13 +17,13 @@ Item {
     signal back()
     signal openYou()
 
-    implicitHeight: column.height + 20
+    implicitHeight: column.y + column.height + 16
 
     PulseButton {
         id: backButton
         visible: header.showBack
-        x: -8
-        y: 10
+        x: -10
+        y: 22
         width: 48
         height: 48
         fill: pressed ? Theme.pressed : "transparent"
@@ -35,15 +37,19 @@ Item {
     Column {
         id: column
         x: header.showBack ? 44 : 0
-        y: 14
+        y: 24
         width: parent.width - x - (header.showYou ? 56 : 0)
-        spacing: 2
+        spacing: 6
         Text {
             width: parent.width
+            // on the 44 high line of the You button, as Today's date
+            height: Math.max(44, implicitHeight)
+            verticalAlignment: Text.AlignVCenter
             text: header.title
             color: Theme.text
             font.family: Theme.display
-            font.pixelSize: header.showBack ? 24 : 32
+            font.pixelSize: header.showBack ? 26 : 34
+            font.letterSpacing: header.showBack ? -0.4 : -0.8
             wrapMode: Text.WordWrap
             maximumLineCount: 2
             elide: Text.ElideRight
@@ -56,7 +62,7 @@ Item {
             text: header.subtitle
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: Theme.labelSize
+            font.pixelSize: 13
             wrapMode: Text.WordWrap
         }
     }
@@ -64,10 +70,15 @@ Item {
     PulseButton {
         visible: header.showYou
         anchors.right: parent.right
-        y: 12
-        width: 44
-        height: 44
-        fill: Theme.chip
+        y: 22
+        // 48 to touch, 44 to see
+        width: 48
+        height: 48
+        topInset: 2
+        bottomInset: 2
+        leftInset: 2
+        rightInset: 2
+        fill: pressed ? Theme.pressed : Theme.control
         Accessible.name: qsTr("You, profile and settings")
         onClicked: header.openYou()
         contentItem: Text {

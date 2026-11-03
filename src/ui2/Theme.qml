@@ -88,6 +88,52 @@ QtObject {
     readonly property int colorTime: 600
     property bool reduceMotion: false
 
+    // Motion of the Signature pass: the M3 Expressive springs, as damping ratio / stiffness
+    // (mass 1): fast spatial 0.6 / 800 (presses, toggles, small moves), default spatial 0.8 / 380
+    // (rows, sheets, cards entering), slow spatial 0.8 / 200 (hero, zone crossings, page moves).
+    // Effects (color, opacity) never bounce: the effects curve above, effectsTime long.
+    //
+    // As a SpringAnimation (or Behavior { SpringAnimation {...} }, which keeps the velocity when
+    // the target changes mid-way): Qt 5.15 steps the spring in 16 ms ticks, about
+    //   velocity += spring * distance - damping * velocity;  value += velocity * 0.016
+    // so spring = 0.016 * stiffness and damping is about 0.016 * 2 * ratio * sqrt(stiffness),
+    // trimmed by sampling a 0 to 100 move in qmlscene against the M3 step response:
+    //   fast     spring 12.8 damping 0.48: overshoot 9.0% (M3 9.5%), half way 52 ms (52), settled 180 ms (208)
+    //   default  spring 6.08 damping 0.45: overshoot 1.0% (1.5%), half way 76 ms (80), settled 176 ms (192)
+    //   slow     spring 3.2  damping 0.33: overshoot 1.5% (1.5%), half way 104 ms (108), settled 244 ms (264)
+    // epsilon is in the unit of the property: about 0.25 for pixels, 0.002 for scale and opacity.
+    // The effects spring (1.0 / 1600) needs a damping over 1, which SpringAnimation clamps, so
+    // effects use a NumberAnimation.
+    //
+    // As a NumberAnimation (easing.type: Easing.Bezier): the curves of the motion board, each with
+    // the duration that reaches half way when the spring does:
+    //   fast [0.34, 1.56, 0.64, 1] 400 ms, default [0.3, 1.35, 0.5, 1] 600 ms,
+    //   slow [0.32, 1.18, 0.5, 1] 650 ms, effects [0.2, 0, 0, 1] 250 ms.
+    readonly property real fastSpatialSpring: 12.8
+    readonly property real fastSpatialDamping: 0.48
+    readonly property real defaultSpatialSpring: 6.08
+    readonly property real defaultSpatialDamping: 0.45
+    readonly property real slowSpatialSpring: 3.2
+    readonly property real slowSpatialDamping: 0.33
+    readonly property var fastSpatialCurve: [0.34, 1.56, 0.64, 1, 1, 1]
+    readonly property var defaultSpatialCurve: [0.3, 1.35, 0.5, 1, 1, 1]
+    readonly property var slowSpatialCurve: [0.32, 1.18, 0.5, 1, 1, 1]
+    readonly property int fastSpatialTime: 400
+    readonly property int defaultSpatialTime: 600
+    readonly property int slowSpatialTime: 650
+    readonly property int effectsTime: 250
+    // the entrance of a page: each item rises 10 and fades in, 80 ms after the one before
+    readonly property int riseTime: 700
+    readonly property int riseStagger: 80
+    readonly property int riseDistance: 10
+
+    // Signature type and shapes
+    readonly property int capSize: 11
+    readonly property real capSpacing: 1.5
+    readonly property int heroRadius: 32
+    readonly property color raisedBorder: Qt.rgba(1, 1, 1, 0.05)
+    readonly property color rest: "#2a2a30"
+
     function powerZone(watts, ftp) {
         var zone = 1
         for (var i = 0; i < powerZoneStarts.length; i++) {

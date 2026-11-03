@@ -7,6 +7,8 @@ import "../you"
 Item {
     id: sheet
 
+    property string hint: qsTr("Pick the Progress cards and their order.")
+
     property bool open: false
     property var cards: []           // [{id, shown}] in order
     property var titles: ({})        // id -> title
@@ -76,7 +78,7 @@ Item {
                 }
                 Text {
                     width: parent.width
-                    text: qsTr("Pick the Progress cards and their order.")
+                    text: sheet.hint
                     color: Theme.text3
                     font.family: Theme.bodyMedium
                     font.pixelSize: Theme.tertiarySize

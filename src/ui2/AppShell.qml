@@ -1,9 +1,13 @@
 import QtQuick 2.15
 import "."
+import "sig"
 
 // The app around the ride: Today, Rides, Progress, Goals and You, with Ride always one tap away.
-// Compact windows (phones held upright) get a bottom bar with Ride in the middle and You behind
-// the round button in each header; wider windows get a side rail with Ride on top.
+// The navigation floats over the content (sig/FloatingNav): on compact windows (phones held
+// upright) a pill at the bottom with Today, Rides, Progress and Goals and the round Ride button
+// beside it, You behind the round button in each header; on wider windows a floating rail on the
+// left with Ride on top and You in it. A tab switch fades through: the open page fades out
+// quickly, then the new one fades in as it grows from 96%. The pages stay alive.
 // The shell keeps clear of the system bars and the camera cutout with the insets it is given.
 Item {
     id: shell
@@ -33,9 +37,86 @@ Item {
     signal refreshDevices()
 
     readonly property bool rail: width >= 600
-    readonly property int railWidth: 88
-    readonly property int barHeight: 76
+    // the room the floating rail takes on the left: its margin, its width and a gap
+    readonly property int railWidth: 12 + 72 + 12
+    // how high the bottom pill floats over the bottom inset
+    readonly property int navLift: insetBottom > 0 ? 10 : 20
+    // what a page that scrolls under the bottom pill keeps free at its end, over the bottom inset
+    readonly property int navClearance: rail ? 16 : 64 + navLift + 16
     readonly property string initial: nickname !== "" ? nickname.charAt(0).toUpperCase() : "B"
+
+    readonly property var destinations: {
+        var list = [
+            { name: "today", label: qsTr("Today"), icon: "today" },
+            { name: "rides", label: qsTr("Rides"), icon: "rides" },
+            { name: "progress", label: qsTr("Progress"), icon: "progress" },
+            { name: "goals", label: qsTr("Goals"), icon: "goals" }
+        ]
+        if (rail)
+            list.push({ name: "you", label: qsTr("You"), icon: "you" })
+        return list
+    }
+
+    // the fade through between tabs: the page on screen, the page fading out, and how far each is
+    property string shownTab: ""
+    property string leavingTab: ""
+    property real leaveFade: 1
+    property real enterFade: 1
+
+    onTabChanged: {
+        if (tab === shownTab)
+            return
+        if (Theme.reduceMotion) {
+            fadeThrough.stop()
+            leavingTab = ""
+            shownTab = tab
+            leaveFade = 1
+            enterFade = 1
+            return
+        }
+        // a switch while a page is still fading in: that page leaves from where it got to
+        var from = fadeThrough.running ? (leavingTab !== "" ? 0 : enterFade) : 1
+        leavingTab = from > 0 ? shownTab : ""
+        leaveFade = from
+        shownTab = tab
+        enterFade = 0
+        fadeThrough.restart()
+    }
+
+    SequentialAnimation {
+        id: fadeThrough
+        NumberAnimation {
+            target: shell
+            property: "leaveFade"
+            to: 0
+            duration: 90
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.effectsCurve
+        }
+        PropertyAction { target: shell; property: "leavingTab"; value: "" }
+        NumberAnimation {
+            target: shell
+            property: "enterFade"
+            to: 1
+            duration: 210
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.effectsCurve
+        }
+    }
+
+    function pageShown(name) {
+        return name === shownTab || name === leavingTab
+    }
+    function pageOpacity(name) {
+        if (name === leavingTab)
+            return leaveFade
+        return name === shownTab ? enterFade : 0
+    }
+    function pageScale(name) {
+        return name === shownTab ? 0.96 + 0.04 * enterFade : 1
+    }
+
+    Component.onCompleted: shownTab = tab
 
     function openRide(id) {
         tab = "rides"
@@ -48,7 +129,11 @@ Item {
             return true
         if (tab === "progress" && progressScreen.goBack())
             return true
+        if (tab === "today" && todayScreen.goBack())
+            return true
         if (tab === "you" && youLoader.item && youLoader.item.goBack())
+            return true
+        if (tab === "goals" && goalsScreen.goBack())
             return true
         if (tab !== "today") {
             tab = "today"
@@ -62,17 +147,27 @@ Item {
         color: Theme.bg
     }
 
-    // the pages, between the system bars and beside the rail
+    // The pages, under the status bar and beside the rail. Today scrolls under the floating pill
+    // (it keeps navClearance free at its end); the other pages end above it.
     Item {
         id: pages
         x: shell.rail ? shell.insetLeft + shell.railWidth : shell.insetLeft
         y: shell.insetTop
         width: shell.width - x - shell.insetRight
-        height: shell.height - y - (shell.rail ? shell.insetBottom : shell.insetBottom + shell.barHeight)
+        height: shell.height - y
+        readonly property real shortHeight: height - shell.insetBottom - (shell.rail ? 0 : shell.navClearance - 8)
+        readonly property bool fading: fadeThrough.running
 
         TodayScreen {
-            anchors.fill: parent
-            visible: shell.tab === "today"
+            id: todayScreen
+            width: parent.width
+            height: parent.height
+            visible: shell.pageShown("today")
+            opacity: shell.pageOpacity("today")
+            scale: shell.pageScale("today")
+            enabled: shell.shownTab === "today"
+            layer.enabled: pages.fading && visible
+            bottomClearance: shell.navClearance + shell.insetBottom
             library: shell.library
             connected: shell.connected
             deviceName: shell.deviceName
@@ -90,8 +185,13 @@ Item {
         }
         RidesScreen {
             id: rides
-            anchors.fill: parent
-            visible: shell.tab === "rides"
+            width: parent.width
+            height: pages.shortHeight
+            visible: shell.pageShown("rides")
+            opacity: shell.pageOpacity("rides")
+            scale: shell.pageScale("rides")
+            enabled: shell.shownTab === "rides"
+            layer.enabled: pages.fading && visible
             library: shell.library
             miles: shell.miles
             showYou: !shell.rail
@@ -100,8 +200,13 @@ Item {
         }
         ProgressScreen {
             id: progressScreen
-            anchors.fill: parent
-            visible: shell.tab === "progress"
+            width: parent.width
+            height: pages.shortHeight
+            visible: shell.pageShown("progress")
+            opacity: shell.pageOpacity("progress")
+            scale: shell.pageScale("progress")
+            enabled: shell.shownTab === "progress"
+            layer.enabled: pages.fading && visible
             library: shell.library
             miles: shell.miles
             showYou: !shell.rail
@@ -110,8 +215,14 @@ Item {
             onOpenRide: shell.openRide(id)
         }
         GoalsScreen {
-            anchors.fill: parent
-            visible: shell.tab === "goals"
+            id: goalsScreen
+            width: parent.width
+            height: pages.shortHeight
+            visible: shell.pageShown("goals")
+            opacity: shell.pageOpacity("goals")
+            scale: shell.pageScale("goals")
+            enabled: shell.shownTab === "goals"
+            layer.enabled: pages.fading && visible
             library: shell.library
             miles: shell.miles
             showYou: !shell.rail
@@ -120,8 +231,13 @@ Item {
         }
         Loader {
             id: youLoader
-            anchors.fill: parent
-            visible: shell.tab === "you"
+            width: parent.width
+            height: pages.shortHeight
+            visible: shell.pageShown("you")
+            opacity: shell.pageOpacity("you")
+            scale: shell.pageScale("you")
+            enabled: shell.shownTab === "you"
+            layer.enabled: pages.fading && visible
             active: shell.tab === "you" || status === Loader.Ready
             source: "you/YouScreen.qml"
             onLoaded: {
@@ -140,126 +256,22 @@ Item {
         }
     }
 
-    // bottom bar on compact windows
-    Rectangle {
-        visible: !shell.rail
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-        height: shell.barHeight + shell.insetBottom
-        color: Theme.surface
-
-        Rectangle { width: parent.width; height: 1; color: Theme.hairline }
-
-        Row {
-            id: barRow
-            x: shell.insetLeft
-            width: parent.width - shell.insetLeft - shell.insetRight
-            height: shell.barHeight
-            readonly property real slot: width / 5
-
-            NavButton {
-                width: barRow.slot; height: barRow.height
-                text: qsTr("Today"); iconName: "today"
-                current: shell.tab === "today"
-                onClicked: shell.tab = "today"
-            }
-            NavButton {
-                width: barRow.slot; height: barRow.height
-                text: qsTr("Rides"); iconName: "rides"
-                current: shell.tab === "rides"
-                onClicked: shell.tab = "rides"
-            }
-            Item {
-                width: barRow.slot; height: barRow.height
-                PulseButton {
-                    anchors.centerIn: parent
-                    width: 64
-                    height: 52
-                    radius: 18
-                    pressedRadius: 26
-                    fill: Theme.accent
-                    Accessible.name: qsTr("Ride")
-                    onClicked: shell.rideRequested()
-                    contentItem: Item {
-                        BrandMark { anchors.centerIn: parent; width: 38; height: 38; color: Theme.accentInk }
-                    }
-                }
-            }
-            NavButton {
-                width: barRow.slot; height: barRow.height
-                text: qsTr("Progress"); iconName: "progress"
-                current: shell.tab === "progress"
-                onClicked: shell.tab = "progress"
-            }
-            NavButton {
-                width: barRow.slot; height: barRow.height
-                text: qsTr("Goals"); iconName: "goals"
-                current: shell.tab === "goals"
-                onClicked: shell.tab = "goals"
-            }
-        }
-    }
-
-    // side rail on medium and expanded windows
-    Rectangle {
-        visible: shell.rail
-        x: 0
-        width: shell.insetLeft + shell.railWidth
-        height: parent.height
-        color: Theme.surface
-
-        Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.hairline }
-
-        Column {
-            // a phone held sideways has about 390 of height: everything fits in one column
-            readonly property bool tight: shell.height - shell.insetTop - shell.insetBottom < 520
-            readonly property int itemHeight: tight ? 58 : 64
-            x: shell.insetLeft + (shell.railWidth - 72) / 2
-            y: shell.insetTop + (tight ? 10 : 16)
-            spacing: tight ? 0 : 6
-
-            PulseButton {
-                width: 72
-                height: parent.tight ? 54 : 64
-                radius: 20
-                pressedRadius: 28
-                fill: Theme.accent
-                Accessible.name: qsTr("Ride")
-                onClicked: shell.rideRequested()
-                contentItem: Item {
-                    BrandMark { anchors.centerIn: parent; width: 42; height: 42; color: Theme.accentInk }
-                }
-            }
-            Item { width: 1; height: parent.tight ? 8 : 14 }
-            NavButton {
-                height: parent.itemHeight
-                text: qsTr("Today"); iconName: "today"
-                current: shell.tab === "today"
-                onClicked: shell.tab = "today"
-            }
-            NavButton {
-                height: parent.itemHeight
-                text: qsTr("Rides"); iconName: "rides"
-                current: shell.tab === "rides"
-                onClicked: shell.tab = "rides"
-            }
-            NavButton {
-                height: parent.itemHeight
-                text: qsTr("Progress"); iconName: "progress"
-                current: shell.tab === "progress"
-                onClicked: shell.tab = "progress"
-            }
-            NavButton {
-                height: parent.itemHeight
-                text: qsTr("Goals"); iconName: "goals"
-                current: shell.tab === "goals"
-                onClicked: shell.tab = "goals"
-            }
-            NavButton {
-                height: parent.itemHeight
-                text: qsTr("You"); iconName: "you"
-                current: shell.tab === "you"
-                onClicked: shell.tab = "you"
-            }
-        }
+    // the floating navigation: a pill at the bottom, or a rail on the left
+    FloatingNav {
+        id: nav
+        objectName: "floatingNav"
+        vertical: shell.rail
+        tab: shell.tab
+        destinations: shell.destinations
+        available: shell.rail ? shell.height - shell.insetTop - shell.insetBottom - 24
+                              : shell.width - shell.insetLeft - shell.insetRight - 32
+        x: shell.rail ? shell.insetLeft + 12
+                      : shell.insetLeft + Math.round((shell.width - shell.insetLeft - shell.insetRight - width) / 2)
+        y: shell.rail ? shell.insetTop + Math.max(12, Math.round((shell.height - shell.insetTop - shell.insetBottom - height) / 2))
+                      : shell.height - shell.insetBottom - shell.navLift - height
+        width: implicitWidth
+        height: implicitHeight
+        onPicked: shell.tab = name
+        onRideRequested: shell.rideRequested()
     }
 }
