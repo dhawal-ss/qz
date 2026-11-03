@@ -33,6 +33,43 @@ function distance(km, miles) {
     return (v >= 100 ? Math.round(v) : v.toFixed(1)) + (miles ? " mi" : " km")
 }
 
+// For values in km/h and kg only. The live ride's numbers from rideMetrics are already in the
+// rider's unit (ridemetrics.cpp converts them), so they must not go through these again.
+
+// 32.4 km/h, or 20.1 mph
+function speed(kmh, miles) {
+    var v = (kmh || 0) * (miles ? 0.621371 : 1)
+    return v.toFixed(1) + (miles ? " mph" : " km/h")
+}
+
+// 75.5 kg, or 166 lb. lbs is QZ's rule: miles_unit and not weight_kg_unit
+function weight(kg, lbs) {
+    if (lbs)
+        return Math.round((kg || 0) * 2.20462) + " lb"
+    return (Math.round((kg || 0) * 10) / 10) + " kg"
+}
+
+function distanceUnit(miles) {
+    return miles ? "mi" : "km"
+}
+
+function speedUnit(miles) {
+    return miles ? "mph" : "km/h"
+}
+
+function weightUnit(lbs) {
+    return lbs ? "lb" : "kg"
+}
+
+// km to the rider's distance unit, and back
+function toDistance(km, miles) {
+    return (km || 0) * (miles ? 0.621371 : 1)
+}
+
+function fromDistance(value, miles) {
+    return (value || 0) / (miles ? 0.621371 : 1)
+}
+
 function whole(v) {
     return v === undefined || v === null || isNaN(v) ? "0" : String(Math.round(v))
 }
@@ -86,10 +123,11 @@ function monthKey(ms) {
     return d.getFullYear() * 12 + d.getMonth()
 }
 
-// Monday 00:00 of the week holding ms
-function weekStart(ms) {
+// 00:00 of the first day of the week holding ms. firstDay is the ui2 setting weekStart: 0 for
+// Sunday, anything else (1, or left out) for Monday
+function weekStart(ms, firstDay) {
     var d = new Date(startOfDay(ms))
-    var back = (d.getDay() + 6) % 7
+    var back = Number(firstDay) === 0 && firstDay !== null && firstDay !== "" ? d.getDay() : (d.getDay() + 6) % 7
     d.setDate(d.getDate() - back)
     return d.getTime()
 }

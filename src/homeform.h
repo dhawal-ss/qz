@@ -459,6 +459,22 @@ class homeform : public QObject {
     Q_INVOKABLE bool ridePaused() { return paused; }
     Q_INVOKABLE bool rideStopped() { return stopped; }
 
+    // Whether the app can set the level of the connected bike. QZ has no capability flag for this
+    // (ergModeSupported is about power targets), so this only rules out the classes whose code
+    // never writes a level. Bikes with a hand knob that share a class with motorised ones (Echelon)
+    // still answer true; src/ui2 learns those from a level press that changes nothing.
+    Q_INVOKABLE bool canChangeResistance() {
+        bluetoothdevice *dev = bluetoothManager ? bluetoothManager->device() : nullptr;
+        if (!dev || (dev->deviceType() != BIKE && dev->deviceType() != ELLIPTICAL))
+            return false;
+        const QString className = QString::fromLatin1(dev->metaObject()->className());
+        const QStringList readOnly = {QStringLiteral("pelotonbike"), QStringLiteral("cscbike"),
+                                      QStringLiteral("m3ibike"),     QStringLiteral("nautilusbike"),
+                                      QStringLiteral("xcxbike"),     QStringLiteral("eliterizer"),
+                                      QStringLiteral("elitesterzosmart")};
+        return !readOnly.contains(className);
+    }
+
     Q_INVOKABLE bool confirmStopEnabled() {
         QSettings settings;
         return settings.value(QZSettings::confirm_stop_workout, QZSettings::default_confirm_stop_workout).toBool();

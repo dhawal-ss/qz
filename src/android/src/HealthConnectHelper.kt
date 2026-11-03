@@ -209,7 +209,7 @@ class HealthConnectHelper {
                 endTime = end,
                 endZoneOffset = zoneOffset,
                 exerciseType = exerciseType(deviceType),
-                title = if (title.isNullOrBlank()) "QZ workout" else title,
+                title = if (title.isNullOrBlank()) "Bikemodo ride" else title,
                 notes = deviceName,
                 metadata = Metadata(recordingMethod = Metadata.RECORDING_METHOD_ACTIVELY_RECORDED)
             )

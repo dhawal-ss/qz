@@ -5,8 +5,10 @@ import "sig"
 import "charts"
 import "laps"
 import "rides"
+import "learn"
 import "Format.js" as Format
 import "rides/Analysis.js" as Analysis
+import "learn/Learn.js" as Learn
 
 // One ride in depth, in the Signature language: the ride's name and day, what a coach would
 // say about it (the record it set, else the most notable thing) with that one number big in its
@@ -16,8 +18,13 @@ import "rides/Analysis.js" as Analysis
 // most rides need; Pro adds every chart (linked: they zoom and read out together), the power
 // curve, durability and the lap views. The screen wears one tint: the zone of its hero number,
 // else the zone the ride counts in. Everything is worked out once when the ride changes.
+// Under the chart, this ride against the usual of the 30 days before it (rides/RideUsual.qml).
+// Tap to learn: the hero number, the charts, every key number and every section opens a Learn
+// sheet (learn/LearnSheet.qml) on what it is and what this ride's number says; holding or
+// dragging a chart still reads it out, a double tap still shows the whole ride.
 Item {
     id: detail
+    objectName: "rideDetail"
 
     property var library: null
     property int rideId: -1
@@ -31,6 +38,8 @@ Item {
     property var rideList: []
     // the end of the page the floating navigation covers
     property real bottomClearance: 0
+    // what a sheet keeps free at its end: the bottom inset
+    property real sheetClearance: 0
     property var ride: ({})
     property var samples: ({})
     // which metrics have data, worked out once per ride
@@ -42,6 +51,18 @@ Item {
     property var story: ({ sentence: "", value: "", unit: "", label: "", sub: "", zone: 0, seconds: 0, power: false })
     property var segment: null
     property var curve90: []
+    // the best of every ride before this one
+    property var curveBefore: []
+    // the rides of the library, newest first, as load() read them
+    property var history: []
+    // the Learn sheet
+    property bool learnOpen: false
+    property var learnEntry: null
+    readonly property var learnIds: ["ridechart", "rideusual", "record", "effort", "time", "work", "distance", "avgpower", "np", "if",
+                                     "tss", "avghr", "cadence", "speed", "level", "zones", "ridecurve", "changes", "decoupling",
+                                     "ef", "workblocks"]
+    // a sheet covers the ride
+    readonly property bool covering: learnOpen
     property var durable: null
     property var changes: []
     property var blocks: ({ blocks: [], work: false })
@@ -94,8 +115,11 @@ Item {
         var spread = Analysis.cadenceSpread(all)
         var similarSpread = similar ? Analysis.cadenceSpread(library.samples(similar.id, 0)) : 0
         curve90 = r.start ? library.powerCurve(r.start - 90 * day, r.start) : []
+        curveBefore = r.start ? library.powerCurve(0, r.start) : []
+        history = list
+        learnOpen = false
         story = Analysis.headline({
-            ride: r, before: r.start ? library.powerCurve(0, r.start) : [], prior90: curve90,
+            ride: r, before: curveBefore, prior90: curve90,
             month: Analysis.sameMonth(list, r), spread: spread, similarSpread: similarSpread, ftp: r.ftp || 0, now: Date.now()
         })
         var length = story.seconds > 0 ? story.seconds : ((r.duration || 0) >= 1200 ? 300 : 60)
@@ -120,6 +144,88 @@ Item {
         for (var i = 0; i < list.length; i++)
             out.push(list[i].start)
         return out
+    }
+
+    // the Learn entry of the hero number, by what the number is
+    function heroLearnId() {
+        if (story.record)
+            return "record"
+        if (story.seconds > 0)
+            return "effort"
+        if (story.unit === "kJ")
+            return "work"
+        if (story.unit === "rpm")
+            return "cadence"
+        if (story.unit === "W")
+            return ride.np > 0 ? "np" : "avgpower"
+        return "time"
+    }
+
+    // what the Learn sheet of an entry says about this ride
+    function factsFor(id) {
+        var r = ride
+        var f = { rides: 1, estimated: estimated, seconds: r.duration || 0, kj: r.kj || 0, power: r.avgPower || 0, np: r.np || 0,
+                  value: r.intensity || 0, tss: r.tss || 0, heart: r.avgHr || 0, cadence: r.avgCadence || 0,
+                  distanceText: r.distance > 0 ? Format.distance(r.distance, miles) : "" }
+        if (id === "record" || id === "effort") {
+            f.effort = Analysis.effortWords(story.seconds)
+            f.watts = Number(story.value) || 0
+            f.previous = Analysis.wattsAt(id === "record" ? curveBefore : curve90, story.seconds)
+        }
+        if (id === "if")
+            f.value = r.intensity || 0
+        if (id === "decoupling" || id === "ef")
+            f.value = durable ? (id === "ef" ? durable.ef : durable.decoupling) : undefined
+        if (id === "zones") {
+            var z = r.powerZones || []
+            var best = -1
+            for (var i = 0; i < z.length; i++)
+                if (best < 0 || z[i] > z[best])
+                    best = i
+            if (best >= 0 && zoneTotal > 1) {
+                f.topZone = Theme.powerZoneNames[best]
+                f.topShare = 100 * z[best] / zoneTotal
+            }
+        }
+        if (id === "ridecurve") {
+            var s = story.seconds > 0 ? story.seconds : 300
+            var w = Analysis.wattsAt(r.best || [], s)
+            if (w > 0) {
+                f.effort = Analysis.effortWords(s)
+                f.watts = w
+                f.prior = Analysis.wattsAt(curve90, s)
+            }
+        }
+        if (id === "ridechart" && segment) {
+            f.bestLabel = Format.effort(segment.seconds)
+            f.bestWatts = segment.watts
+        }
+        if (id === "changes")
+            f.count = changes.length
+        if (id === "workblocks") {
+            f.count = blocks.blocks.length
+            f.work = blocks.work
+        }
+        if (id === "rideusual" || id === "avghr") {
+            var u = usualSection.learnFacts()
+            for (var k in u)
+                f[k] = u[k]
+        }
+        return f
+    }
+
+    function openLearn(id) {
+        learnEntry = Learn.entry(id, factsFor(id))
+        learnOpen = true
+    }
+
+    // Android back closes the Learn sheet first
+    function goBack() {
+        if (learnOpen) {
+            learnOpen = false
+            return true
+        }
+        return false
     }
 
     function hasValues(list) {
@@ -225,22 +331,22 @@ Item {
         if (!r.start)
             return out
         var power = r.avgPower > 0
-        out.push({ label: qsTr("Time"), value: Analysis.shortDuration(r.duration || 0), unit: "" })
+        out.push({ label: qsTr("Time"), value: Analysis.shortDuration(r.duration || 0), unit: "", learn: "time" })
         if (power)
-            out.push({ label: qsTr("Work"), value: Format.big(r.kj || 0), unit: "kJ", estimated: estimated })
+            out.push({ label: qsTr("Work"), value: Format.big(r.kj || 0), unit: "kJ", estimated: estimated, learn: "work" })
         if (!pro)
-            out.push({ label: qsTr("Distance"), value: Format.distance(r.distance || 0, miles).split(" ")[0], unit: miles ? "mi" : "km" })
+            out.push({ label: qsTr("Distance"), value: Format.distance(r.distance || 0, miles).split(" ")[0], unit: miles ? "mi" : "km", learn: "distance" })
         if (power)
-            out.push({ label: qsTr("Avg power"), value: Format.whole(r.avgPower), unit: "W", estimated: estimated })
+            out.push({ label: qsTr("Avg power"), value: Format.whole(r.avgPower), unit: "W", estimated: estimated, learn: "avgpower" })
         if (pro && r.np > 0) {
-            out.push({ label: qsTr("Normalized power"), value: Format.whole(r.np), unit: "W", estimated: estimated })
-            out.push({ label: qsTr("Intensity factor"), value: (r.intensity || 0).toFixed(2), unit: "", estimated: estimated })
-            out.push({ label: qsTr("Training load"), value: Format.whole(r.tss), unit: "TSS", estimated: estimated })
+            out.push({ label: qsTr("Normalized power"), value: Format.whole(r.np), unit: "W", estimated: estimated, learn: "np" })
+            out.push({ label: qsTr("Intensity factor"), value: (r.intensity || 0).toFixed(2), unit: "", estimated: estimated, learn: "if" })
+            out.push({ label: qsTr("Training load"), value: Format.whole(r.tss), unit: "TSS", estimated: estimated, learn: "tss" })
         }
         if (r.avgHr > 0)
-            out.push({ label: qsTr("Avg heart rate"), value: Format.whole(r.avgHr), unit: "bpm" })
+            out.push({ label: qsTr("Avg heart rate"), value: Format.whole(r.avgHr), unit: "bpm", learn: "avghr" })
         if (r.avgCadence > 0)
-            out.push({ label: qsTr("Avg cadence"), value: Format.whole(r.avgCadence), unit: "rpm" })
+            out.push({ label: qsTr("Avg cadence"), value: Format.whole(r.avgCadence), unit: "rpm", learn: "cadence" })
         return out
     }
 
@@ -254,7 +360,12 @@ Item {
 
     onRideIdChanged: load()
     // You may have changed the level while the ride stayed open (tablets)
-    onVisibleChanged: if (visible) readLevel()
+    onVisibleChanged: {
+        if (visible)
+            readLevel()
+        else
+            learnOpen = false
+    }
     onLibraryChanged: {
         loadedId = -1
         load()
@@ -418,14 +529,15 @@ Item {
                     }
                     Item { width: 1; height: 14 }
                     // the hero: the number of the headline, heavier the harder it was
-                    Item {
+                    // the hero number is the button to its Learn sheet
+                    LearnTap {
                         id: heroRow
                         width: parent.width
                         height: Math.max(heroNumber.height, heroLabels.height + Math.round(heroNumber.height * 0.12))
-                        Accessible.role: Accessible.StaticText
-                        Accessible.name: detail.story.label + ", " + detail.story.value + " " + detail.story.unit
-                                         + (detail.story.power && detail.estimated ? " " + qsTr("estimated") : "")
-                                         + (detail.story.sub !== "" ? ", " + detail.story.sub : "")
+                        name: detail.story.label + ", " + detail.story.value + " " + detail.story.unit
+                              + (detail.story.power && detail.estimated ? " " + qsTr("estimated") : "")
+                              + (detail.story.sub !== "" ? ", " + detail.story.sub : "")
+                        onClicked: detail.openLearn(detail.heroLearnId())
                         RollingNumber {
                             id: heroNumber
                             anchors.bottom: parent.bottom
@@ -534,6 +646,8 @@ Item {
                                                                ? Analysis.wattsAt(detail.ride.best, detail.story.seconds)
                                                                : detail.segment.watts) + " W" : ""
                         reveal: detail.reveal
+                        learnable: true
+                        onLearn: detail.openLearn(power ? "ridechart" : "avghr")
                         Accessible.name: power
                                          ? qsTr("Power across the ride%1. Best %2, %3 watts.")
                                            .arg(detail.has.heart === true ? qsTr(" with heart rate") : "")
@@ -554,6 +668,8 @@ Item {
                         average: detail.ride.avgCadence || 0
                         laps: detail.lapStarts
                         reveal: detail.reveal
+                        learnable: true
+                        onLearn: detail.openLearn("cadence")
                     }
                     TimeChart {
                         visible: detail.pro && detail.has.level === true
@@ -566,6 +682,8 @@ Item {
                         color: Theme.text2
                         laps: detail.lapStarts
                         reveal: detail.reveal
+                        learnable: true
+                        onLearn: detail.openLearn("level")
                     }
                     TimeChart {
                         visible: detail.pro && detail.has.speed === true
@@ -581,10 +699,33 @@ Item {
                         color: Theme.text2
                         laps: detail.lapStarts
                         reveal: detail.reveal
+                        learnable: true
+                        onLearn: detail.openLearn("speed")
                     }
                     TimeAxis {
                         width: parent.width
                         view: chartView
+                    }
+                }
+            }
+
+            // this ride against the rides of the 30 days before it
+            Rise {
+                cue: detail
+                order: 2
+                width: parent.width
+                visible: usualSection.rows.length > 0
+                RideUsual {
+                    id: usualSection
+                    width: parent.width
+                    ride: detail.ride
+                    rides: detail.history
+                    tint: detail.tint
+                    estimated: detail.estimated
+                    onClicked: detail.openLearn("rideusual")
+                    Connections {
+                        target: detail
+                        function onEntered() { usualSection.grow() }
                     }
                 }
             }
@@ -609,6 +750,7 @@ Item {
                     KeyGrid {
                         width: parent.width
                         items: detail.keyItems
+                        onPicked: detail.openLearn(detail.keyItems[index].learn)
                     }
                 }
             }
@@ -619,7 +761,11 @@ Item {
                 order: 3
                 width: parent.width
                 visible: (detail.ride.powerZones || []).length === 7 && detail.zoneTotal > 1
-                Column {
+                LearnTap {
+                  width: parent.width
+                  name: qsTr("Time in zones")
+                  onClicked: detail.openLearn("zones")
+                  Column {
                     width: parent.width
                     spacing: 14
                     Item {
@@ -649,6 +795,7 @@ Item {
                         ftp: detail.ride.ftp || 0
                         grow: Math.min(1, detail.reveal * 1.4)
                     }
+                  }
                 }
             }
 
@@ -658,7 +805,11 @@ Item {
                 order: 4
                 width: parent.width
                 visible: detail.pro && (detail.ride.best || []).length > 0 && detail.curve90.length > 0
-                Column {
+                LearnTap {
+                  width: parent.width
+                  name: qsTr("Power curve of the ride")
+                  onClicked: detail.openLearn("ridecurve")
+                  Column {
                     width: parent.width
                     spacing: 10
                     Item {
@@ -694,6 +845,7 @@ Item {
                         heroSeconds: detail.story.seconds || 0
                         reveal: detail.reveal
                     }
+                  }
                 }
             }
 
@@ -703,7 +855,11 @@ Item {
                 order: 4
                 width: parent.width
                 visible: detail.changes.length > 0
-                Column {
+                LearnTap {
+                  width: parent.width
+                  name: qsTr("What changed")
+                  onClicked: detail.openLearn("changes")
+                  Column {
                     width: parent.width
                     Text {
                         bottomPadding: 6
@@ -750,6 +906,7 @@ Item {
                             }
                         }
                     }
+                  }
                 }
             }
 
@@ -775,14 +932,16 @@ Item {
                         spacing: 24
                         Repeater {
                             model: detail.durable ? [
-                                [qsTr("Decoupling"), detail.durable.decoupling.toFixed(1), "%"],
-                                [qsTr("Efficiency factor"), detail.durable.ef.toFixed(2), ""]
+                                [qsTr("Decoupling"), detail.durable.decoupling.toFixed(1), "%", "decoupling"],
+                                [qsTr("Efficiency factor"), detail.durable.ef.toFixed(2), "", "ef"]
                             ] : []
-                            Column {
+                            LearnTap {
                                 width: (parent.width - 24) / 2
+                                name: modelData[0] + ", " + modelData[1] + modelData[2]
+                                onClicked: detail.openLearn(modelData[3])
+                              Column {
+                                width: parent.width
                                 spacing: 10
-                                Accessible.role: Accessible.StaticText
-                                Accessible.name: modelData[0] + ", " + modelData[1] + modelData[2]
                                 Text {
                                     text: modelData[0]
                                     color: Theme.text2
@@ -809,6 +968,7 @@ Item {
                                         Accessible.ignored: true
                                     }
                                 }
+                              }
                             }
                         }
                     }
@@ -833,9 +993,11 @@ Item {
                 Column {
                     width: parent.width
                     spacing: 8
-                    Item {
+                    LearnTap {
                         width: parent.width
                         height: lapsTitle.height
+                        name: qsTr("Laps")
+                        onClicked: detail.openLearn("workblocks")
                         Text {
                             id: lapsTitle
                             text: qsTr("Laps")
@@ -938,6 +1100,17 @@ Item {
                 }
             }
         }
+    }
+
+    LearnSheet {
+        anchors.fill: parent
+        open: detail.learnOpen
+        entry: detail.learnEntry
+        known: detail.learnIds
+        tint: detail.tint
+        bottomInset: detail.sheetClearance
+        onClose: detail.learnOpen = false
+        onRelated: detail.openLearn(id)
     }
 
     // the share sheet of the moments (moments/ShareSheet.qml), the ride as a fingerprint card;

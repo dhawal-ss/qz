@@ -43,7 +43,7 @@ YouPage {
             Rectangle {
                 anchors.fill: parent
                 radius: 24
-                color: modelData.state === "now" ? Qt.rgba(201 / 255, 184 / 255, 1, 0.08) : "transparent"
+                color: modelData.state === "now" ? Theme.accentWash(0.08) : "transparent"
             }
             // the line between two steps
             Rectangle {

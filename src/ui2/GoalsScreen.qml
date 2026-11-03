@@ -4,6 +4,8 @@ import "."
 import "sig"
 import "goals"
 import "progress"
+import "learn"
+import "learn/Learn.js" as Learn
 import "progress/Progress.js" as Progress
 import "goals/Streak.js" as Streak
 import "goals/Journeys.js" as Journeys
@@ -22,6 +24,8 @@ import "Format.js" as Format
 // Everything Goals stores is in the ui2 settings: goalKind, weeklyGoalMinutes (also read by the
 // ride summary), weeklyGoalKj, weeklyGoalKm, weeklyGoalRides, restWeeks, restReasons, goalsPause,
 // welcomeSeen, journeyId, journeyStartKm, journeyStartMs, journeysDone and goalsCards.
+// Tap to learn: each section opens a Learn sheet (learn/LearnSheet.qml) on what it is and what the
+// rider's own numbers say; openLearn("streak") and openLearn("freezes") are there for the hero.
 Item {
     id: goals
     objectName: "goalsScreen"
@@ -32,6 +36,9 @@ Item {
     property string initial: "B"
     // the end of the page the floating navigation covers: the content scrolls under it
     property real bottomClearance: 0
+    // what a sheet keeps free at its end (the bottom inset; the shell binds it, the floating
+    // navigation steps aside while a sheet covers the page)
+    property real sheetClearance: 0
 
     signal openYou()
     // Start on Welcome back: an easy ride
@@ -85,11 +92,15 @@ Item {
     property bool welcomeOpen: false
     // the setup is offered once a session to a rider without a goal
     property bool setupOffered: false
+    // the Learn sheet
+    property bool learnOpen: false
+    property var learnEntry: null
+    readonly property var learnIds: ["streak", "freezes", "challenge", "journey", "badges", "ladders", "recap", "lifetime"]
 
     readonly property bool hasRides: library !== null && library.rideCount > 0
     readonly property bool paused: Streak.pausedNow(pause, nowMs)
     // a full page covers Goals: the shell may hide the floating navigation
-    readonly property bool covering: setupOpen || pauseOpen || welcomeOpen
+    readonly property bool covering: setupOpen || pauseOpen || welcomeOpen || learnOpen || badgeId !== "" || recapOpen
     readonly property var shownIds: {
         var out = []
         for (var i = 0; i < cards.length; i++)
@@ -324,6 +335,57 @@ Item {
         customizing = true
     }
 
+    // what the Learn sheet of an entry says about this rider
+    function factsFor(id) {
+        var f = { rides: lifetime.rides || 0 }
+        if (id === "streak" && streakResult) {
+            f.streak = streakResult.streak
+            f.goalText = goalWords(goalKind, goalValue)
+        }
+        if (id === "freezes" && streakResult) {
+            f.freezes = streakResult.freezes || 0
+            f.toNext = streakResult.toNextFreeze || 0
+        }
+        if (id === "challenge" && challengeHistory.length > 0) {
+            var month = challengeHistory[challengeHistory.length - 1]
+            var pace = Challenge.pace(month.minutes, month.target, nowMs)
+            var hoursText = function (minutes) {
+                var m = Math.round(minutes)
+                return m >= 60 && m % 60 === 0 ? (m / 60) + " h" : Format.hours(m * 60)
+            }
+            f.targetText = hoursText(month.target)
+            f.doneText = hoursText(month.minutes)
+            f.daysLeftText = month.met ? qsTr("done for the month") : (pace.daysLeft === 1 ? qsTr("1 day left") : qsTr("%1 days left").arg(pace.daysLeft))
+            f.paceText = month.met ? qsTr("Everything from here is extra.")
+                         : (pace.onTrack ? qsTr("You are on track.") : qsTr("About %1 a week gets you there.").arg(hoursText(pace.perWeek)))
+        }
+        if (id === "journey") {
+            var journey = Journeys.byId(journeyId)
+            if (journey) {
+                f.name = journey.name
+                f.percent = Journeys.progress(journey, journeyRidden).percent
+            }
+        }
+        if (id === "badges") {
+            f.earned = Badges.earned(badges).length
+            f.total = badges.length
+        }
+        if (id === "ladders" && (lifetime.distance || 0) > 0)
+            f.distanceText = Format.distance(lifetime.distance, miles)
+        if (id === "lifetime")
+            f.seconds = lifetime.seconds || 0
+        if (id === "recap") {
+            f.rides = lastWeek.rides
+            f.seconds = lastWeek.seconds
+        }
+        return f
+    }
+
+    function openLearn(id) {
+        learnEntry = Learn.entry(id, factsFor(id))
+        learnOpen = true
+    }
+
     function openRecap() {
         recapOpen = true
     }
@@ -344,6 +406,10 @@ Item {
     // Android back closes what is on top first: a full page, a badge, the week in review, then
     // Customize
     function goBack() {
+        if (learnOpen) {
+            learnOpen = false
+            return true
+        }
         if (welcomeOpen) {
             welcomeOpen = false
             return true
@@ -373,8 +439,10 @@ Item {
 
     onLibraryChanged: refresh()
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
+            learnOpen = false
             return
+        }
         readSettings()
         refresh()
         entered()
@@ -396,7 +464,11 @@ Item {
 
     Component {
         id: recapComponent
-        Column {
+        LearnTap {
+          name: qsTr("Your week in review")
+          onClicked: goals.openLearn("recap")
+          Column {
+            width: parent.width
             spacing: 8
             CapLabel {
                 text: qsTr("Your week in review")
@@ -439,23 +511,34 @@ Item {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
+          }
         }
     }
     Component {
         id: challengeComponent
-        ChallengeCard {
-            history: goals.challengeHistory
-            nowMs: goals.nowMs
+        LearnTap {
+            name: qsTr("Monthly challenge")
+            onClicked: goals.openLearn("challenge")
+            ChallengeCard {
+                width: parent.width
+                history: goals.challengeHistory
+                nowMs: goals.nowMs
+            }
         }
     }
     Component {
         id: journeyComponent
-        JourneyCard {
-            journeyId: goals.journeyId
-            ridden: goals.journeyRidden
-            finished: goals.journeysDone
-            miles: goals.miles
-            onStartJourney: goals.startJourney(id)
+        LearnTap {
+            name: qsTr("Journey")
+            onClicked: goals.openLearn("journey")
+            JourneyCard {
+                width: parent.width
+                journeyId: goals.journeyId
+                ridden: goals.journeyRidden
+                finished: goals.journeysDone
+                miles: goals.miles
+                onStartJourney: goals.startJourney(id)
+            }
         }
     }
     Component {
@@ -464,13 +547,19 @@ Item {
             badges: goals.badges
             miles: goals.miles
             onOpenBadge: goals.openBadge(id)
+            onLearn: goals.openLearn("badges")
         }
     }
     Component {
         id: laddersComponent
-        LaddersCard {
-            lifetime: goals.lifetime
-            miles: goals.miles
+        LearnTap {
+            name: qsTr("Ladders")
+            onClicked: goals.openLearn("ladders")
+            LaddersCard {
+                width: parent.width
+                lifetime: goals.lifetime
+                miles: goals.miles
+            }
         }
     }
 
@@ -544,6 +633,7 @@ Item {
             StreakCard {
                 id: lead
                 objectName: "goalsHero"
+                onGoalPicked: goals.setGoal(value)
                 y: headerBox.height
                 width: content.leftWidth
                 cue: goals
@@ -611,7 +701,7 @@ Item {
 
     BadgeSheet {
         anchors.fill: parent
-        anchors.bottomMargin: goals.bottomClearance
+        anchors.bottomMargin: goals.sheetClearance
         open: goals.badgeId !== ""
         badge: goals.openedBadge
         miles: goals.miles
@@ -620,7 +710,7 @@ Item {
 
     WeeklyRecap {
         anchors.fill: parent
-        anchors.bottomMargin: goals.bottomClearance
+        anchors.bottomMargin: goals.sheetClearance
         open: goals.recapOpen
         library: goals.library
         miles: goals.miles
@@ -631,6 +721,16 @@ Item {
         goalWords: goals.goalWords(goals.goalKind, goals.goalValue)
         nextGoalWords: goals.goalWords(goals.goalKind, goals.goalValue)
         onClose: goals.recapOpen = false
+    }
+
+    LearnSheet {
+        anchors.fill: parent
+        open: goals.learnOpen
+        entry: goals.learnEntry
+        known: goals.learnIds
+        bottomInset: goals.sheetClearance
+        onClose: goals.learnOpen = false
+        onRelated: goals.openLearn(id)
     }
 
     GoalSetup {

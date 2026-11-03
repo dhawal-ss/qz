@@ -3,10 +3,14 @@ import ".."
 import "../sig"
 import "../Format.js" as Format
 import "Streak.js" as Streak
+import "../settings"
+import "../settings/GoalLimits.js" as GoalLimits
 
 // "What feels doable each week?": the weekly goal as rides or minutes (a rider who counts work or
-// distance keeps that choice too), four sizes to pick from, the ring of the week as it would
-// look, how freezes work, and Set my goal. Nothing is stored until Set my goal.
+// distance keeps that choice too), four sizes as quick picks, the ring of the week as it would
+// look with a minus and a plus beside it (a tap on the number in the ring types any value, see
+// settings/GoalLimits.js for the ranges), how freezes work, and Set my goal. Nothing is stored
+// until Set my goal.
 HabitPage {
     id: setup
 
@@ -38,7 +42,8 @@ HabitPage {
         return [60, 90, 120, 180]
     }
     // the picked size as shown (miles for a rider who sees miles)
-    readonly property real shownValue: pickedKind === "km" && miles ? Math.round(pickedValue / 1.609344) : Math.round(pickedValue)
+    readonly property real shownValue: GoalLimits.toShown(pickedKind, pickedValue, miles)
+    readonly property var limits: GoalLimits.range(pickedKind, miles)
     readonly property string unitWords: {
         if (pickedKind === "rides")
             return Math.round(pickedValue) === 1 ? qsTr("ride a week") : qsTr("rides a week")
@@ -55,7 +60,7 @@ HabitPage {
     onPrimary: setup.chosen(pickedKind, pickedValue)
     onOpenChanged: if (open) start()
 
-    // from the stored goal; a size not on the list snaps to the nearest one
+    // from the stored goal, kept as it is (inside the range)
     function start() {
         pickedKind = kindOptions.map(function (o) { return o[0] }).indexOf(kind) >= 0 ? kind : "rides"
         pickValue(pickedKind === kind ? goal : (pickedKind === "rides" ? 3 : 120))
@@ -65,17 +70,12 @@ HabitPage {
         if (k === pickedKind)
             return
         pickedKind = k
-        pickValue(k === kind ? goal : (k === "rides" ? 3 : (k === "minutes" ? 120 : sizes[1])))
+        pickValue(k === kind ? goal : (k === "rides" ? 3 : (k === "minutes" ? 120 : GoalLimits.toStored(k, sizes[1], miles))))
     }
 
+    // v in the stored unit (km for distance)
     function pickValue(v) {
-        var list = sizes
-        var shown = pickedKind === "km" && miles ? v / 1.609344 : v
-        var best = list[0]
-        for (var i = 1; i < list.length; i++)
-            if (Math.abs(list[i] - shown) < Math.abs(best - shown))
-                best = list[i]
-        pickedValue = pickedKind === "km" && miles ? best * 1.609344 : best
+        pickedValue = GoalLimits.clampStored(pickedKind, v, miles)
     }
 
     Item { width: 1; height: 20 }
@@ -242,8 +242,25 @@ HabitPage {
                 segments: setup.pickedKind === "rides" ? Math.round(setup.pickedValue) : 0
                 done: setup.pickedKind === "rides" ? Math.min(Math.round(setup.pickedValue), Streak.measure(setup.week, "rides"))
                                                    : Streak.measure(setup.week, setup.pickedKind) / Math.max(1, setup.pickedValue)
-                value: String(setup.shownValue)
-                word: setup.unitWords
+                value: goalStepper.editing ? "" : Format.big(setup.shownValue)
+                word: goalStepper.editing ? "" : setup.unitWords
+            }
+            // minus and plus beside the ring, the number in it opens a field
+            NumberStepper {
+                id: goalStepper
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: Math.min(parent.width, ring.width + 2 * 72)
+                height: ring.height
+                showValue: false
+                buttonSize: 52
+                numberSize: Math.round(ring.width * 44 / 188)
+                value: setup.shownValue
+                from: setup.limits.from
+                to: setup.limits.to
+                step: setup.limits.step
+                unit: setup.unitWords
+                name: qsTr("Weekly goal")
+                onEdited: setup.pickedValue = GoalLimits.toStored(setup.pickedKind, value, setup.miles)
             }
         }
     }

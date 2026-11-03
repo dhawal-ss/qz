@@ -3,11 +3,14 @@ import ".."
 import "../sig"
 import "../Format.js" as Format
 import "Streak.js" as Streak
+import "../settings"
+import "../settings/GoalLimits.js" as GoalLimits
 
 // The hero of Goals: the streak in the breathing Pulse, what a coach would say about it, the
 // last weeks as a row (a goal week is the Pulse, a freeze or a rest week its glyph, this week a
-// ring that fills), and the one raised card: this week against the goal, the freezes, and the
-// ways to change the goal or take a break. The rules are in Streak.js.
+// ring that fills), and the one raised card: this week against the goal, the freezes, the goal
+// itself as a number to step or type (goalPicked, a moment after the last change), and the ways
+// to change the goal or take a break. The rules are in Streak.js.
 Column {
     id: streakCard
 
@@ -25,6 +28,28 @@ Column {
     signal changeGoal()
     signal takeBreak()
     signal resume()
+    // a new goal of the same kind, in the stored unit (km for distance); GoalsScreen stores it
+    signal goalPicked(real value)
+
+    // the goal being stepped, shown at once and stored a moment after the last change; -1 when none
+    property real draftGoal: -1
+    readonly property real liveGoal: draftGoal >= 0 ? draftGoal : goal
+    readonly property var limits: GoalLimits.range(kind, miles)
+    onGoalChanged: if (!goalCommit.running) draftGoal = -1
+    onKindChanged: draftGoal = -1
+
+    Timer {
+        id: goalCommit
+        interval: 700
+        onTriggered: {
+            if (streakCard.draftGoal < 0)
+                return
+            var picked = streakCard.draftGoal
+            streakCard.draftGoal = -1
+            // GoalsScreen stores it and hands the new goal back at once
+            streakCard.goalPicked(picked)
+        }
+    }
 
     readonly property var current: result && result.current ? result.current : { key: 0, value: 0, status: "current" }
     readonly property real value: current.value
@@ -32,7 +57,7 @@ Column {
     readonly property int streak: result ? result.streak : 0
     readonly property int freezes: result ? result.freezes : 0
     readonly property var weeks: result ? Streak.lastWeeks(result.timeline, weekCount, nowMs) : []
-    readonly property real share: goal > 0 ? Math.min(1, value / goal) : 0
+    readonly property real share: liveGoal > 0 ? Math.min(1, value / liveGoal) : 0
     readonly property var numberWords: [qsTr("No"), qsTr("One"), qsTr("Two"), qsTr("Three"), qsTr("Four"), qsTr("Five"),
                                         qsTr("Six"), qsTr("Seven"), qsTr("Eight"), qsTr("Nine"), qsTr("Ten"),
                                         qsTr("Eleven"), qsTr("Twelve")]
@@ -72,7 +97,7 @@ Column {
 
     // what is left of the week, as words
     readonly property string toGo: {
-        var left = Math.max(0, goal - value)
+        var left = Math.max(0, liveGoal - value)
         if (kind === "rides") {
             var n = Math.max(1, Math.ceil(left - 1e-9))
             return n === 1 ? qsTr("One more ride closes the week.") : qsTr("%1 more rides close the week.").arg(countWord(n))
@@ -200,23 +225,9 @@ Column {
                 width: parent.width - 40
                 spacing: 16
 
-                Item {
-                    width: parent.width
-                    height: weekCap.height
-                    CapLabel {
-                        id: weekCap
-                        text: qsTr("This week")
-                    }
-                    Text {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: weekCap.verticalCenter
-                        width: Math.min(implicitWidth, parent.width - weekCap.implicitWidth - 12)
-                        text: qsTr("Goal %1").arg(streakCard.amount(streakCard.goal))
-                        color: Theme.text2
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: 13
-                        elide: Text.ElideRight
-                    }
+                CapLabel {
+                    id: weekCap
+                    text: qsTr("This week")
                 }
 
                 Item {
@@ -226,7 +237,7 @@ Column {
                         id: ring
                         width: 104
                         height: 104
-                        segments: streakCard.kind === "rides" ? Math.max(1, Math.round(streakCard.goal)) : 0
+                        segments: streakCard.kind === "rides" ? Math.max(1, Math.round(streakCard.liveGoal)) : 0
                         done: streakCard.kind === "rides" ? streakCard.value : streakCard.share
                         value: streakCard.bigValue(streakCard.value)
                         word: streakCard.unitWord
@@ -275,6 +286,65 @@ Column {
                                 font.family: Theme.bodyMedium
                                 font.pixelSize: 13
                                 wrapMode: Text.WordWrap
+                            }
+                        }
+                    }
+                }
+
+                // the goal itself on a hairline: step it or type it
+                Item {
+                    width: parent.width
+                    height: goalRow.height + 1
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Theme.hairline
+                    }
+                    Item {
+                        id: goalRow
+                        y: 1
+                        width: parent.width
+                        height: Math.max(64, goalStepper.height + 16)
+                        Column {
+                            width: Math.max(0, goalStepper.x - 12)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 3
+                            Text {
+                                width: parent.width
+                                text: qsTr("Weekly goal")
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 15
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                text: streakCard.kind === "rides" ? (Math.round(streakCard.liveGoal) === 1 ? qsTr("ride a week") : qsTr("rides a week"))
+                                      : streakCard.kind === "kj" ? qsTr("kJ a week")
+                                      : streakCard.kind === "km" ? (streakCard.miles ? qsTr("miles a week") : qsTr("km a week"))
+                                      : qsTr("minutes a week")
+                                color: Theme.text2
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                            }
+                        }
+                        NumberStepper {
+                            id: goalStepper
+                            x: parent.width - width
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.min(196, parent.width * 0.58)
+                            height: 48
+                            buttonSize: 44
+                            numberSize: 24
+                            value: GoalLimits.toShown(streakCard.kind, streakCard.liveGoal, streakCard.miles)
+                            from: streakCard.limits.from
+                            to: streakCard.limits.to
+                            step: streakCard.limits.step
+                            name: qsTr("Weekly goal")
+                            onEdited: {
+                                streakCard.draftGoal = GoalLimits.toStored(streakCard.kind, value, streakCard.miles)
+                                goalCommit.restart()
                             }
                         }
                     }

@@ -9918,7 +9918,7 @@ static void healthConnectWriteWorkout(const QList<SessionLine> &session, bluetoo
         return;
     }
 
-    const QString title = workoutName.isEmpty() ? QStringLiteral("QZ workout") : workoutName;
+    const QString title = workoutName.isEmpty() ? QStringLiteral("Bikemodo ride") : workoutName;
     QAndroidJniObject jTitle = QAndroidJniObject::fromString(title);
     QAndroidJniObject jDeviceName = QAndroidJniObject::fromString(dev->bluetoothDevice.name());
     QAndroidJniObject jSamplesJson =
@@ -10977,7 +10977,7 @@ void homeform::android_notification_apply(bool enabled) {
         // same call bluetooth.cpp makes at startup: QZ is in the foreground now, so the service can
         // start right away and the running workout doesn't need a restart
         //: Android notification: title shown while QZ works in the background.
-        QAndroidJniObject javaNotification = QAndroidJniObject::fromString(tr("QZ is running"));
+        QAndroidJniObject javaNotification = QAndroidJniObject::fromString(tr("Bikemodo is ready"));
         QAndroidJniObject::callStaticMethod<void>(
             "org/cagnulen/qdomyoszwift/NotificationClient", "notify", "(Landroid/content/Context;Ljava/lang/String;)V",
             QtAndroid::androidContext().object(), javaNotification.object<jstring>());

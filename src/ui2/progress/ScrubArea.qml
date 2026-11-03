@@ -1,8 +1,10 @@
 import QtQuick 2.15
+import ".."
 
 // The touch of a chart on a scrolling page, as in charts/TimeChart.qml: a sideways drag, or press
-// and hold then drag, moves the crosshair; a tap shows or hides it. Vertical drags are left to
-// the page, so it still scrolls over the chart.
+// and hold then drag, moves the crosshair; a tap is the chart's to use (hide the crosshair, or
+// open the Learn sheet). Vertical drags are left to the page, so it still scrolls over the chart.
+// With `learnable` the chart shows it is a button while a finger rests on it without scrubbing.
 MouseArea {
     id: touch
 
@@ -12,6 +14,7 @@ MouseArea {
     property bool scrubbing: false
     property real pressX: 0
     property real pressY: 0
+    property bool learnable: false
 
     Accessible.ignored: true
     pressAndHoldInterval: 350
@@ -52,5 +55,18 @@ MouseArea {
     onClicked: {
         if (!scrubbing)
             touch.tap(mouse.x)
+    }
+
+    // the pressed state of a chart that is a button: gone as soon as the touch scrubs
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: -6
+        radius: 18
+        color: Qt.rgba(1, 1, 1, 0.05)
+        opacity: touch.learnable && touch.pressed && !touch.scrubbing ? 1 : 0
+        Behavior on opacity {
+            enabled: !Theme.reduceMotion
+            NumberAnimation { duration: Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }
+        }
     }
 }

@@ -3937,7 +3937,7 @@ void bluetooth::connectedAndDiscovered() {
         // the context of homeform: the same text as android_notification_apply, translated once
         //: Android notification: title shown while QZ works in the background.
         QAndroidJniObject javaNotification =
-            QAndroidJniObject::fromString(QCoreApplication::translate("homeform", "QZ is running"));
+            QAndroidJniObject::fromString(QCoreApplication::translate("homeform", "Bikemodo is ready"));
         QAndroidJniObject::callStaticMethod<void>(
             "org/cagnulen/qdomyoszwift/NotificationClient", "notify", "(Landroid/content/Context;Ljava/lang/String;)V",
             QtAndroid::androidContext().object(), javaNotification.object<jstring>());

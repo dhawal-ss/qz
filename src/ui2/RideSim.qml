@@ -35,6 +35,13 @@ QtObject {
     property var cadenceTrail: []
     // power zone of every 30 s of the ride
     property var zoneHistory: []
+    // whether the demo bike takes level changes from the app; the ride screen shows the level
+    // buttons when it does and the ride controls when not
+    property bool canChangeResistance: true
+    property int laps: 0
+    // when the ride was paused (ms since the epoch), 0 while it is not
+    property double pausedAt: 0
+    onPausedChanged: pausedAt = paused ? Date.now() : 0
 
     // demo settings
     property int startAt: 0
@@ -63,6 +70,7 @@ QtObject {
         _fourthSum = 0
         _fourthCount = 0
         _powerSum = 0
+        laps = 0
         paused = false
         stopped = false
         running = true
@@ -77,18 +85,39 @@ QtObject {
         if (level > 1)
             level--
     }
-    function togglePause() {
-        if (stopped) {
+    // the same lifecycle as LiveSource: begin only from stopped, pause and resume keep the ride
+    function begin() {
+        if (stopped)
             restart()
-            return
-        }
-        paused = !paused
+    }
+    function pause() {
+        if (!stopped)
+            paused = true
+    }
+    function resume() {
+        if (!stopped)
+            paused = false
+    }
+    function togglePause() {
+        if (stopped)
+            begin()
+        else
+            paused = !paused
+    }
+    function end() {
+        if (stopped)
+            return false
+        stop()
+        return true
     }
     function stop() {
         running = false
         stopped = true
+        paused = false
     }
     function lap() {
+        if (!stopped)
+            laps++
     }
 
     function targetPower() {

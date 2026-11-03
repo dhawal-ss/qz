@@ -106,7 +106,7 @@ class HealthConnectHelperTest {
     fun `buildRecords uses default title when blank`() {
         val records = HealthConnectHelper.buildRecords(singleSample(), "", BIKE, "TestBike")
         val session = records.first() as ExerciseSessionRecord
-        assertEquals("QZ workout", session.title)
+        assertEquals("Bikemodo ride", session.title)
     }
 
     @Test

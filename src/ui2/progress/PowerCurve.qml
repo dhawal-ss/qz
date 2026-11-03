@@ -21,6 +21,12 @@ Column {
     property bool pro: false
 
     signal openRide(int id)
+    // a tap on the chart asks for its Learn sheet, with the rider's best 5 minutes
+    signal learn(string key, var facts)
+
+    function learnFacts() {
+        return { w300: wattsAt(points, 300), prior300: comparing ? wattsAt(comparePoints, 300) : 0 }
+    }
 
     property var points: []
     property var comparePoints: []
@@ -223,16 +229,17 @@ Column {
             width: drawIn.width
             height: plot.height + 22
 
-            Accessible.role: Accessible.Graphic
+            Accessible.role: Accessible.Button
             Accessible.name: {
                 var parts = []
                 var want = [5, 60, 300, 1200, 3600]
                 for (var i = 0; i < curve.points.length; i++)
                     if (want.indexOf(curve.points[i].seconds) >= 0)
                         parts.push(Progress.effort(curve.points[i].seconds) + " " + Math.round(curve.points[i].watts) + " W")
-                return parts.length > 0 ? qsTr("Power curve of the period: %1").arg(parts.join(", "))
-                                        : qsTr("Power curve, no rides in this period")
+                return parts.length > 0 ? qsTr("Power curve of the period: %1. Tap to learn more").arg(parts.join(", "))
+                                        : qsTr("Power curve, no rides in this period. Tap to learn more")
             }
+            Accessible.onPressAction: curve.learn("curve", curve.learnFacts())
 
             Item {
                 id: plot
@@ -351,7 +358,13 @@ Column {
                     anchors.fill: parent
                     enabled: curve.points.length > 0
                     onScrub: curve.cursor = curve.nearest(at)
-                    onTap: curve.cursor = curve.cursor >= 0 ? -1 : curve.nearest(at)
+                    learnable: true
+                    onTap: {
+                        if (curve.cursor >= 0)
+                            curve.cursor = -1
+                        else
+                            curve.learn("curve", curve.learnFacts())
+                    }
                 }
             }
 

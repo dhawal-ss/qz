@@ -27,12 +27,16 @@ Item {
     property var core: null
     // the end of the page the floating navigation covers: the list and the ride scroll under it
     property real bottomClearance: 0
+    // what a sheet keeps free at its end (the bottom inset; the shell binds it)
+    property real sheetClearance: 0
 
     signal openYou()
 
     readonly property bool twoPane: width >= 760
     // a ride covers the list (phones): the shell can hide its navigation
     readonly property bool detailOpen: !twoPane && shownId >= 0
+    // a Learn sheet is open over the ride
+    readonly property bool covering: rideDetail.covering
 
     // the ride the detail shows: it stays while the detail slides away
     property int shownId: -1
@@ -63,6 +67,8 @@ Item {
     }
 
     function goBack() {
+        if (rideDetail.goBack())
+            return true
         if (!twoPane && selectedId >= 0) {
             selectedId = -1
             return true
@@ -405,6 +411,7 @@ Item {
             core: rides.core
             rideList: rides.allRides
             bottomClearance: rides.bottomClearance
+            sheetClearance: rides.sheetClearance
             onBack: rides.goBack()
         }
     }

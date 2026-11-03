@@ -19,6 +19,19 @@ Column {
     property bool pro: false
 
     signal openRide(int id)
+    // the label asks for the Learn sheet of records, with the newest one
+    signal learn(string key, var facts)
+
+    function learnFacts() {
+        var newest = null
+        for (var i = 0; i < allPowerRows.length; i++)
+            if (newest === null || allPowerRows[i].start > newest.start)
+                newest = allPowerRows[i]
+        if (newest === null)
+            return { rides: 0 }
+        return { rides: 1, newest: qsTr("%1 power").arg(Progress.effort(newest.seconds)),
+                 when: Progress.stood(newest.start, Date.now()) === "today" ? qsTr("today") : qsTr("%1 ago").arg(Progress.stood(newest.start, Date.now())) }
+    }
 
     readonly property var allDurations: [5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600]
     readonly property var simpleDurations: [5, 60, 300, 1200, 3600]
@@ -123,6 +136,8 @@ Column {
         width: parent.width
         title: qsTr("Records")
         note: qsTr("All time")
+        learnable: true
+        onLearn: board.learn("records", board.learnFacts())
     }
 
     Text {

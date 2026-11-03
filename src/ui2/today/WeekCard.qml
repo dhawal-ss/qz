@@ -4,7 +4,7 @@ import "../sig"
 
 // This week: each day as the Pulse of the zone it was ridden in, a dot for a day off and a dashed
 // ring for today still to ride, with the week against the weekly goal on the right
-// ("3 of 4 rides", as set on Goals). A tap opens Goals.
+// ("3 of 4 rides", as set on Goals). A tap opens its Learn sheet (learn()), which leads on to Goals.
 PulseButton {
     id: weekCard
 
@@ -13,13 +13,14 @@ PulseButton {
     property bool met: false
 
     signal openGoals()
+    signal learn()
 
     implicitHeight: weekColumn.implicitHeight + 8
     fill: pressed ? Theme.pressed : "transparent"
     radius: 20
     pressedScale: 0.985
-    Accessible.name: qsTr("This week, %1. Open your goals").arg(summary)
-    onClicked: weekCard.openGoals()
+    Accessible.name: qsTr("This week, %1, tap to learn more").arg(summary)
+    onClicked: weekCard.learn()
 
     contentItem: Column {
         id: weekColumn

@@ -77,6 +77,12 @@ QVector<double> bucketAverage(const QVector<double> &values, int points);
 // a record. A value equal to the best so far does not beat it.
 QVector<int> recordSteps(const QVector<double> &values);
 
+// Rides saved one after the other (a pause, a restart of the app) as one ride: the samples of the
+// parts follow each other with the pauses left out. The distance and calories of a part go on from
+// where the part before ended and second counts on from the parts before. partStarts, when given,
+// gets the index of the first sample of every part.
+QVector<RideSample> joinParts(const QList<QVector<RideSample>> &parts, QList<int> *partStarts);
+
 // Monday of the week holding a date.
 QDate weekMonday(const QDate &date);
 

@@ -9,7 +9,8 @@ import "Progress.js" as Progress
 // Fitness, fatigue and form (see Fitness.js) over the period: today's three numbers in plain
 // words on a hairline, fitness as a filled line with fatigue beside it, and form as a bar a day
 // over its bands (Fresh, Productive, Overreaching). Drag across to read any day; the numbers
-// roll to it. Pro adds the scale and the fatigue line.
+// roll to it. Pro adds the scale and the fatigue line. A tap on the chart or on one of the three
+// numbers opens its Learn sheet (learn()); a tap while the crosshair shows hides it.
 Column {
     id: fitness
     objectName: "fitnessChart"
@@ -40,6 +41,17 @@ Column {
     readonly property real formLower: -45
 
     property var drawn: ({ ctl: [], area: [], atl: [] })
+
+    // a tap asks for the Learn sheet of "fitness", "fatigue" or "form", with the rider's numbers
+    signal learn(string key, var facts)
+
+    // today and four weeks before: what the Learn sheets say about yours
+    function learnFacts() {
+        var n = all.length
+        var before = n > 28 ? all[n - 29] : (n > 0 ? all[0] : today)
+        return { ctl: today.ctl, atl: today.atl, tsb: today.tsb, state: Fitness.formLabel(today.ctl, today.tsb),
+                 change: today.ctl - before.ctl, days: Math.min(28, Math.max(1, n - 1)), rides: hasRides ? 1 : 0 }
+    }
 
     function play() {
         cursor = -1
@@ -165,11 +177,17 @@ Column {
                     [qsTr("Fatigue"), String(Math.round(fitness.shownDay.atl)), Theme.text],
                     [fitness.formState === "start" ? qsTr("Form") : qsTr("Form, %1").arg(fitness.stateName(fitness.formState)),
                      fitness.signed(fitness.shownDay.tsb), Theme.text]]
-            Item {
+            PulseButton {
                 id: numberCell
                 x: index * parent.width / 3
                 width: parent.width / 3
-                height: parent.height
+                height: parent.height - 1
+                radius: 16
+                fill: pressed ? Theme.pressed : "transparent"
+                pressedScale: 0.97
+                leftInset: -8
+                Accessible.name: qsTr("%1, %2, tap to learn more").arg(modelData[0]).arg(modelData[1])
+                onClicked: fitness.learn(["fitness", "fatigue", "form"][index], fitness.learnFacts())
                 RollingNumber {
                     id: cellNumber
                     y: 6
@@ -206,10 +224,11 @@ Column {
             width: drawIn.width
             height: strip.y + strip.height + 4
 
-            Accessible.role: Accessible.Graphic
-            Accessible.name: qsTr("Fitness chart, last %1 days: fitness %2, fatigue %3, form %4, %5")
+            Accessible.role: Accessible.Button
+            Accessible.name: qsTr("Fitness chart, last %1 days: fitness %2, fatigue %3, form %4, %5. Tap to learn more")
                              .arg(fitness.range).arg(Math.round(fitness.today.ctl)).arg(Math.round(fitness.today.atl))
                              .arg(fitness.signed(fitness.today.tsb)).arg(fitness.stateName(Fitness.formLabel(fitness.today.ctl, fitness.today.tsb)))
+            Accessible.onPressAction: fitness.learn("fitness", fitness.learnFacts())
 
             Item {
                 id: plot
@@ -419,7 +438,13 @@ Column {
                 width: parent.width
                 height: strip.y + strip.height
                 onScrub: fitness.cursor = fitness.dayAt(at)
-                onTap: fitness.cursor = fitness.cursor >= 0 ? -1 : fitness.dayAt(at)
+                learnable: true
+                onTap: {
+                    if (fitness.cursor >= 0)
+                        fitness.cursor = -1
+                    else
+                        fitness.learn("fitness", fitness.learnFacts())
+                }
             }
         }
     }

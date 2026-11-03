@@ -6,8 +6,8 @@ import "../sig"
 // You: the profile and the settings Bikemodo needs, the bike, heart rate, power, body, zones,
 // units, connections, the rides on disk and the credits. The profile leads as a hero (the initial
 // in the Pulse, the name, FTP and max heart rate), the sections follow as hairline rows under cap
-// labels. The list of sections and the open page side
-// by side on wide windows, one after the other on phones.
+// labels, with Units and Make it yours (MakeItYours.qml) set right on the list. The list of
+// sections and the open page side by side on wide windows, one after the other on phones.
 // The values are QZ's own settings (the same keys as settings.qml), read and written here.
 Item {
     id: screen
@@ -22,6 +22,17 @@ Item {
     signal intervalsConnect()
     // the shell forwards it to refresh_bluetooth_devices_clicked() of the window
     signal refreshDevicesRequested()
+    // miles or kilometers was picked: the shell passes it to the other screens at once
+    signal milesPicked(bool miles)
+
+    // a page over You with its own bottom actions: the shell moves the floating navigation aside
+    readonly property bool covering: pageLoader.item !== null && pageLoader.item.covering === true
+
+    // Bikemodo's own choices (ui2), read fresh each time You shows: other screens write some of
+    // them (the ride screen its layout, Progress the detail level), and Settings objects do not
+    // see each other's writes
+    property var look: ({ detailLevel: "simple", reduceMotion: false, ridePreset: "power", accentChoice: "lavender",
+                          weekStart: 1, resistanceControl: "auto", mergeGapMinutes: 10 })
 
     // the end of the page the floating navigation covers: the content scrolls under it
     property real bottomClearance: 0
@@ -72,7 +83,6 @@ Item {
         { id: "power", title: qsTr("Power"), icon: "bolt", group: "ride" },
         { id: "body", title: qsTr("Body and FTP"), icon: "body", group: "you" },
         { id: "zones", title: qsTr("Zones"), icon: "zones", group: "you" },
-        { id: "units", title: qsTr("Units and display"), icon: "units", group: "app" },
         { id: "connections", title: qsTr("Connections"), icon: "link", group: "app" },
         { id: "data", title: qsTr("Your data"), icon: "data", group: "app" },
         { id: "about", title: qsTr("About"), icon: "info", group: "app" }
@@ -101,15 +111,70 @@ Item {
         property string echelon_watttable: "Echelon"
     }
 
-    // what only Bikemodo uses
+    // what only Bikemodo uses, read and written by key (readLook, setLook)
     Settings {
         id: prefStore
         category: "ui2"
-        property string detailLevel: "simple"
-        property bool reduceMotion: false
     }
 
-    Component.onCompleted: Theme.reduceMotion = prefStore.reduceMotion
+    Component.onCompleted: {
+        readLook()
+        Theme.reduceMotion = look.reduceMotion
+    }
+    onVisibleChanged: if (visible) readLook()
+
+    function flag(v, fallback) {
+        if (v === undefined || v === null || v === "")
+            return fallback
+        return v === true || v === "true"
+    }
+
+    function readLook() {
+        var preset = String(prefStore.value("ridePreset", "power"))
+        var gap = Number(prefStore.value("mergeGapMinutes", 10))
+        var first = Number(prefStore.value("weekStart", 1))
+        look = {
+            detailLevel: String(prefStore.value("detailLevel", "simple")) === "pro" ? "pro" : "simple",
+            reduceMotion: flag(prefStore.value("reduceMotion", false), false),
+            ridePreset: ["power", "simple", "heart"].indexOf(preset) >= 0 ? preset : "custom",
+            accentChoice: Theme.accentChoice,
+            weekStart: first === 0 ? 0 : 1,
+            resistanceControl: ["auto", "on", "off"].indexOf(String(prefStore.value("resistanceControl", "auto"))) >= 0
+                               ? String(prefStore.value("resistanceControl", "auto")) : "auto",
+            mergeGapMinutes: isNaN(gap) ? 10 : Math.max(0, Math.min(60, Math.round(gap)))
+        }
+    }
+
+    // one Bikemodo choice: stored at once, applied where it shows right away
+    function setLook(key, value) {
+        prefStore.setValue(key, value)
+        if (key === "ridePreset")
+            prefStore.setValue("rideLayout", "")   // the ride screen opens the preset, not an old custom layout
+        if (key === "reduceMotion")
+            Theme.reduceMotion = value
+        if (key === "accentChoice")
+            Theme.accentChoice = value
+        prefStore.sync()
+        var next = {}
+        for (var k in look)
+            next[k] = look[k]
+        next[key] = value
+        look = next
+    }
+
+    // QZ's units, written as settings.qml does, and synced so the ride sees them at once
+    function setMiles(value) {
+        qzStore.miles_unit = value
+        qzStore.setValue("miles_unit", value)
+        qzStore.sync()
+        milesPicked(value)
+    }
+
+    function setWeightKg(value) {
+        qzStore.weight_kg_unit = value
+        qzStore.setValue("weight_kg_unit", value)
+        qzStore.sync()
+    }
 
     Timer {
         interval: 1000
@@ -179,7 +244,7 @@ Item {
             return qsTr("7 power zones, 5 heart zones")
         if (id === "units")
             return (qzStore.miles_unit ? qsTr("Miles") : qsTr("Kilometers")) + ", "
-                    + (prefStore.detailLevel === "pro" ? qsTr("Pro detail") : qsTr("Simple detail"))
+                    + (look.detailLevel === "pro" ? qsTr("Pro detail") : qsTr("Simple detail"))
         if (id === "connections") {
             var names = []
             if (ask("isStravaLoggedIn", false))
@@ -219,6 +284,7 @@ Item {
 
         Flickable {
             id: listFlick
+            objectName: "youList"
             anchors.fill: parent
             contentHeight: listColumn.y + listColumn.height + 32 + screen.bottomClearance + (screen.restartNeeded ? 140 : 0)
             boundsBehavior: Flickable.StopAtBounds
@@ -334,6 +400,13 @@ Item {
                         width: listColumn.width
                         Column {
                             width: parent.width
+                            // units and the rider's own choices, before the app's sections
+                            Loader {
+                                active: group.groupId === "app"
+                                visible: active
+                                width: parent.width
+                                sourceComponent: MakeItYours { you: screen }
+                            }
                             YouText {
                                 kind: "heading"
                                 text: modelData.title

@@ -1,5 +1,6 @@
 pragma Singleton
 import QtQuick 2.15
+import Qt.labs.settings 1.0
 
 // Colors, type, zones and motion of the Pulse interface (ui2).
 QtObject {
@@ -23,9 +24,34 @@ QtObject {
     readonly property color danger: "#ffb3a8"
     readonly property color recording: "#ff5e5e"
 
-    // brand accent, used when no zone tints the screen
-    readonly property color accent: "#c9b8ff"
-    readonly property color accentInk: "#1e1240"
+    // brand accent, used when no zone tints the screen. The rider picks it in You (Make it yours);
+    // each one is a light tone that reads on bg and cards, with its own dark ink for text on it.
+    readonly property var accents: [
+        { id: "lavender", name: qsTr("Lavender"), color: "#c9b8ff", ink: "#1e1240" },
+        { id: "sky", name: qsTr("Sky"), color: "#a9c7ff", ink: "#0b1d3d" },
+        { id: "mint", name: qsTr("Mint"), color: "#8fe3cc", ink: "#062a20" },
+        { id: "peach", name: qsTr("Peach"), color: "#ffc29e", ink: "#3d1a06" },
+        { id: "rose", name: qsTr("Rose"), color: "#ffb0c8", ink: "#3e0f22" },
+        { id: "silver", name: qsTr("Silver"), color: "#d8d5de", ink: "#1c1b21" }
+    ]
+    // the saved choice (ui2/accentChoice), read once at start; You sets accentChoice when it changes
+    readonly property Settings savedLook: Settings {
+        category: "ui2"
+        property string accentChoice: "lavender"
+    }
+    property string accentChoice: savedLook.accentChoice
+    readonly property var accentEntry: {
+        for (var i = 0; i < accents.length; i++)
+            if (accents[i].id === accentChoice)
+                return accents[i]
+        return accents[0]
+    }
+    readonly property color accent: accentEntry.color
+    readonly property color accentInk: accentEntry.ink
+    // the accent as a faint wash, e.g. accentWash(0.08) behind a picked row
+    function accentWash(alpha) {
+        return Qt.rgba(accent.r, accent.g, accent.b, alpha)
+    }
 
     // zones: fill color and the lighter color of the hero numeral
     readonly property var zoneColors: ["#8ab4ff", "#5fd8c6", "#b9e66e", "#ffcb52", "#ff8f52", "#ff5e7e", "#c487ff"]

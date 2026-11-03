@@ -115,7 +115,7 @@ YouPage {
                     radius: 24
                     pressedRadius: 28
                     pressedScale: 0.97
-                    fill: on ? Qt.rgba(201 / 255, 184 / 255, 1, 0.09) : Theme.card
+                    fill: on ? Theme.accentWash(0.09) : Theme.card
                     Accessible.name: modelData.name + (modelData.chip !== "" ? ", " + modelData.chip : "") + (modelData.note !== "" ? ", " + modelData.note : "")
                     Accessible.checkable: true
                     Accessible.checked: on
@@ -176,7 +176,7 @@ YouPage {
                             width: Math.min(parent.width, chipLabel.implicitWidth + 18)
                             height: chipLabel.implicitHeight + 10
                             radius: 10
-                            color: tile.on ? Qt.rgba(201 / 255, 184 / 255, 1, 0.14) : Theme.pressed
+                            color: tile.on ? Theme.accentWash(0.14) : Theme.pressed
                             Text {
                                 id: chipLabel
                                 x: 9
@@ -308,7 +308,7 @@ YouPage {
                         radius: 52
                         color: "transparent"
                         border.width: 2
-                        border.color: Qt.rgba(201 / 255, 184 / 255, 1, 0.18)
+                        border.color: Theme.accentWash(0.18)
                         SequentialAnimation on scale {
                             running: !Theme.reduceMotion && page.visible && page.step === 1
                             loops: Animation.Infinite

@@ -260,6 +260,23 @@
         <file>ui2/moments/WeekClosed.qml</file>
         <file>ui2/moments/Fingerprint.qml</file>
         <file>ui2/moments/ShareSheet.qml</file>
+        <file>ui2/you/MakeItYours.qml</file>
+        <file>ui2/settings/NumberStepper.qml</file>
+        <file>ui2/settings/GoalLimits.js</file>
+        <file>ui2/ride/HoldButton.qml</file>
+        <file>ui2/ride/RideControls.qml</file>
+        <file>ui2/learn/Learn.js</file>
+        <file>ui2/learn/LearnSheet.qml</file>
+        <file>ui2/learn/LearnTap.qml</file>
+        <file>ui2/learn/LearnLabel.qml</file>
+        <file>ui2/today/Patterns.js</file>
+        <file>ui2/today/UsualCard.qml</file>
+        <file>ui2/today/WhenCard.qml</file>
+        <file>ui2/today/MixCard.qml</file>
+        <file>ui2/today/VisualHead.qml</file>
+        <file>ui2/sig/CompareBars.qml</file>
+        <file>ui2/progress/YearCard.qml</file>
+        <file>ui2/rides/RideUsual.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

@@ -2,6 +2,7 @@ import QtQuick 2.15
 import Qt.labs.settings 1.0
 import "."
 import "sig"
+import "ride"
 import "Metrics.js" as Metrics
 
 // The live ride. One big number, four quiet rows, the level dock and the ride ribbon.
@@ -11,6 +12,9 @@ import "Metrics.js" as Metrics
 // that presses, morphs into a round pause button and counts 3, 2, 1 before the ride starts; at a
 // zone crossing the hero numeral, the tint and the Pulse cross to the next zone; a swapped metric
 // rolls into its row.
+// The lifecycle: Pause and Resume always keep the same ride; only a held End (or End confirmed,
+// for a screen reader) finishes and saves it. A paused or not yet started ride can be left with
+// the back button: the ride stays paused and the Ride button comes back to it.
 Item {
     id: screen
 
@@ -26,10 +30,24 @@ Item {
     property string toastText: ""
 
     signal finishRequested()
+    // back to the app, the ride stays as it is (paused, or not started)
+    signal leaveRequested()
 
     // stopped: the ride was finished and the next tap on Start begins a new one
     readonly property bool stopped: source.stopped === true
     readonly property bool idle: source.paused || stopped
+
+    // the level buttons, or Pause, Lap and End in their place for a bike whose level is set by
+    // hand. "resistanceControl" (You): "auto" follows the bike, "on" and "off" force it
+    property string resistanceMode: "auto"
+    // names of the bikes that ignored a level press from the app, learned in "auto"
+    property var manualBikes: []
+    readonly property bool learnedManual: manualBikes.indexOf(source.deviceName) >= 0
+    readonly property bool levelControls: resistanceMode === "on"
+                                          || (resistanceMode === "auto" && source.canChangeResistance !== false && !learnedManual)
+    // End asked for a confirm (a screen reader cannot hold)
+    property bool confirmingEnd: false
+    property double lastToggle: 0
 
     readonly property bool heartDriven: preset === "heart" && source.heartRate > 0
     readonly property int zone: heartDriven ? Theme.heartZone(source.heartRate, source.maxHeartRate)
@@ -142,7 +160,7 @@ Item {
             screen.startPhase = "go"
             // start once, and only a ride that is still waiting to start
             if (screen.source.stopped)
-                screen.source.togglePause()
+                screen.source.begin()
             goTimer.restart()
         }
     }
@@ -161,6 +179,13 @@ Item {
     }
 
     Component.onCompleted: {
+        resistanceMode = String(saved.value("resistanceControl", "auto"))
+        try {
+            var known = JSON.parse(String(saved.value("manualLevelBikes", "[]")))
+            manualBikes = Array.isArray(known) ? known : []
+        } catch (e) {
+            manualBikes = []
+        }
         preset = saved.ridePreset
         slots = Metrics.parseLayout(saved.rideLayout, preset === "custom" ? "power" : preset)
         lastZone = zone
@@ -169,6 +194,124 @@ Item {
 
     // true once the saved layout is in: changes after that are the rider's, and they move
     property bool settled: false
+
+    // Pause or Resume, never a new ride; a second tap within half a second is ignored so a
+    // bump on the handlebar cannot pause and resume at once
+    function pauseResume() {
+        if (bounced())
+            return
+        toggleRide()
+    }
+
+    // true for a second press within half a second of the last one, which is then ignored
+    function bounced() {
+        touched = true
+        var now = Date.now()
+        if (now - lastToggle < 500)
+            return true
+        lastToggle = now
+        return false
+    }
+
+    function toggleRide() {
+        if (source.stopped)
+            return
+        if (source.paused)
+            source.resume()
+        else
+            source.pause()
+    }
+
+    // the big button of the ride controls, the pause button of the level dock and the Start ride
+    // pill: start (3, 2, 1), cancel the count, pause or resume; a bump right after is ignored
+    function mainControl() {
+        if (bounced())
+            return
+        if (startPhase === "count")
+            cancelCountdown()
+        else if (stopped)
+            startCountdown()
+        else
+            toggleRide()
+    }
+
+    // how long the ride has been paused, in seconds
+    property int pausedFor: 0
+    Timer {
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        running: screen.source.paused === true && !screen.stopped && screen.source.pausedAt > 0
+        onTriggered: screen.pausedFor = Math.max(0, Math.round((Date.now() - screen.source.pausedAt) / 1000))
+    }
+
+    function lapRide() {
+        touched = true
+        if (stopped)
+            return
+        source.lap()
+        toast(qsTr("Lap %1").arg(source.laps))
+    }
+
+    function askEnd() {
+        if (stopped)
+            return
+        editing = -1
+        confirmingEnd = true
+        confirmTimer.restart()
+    }
+
+    function endRide() {
+        confirmingEnd = false
+        if (stopped)
+            return
+        finishRequested()
+    }
+
+    // Harder or easier. In "auto" a press that leaves the level where it was for 5 s means the
+    // bike has a hand knob: the dock turns into the ride controls, for this bike from now on.
+    property int levelBefore: 0
+    function pressLevel(up) {
+        touched = true
+        if (up)
+            source.levelUp()
+        else
+            source.levelDown()
+        var atEdge = up ? source.level >= source.levelMax : source.level <= 1
+        if (resistanceMode === "auto" && source.connected && source.level > 0 && !atEdge && !levelWatch.running) {
+            levelBefore = source.level
+            levelWatch.restart()
+        }
+    }
+
+    function learnManual() {
+        if (source.deviceName === "" || learnedManual)
+            return
+        var next = manualBikes.slice()
+        next.push(source.deviceName)
+        manualBikes = next
+        saved.setValue("manualLevelBikes", JSON.stringify(next))
+        toast(qsTr("This bike sets its level by hand, so the dock now holds Pause, Lap and End."), 6000)
+    }
+
+    Timer {
+        id: levelWatch
+        interval: 5000
+        onTriggered: {
+            if (screen.source.level === screen.levelBefore)
+                screen.learnManual()
+        }
+    }
+    Connections {
+        target: screen.source
+        ignoreUnknownSignals: true
+        // rideMetrics renews every number each second, so this also comes with no change
+        function onLevelChanged() {
+            if (screen.source.level !== screen.levelBefore)
+                levelWatch.stop()
+        }
+    }
+    Timer { id: confirmTimer; interval: 8000; onTriggered: screen.confirmingEnd = false }
 
     function presetSlotsFor(id) {
         return Metrics.presetSlots(id)
@@ -195,8 +338,9 @@ Item {
         editing = index
     }
 
-    function toast(text) {
+    function toast(text, ms) {
         toastText = text
+        toastTimer.interval = ms ? ms : 2600
         toastTimer.restart()
     }
 
@@ -317,8 +461,29 @@ Item {
             width: stage.width - x - (screen.portrait ? 24 : 24)
             height: 40
 
+            // back to the app while the ride is paused or has not started; it stays as it is
+            PulseButton {
+                id: leaveButton
+                anchors.verticalCenter: parent.verticalCenter
+                width: 36
+                height: 36
+                visible: screen.idle && screen.startPhase === "" && screen.editing < 0
+                fill: Theme.control
+                Accessible.name: screen.stopped ? qsTr("Back") : qsTr("Back, the ride stays paused")
+                onClicked: screen.leaveRequested()
+                contentItem: Item {
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "back"
+                        color: Theme.text2
+                        size: 18
+                    }
+                }
+            }
+
             Rectangle {
                 id: recDot
+                x: leaveButton.visible ? leaveButton.width + 14 : 0
                 width: 9
                 height: 9
                 radius: 4.5
@@ -338,7 +503,9 @@ Item {
             Text {
                 anchors { left: recDot.right; leftMargin: 10; verticalCenter: parent.verticalCenter }
                 text: screen.startPhase === "count" ? qsTr("Get ready")
-                      : (screen.stopped ? qsTr("Ready") : (screen.source.paused ? qsTr("Paused") : Metrics.clock(screen.source.elapsed)))
+                      : (screen.stopped ? qsTr("Ready")
+                         : (screen.source.paused ? (screen.pausedFor >= 5 ? qsTr("Paused for %1").arg(Metrics.clock(screen.pausedFor)) : qsTr("Paused"))
+                            : Metrics.clock(screen.source.elapsed)))
                 color: Theme.text
                 font.family: screen.idle ? Theme.bodySemibold : Theme.display
                 font.pixelSize: screen.idle ? 16 : 20
@@ -403,7 +570,7 @@ Item {
             height: screen.portrait ? 270 : 300
             radius: 28
             pressedScale: 0.985
-            fill: screen.editing === 0 ? Qt.rgba(201 / 255, 184 / 255, 1, 0.06) : "transparent"
+            fill: screen.editing === 0 ? Theme.accentWash(0.06) : "transparent"
             Accessible.name: qsTr("Change the main number, now %1").arg(screen.hero.label) + ", " + screen.hero.value + " " + screen.hero.unit
             onClicked: screen.edit(0)
 
@@ -611,17 +778,19 @@ Item {
             }
         }
 
-        // the level dock: harder, the level, easier, pause
+        // the dock: harder, the level, easier and pause for a bike the app can set; the ride
+        // controls (Pause, Lap, held End and the level to read) for one whose level is set by hand
         Rectangle {
             id: dock
             x: screen.portrait ? 20 : stage.width - 20 - width
             y: screen.portrait ? stage.height - 20 - height : 62
-            width: screen.portrait ? stage.width - 40 : 92
-            height: screen.portrait ? 92 : Math.max(306, stage.height - 106)
-            radius: 46
+            width: screen.portrait ? stage.width - 40 : (screen.levelControls ? 92 : 124)
+            height: screen.portrait ? (screen.levelControls ? 92 : 116) : Math.max(306, stage.height - 106)
+            radius: screen.levelControls ? 46 : 40
             color: Theme.control
 
             Grid {
+                visible: screen.levelControls
                 anchors.fill: parent
                 anchors.margins: screen.portrait ? 10 : 0
                 anchors.topMargin: 10
@@ -631,8 +800,8 @@ Item {
                 rows: screen.portrait ? 1 : 4
                 horizontalItemAlignment: Grid.AlignHCenter
                 verticalItemAlignment: Grid.AlignVCenter
-                columnSpacing: screen.portrait ? (width - 72 - 72 - 64 - 44) / 3 : 0
-                rowSpacing: screen.portrait ? 0 : (height - 72 - 72 - 64 - 44) / 3
+                columnSpacing: screen.portrait ? (width - 72 - 72 - 64 - 56) / 3 : 0
+                rowSpacing: screen.portrait ? 0 : (height - 72 - 72 - 64 - 56) / 3
                 layoutDirection: Qt.LeftToRight
 
                 PulseButton {
@@ -643,7 +812,7 @@ Item {
                     pressedRadius: 36
                     fill: screen.shownTint
                     Accessible.name: qsTr("Harder, level up")
-                    onClicked: { screen.touched = true; screen.source.levelUp() }
+                    onClicked: screen.pressLevel(true)
                     contentItem: Item { Icon { anchors.centerIn: parent; name: "plus"; color: "#141011"; size: 28 } }
                 }
                 Column {
@@ -669,32 +838,40 @@ Item {
                     pressedRadius: 20
                     fill: Theme.chip
                     Accessible.name: qsTr("Easier, level down")
-                    onClicked: { screen.touched = true; screen.source.levelDown() }
+                    onClicked: screen.pressLevel(false)
                     contentItem: Item { Icon { anchors.centerIn: parent; name: "minus"; color: Theme.text; size: 28 } }
                 }
                 PulseButton {
-                    width: 44
-                    height: 44
+                    width: 56
+                    height: 56
+                    pressedRadius: 18
                     fill: screen.idle && screen.startPhase === "" ? Theme.accent : Theme.pressed
                     Accessible.name: screen.startPhase === "count" ? qsTr("Cancel the start")
                                      : (screen.stopped ? qsTr("Start ride") : (screen.source.paused ? qsTr("Resume ride") : qsTr("Pause ride")))
-                    onClicked: {
-                        if (screen.startPhase === "count")
-                            screen.cancelCountdown()
-                        else if (screen.stopped)
-                            screen.startCountdown()
-                        else
-                            screen.source.togglePause()
-                    }
+                    onClicked: screen.mainControl()
                     contentItem: Item {
                         Icon {
                             anchors.centerIn: parent
                             name: screen.idle && screen.startPhase === "" ? "play" : "pause"
                             color: screen.idle && screen.startPhase === "" ? Theme.accentInk : Theme.text
-                            size: 16
+                            size: 20
                         }
                     }
                 }
+            }
+
+            RideControls {
+                visible: !screen.levelControls
+                anchors.fill: parent
+                vertical: !screen.portrait
+                source: screen.source
+                tint: screen.shownTint
+                phase: screen.startPhase
+                onMainPressed: screen.mainControl()
+                onLapPressed: screen.lapRide()
+                onEndHeld: screen.endRide()
+                onEndTapped: screen.toast(qsTr("Hold End to finish the ride."))
+                onEndConfirm: screen.askEnd()
             }
         }
 
@@ -728,20 +905,42 @@ Item {
         Text {
             x: ribbon.x
             y: ribbon.y - 20 - height
-            width: Math.min(400, ribbon.width)
+            width: Math.min(400, stage.leftRoom)
             visible: !screen.touched && screen.editing < 0 && !screen.idle
-            text: qsTr("Tap any number to change it. Level buttons push you through the zones.")
+            text: screen.levelControls ? qsTr("Tap any number to change it. Level buttons push you through the zones.")
+                                       : qsTr("Tap any number to change it. Hold End when the ride is done.")
             color: Theme.text3
             font.family: Theme.bodyMedium
             font.pixelSize: 12
             wrapMode: Text.WordWrap
         }
 
+        // paused, with the ride controls in the dock: say what the two ways on are
+        Text {
+            x: ribbon.x
+            y: ribbon.y - 20 - height
+            width: Math.min(420, ribbon.width)
+            visible: !screen.levelControls && screen.source.paused && !screen.stopped && screen.editing < 0
+                     && screen.toastText === "" && screen.undoState === null && !screen.confirmingEnd
+            text: qsTr("Paused. Resume and this stays one ride, or hold End to finish it.")
+            color: Theme.text2
+            font.family: Theme.bodyMedium
+            font.pixelSize: 14
+            wrapMode: Text.WordWrap
+        }
+
+        // the room at the left above the ribbon, next to Lap and End in portrait
+        readonly property real leftRoom: screen.portrait ? ribbon.width - (lapEnd.visible ? lapEnd.width + 16 : 0)
+                                                         : heroButton.width
+        // the top of the bars above the ribbon: a toast or the undo sits above them
+        readonly property real barsTop: Math.min(ribbon.y - 6, pausedBar.visible ? pausedBar.y : ribbon.y,
+                                                 confirmBar.visible ? confirmBar.y : ribbon.y)
+
         Rectangle {
             id: snack
             x: ribbon.x
-            y: ribbon.y - 16 - height
-            width: 340
+            y: stage.barsTop - 10 - height
+            width: Math.min(340, stage.leftRoom)
             height: 48
             radius: 18
             color: Theme.text
@@ -777,25 +976,68 @@ Item {
 
         Rectangle {
             x: ribbon.x
-            y: ribbon.y - 18 - height
-            width: toastLabel.implicitWidth + 32
-            height: 40
+            y: stage.barsTop - 12 - height
+            readonly property real room: stage.leftRoom
+            width: Math.min(toastLabel.implicitWidth, room - 32) + 32
+            height: Math.max(40, toastLabel.height + 22)
             radius: 18
             color: Theme.pressed
             visible: screen.toastText !== "" && screen.editing < 0
             Text {
                 id: toastLabel
                 anchors.centerIn: parent
+                width: Math.min(implicitWidth, parent.room - 32)
                 text: screen.toastText
                 color: Theme.text
                 font.family: Theme.bodySemibold
                 font.pixelSize: 13
+                wrapMode: Text.WordWrap
             }
         }
 
-        // paused: resume or finish
+        // Lap and a held End, for the layout with the level dock (the ride controls have their own):
+        // in the top bar in landscape, above the ribbon at the right in portrait. The paused bar
+        // takes over while paused.
+        Row {
+            id: lapEnd
+            x: screen.portrait ? ribbon.x + ribbon.width - width : topBar.x + presetPill.x - 10 - width
+            y: screen.portrait ? ribbon.y - 16 - height : topBar.y + (topBar.height - height) / 2
+            spacing: 8
+            visible: screen.levelControls && !screen.stopped && !pausedBar.visible && !screen.confirmingEnd
+                     && screen.editing < 0
+            PulseButton {
+                width: 64
+                height: 40
+                fill: Theme.control
+                Accessible.name: qsTr("Lap")
+                onClicked: screen.lapRide()
+                contentItem: Text {
+                    text: qsTr("Lap")
+                    color: Theme.text
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: 13
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            HoldButton {
+                width: 72
+                height: 40
+                fill: Theme.control
+                fontSize: 13
+                label: qsTr("End")
+                holdingLabel: qsTr("Hold")
+                onHeld: screen.endRide()
+                onTapped: screen.toast(qsTr("Hold End to finish the ride."))
+                onConfirmRequested: screen.askEnd()
+            }
+        }
+
+        // paused, with the level dock: resume, or hold to end
         Rectangle {
-            visible: screen.source.paused && !screen.stopped && screen.editing < 0
+            id: pausedBar
+            visible: screen.levelControls && screen.source.paused && !screen.stopped && screen.editing < 0
+                     && !screen.confirmingEnd
             anchors.horizontalCenter: screen.portrait ? parent.horizontalCenter : undefined
             x: screen.portrait ? 0 : heroButton.x
             y: ribbon.y - 12 - height
@@ -811,8 +1053,8 @@ Item {
                     height: 46
                     fill: Theme.accent
                     pressedRadius: 16
-                    Accessible.name: qsTr("Resume")
-                    onClicked: screen.source.togglePause()
+                    Accessible.name: qsTr("Resume ride")
+                    onClicked: screen.pauseResume()
                     contentItem: Text {
                         text: qsTr("Resume")
                         color: Theme.accentInk
@@ -822,18 +1064,67 @@ Item {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
-                PulseButton {
+                HoldButton {
                     width: 140
                     height: 46
+                    label: qsTr("Hold to end")
+                    onHeld: screen.endRide()
+                    onTapped: screen.toast(qsTr("Hold to end the ride."))
+                    onConfirmRequested: screen.askEnd()
+                }
+            }
+        }
+
+        // End without a hold (a screen reader): one more step before the ride is saved
+        Rectangle {
+            id: confirmBar
+            x: ribbon.x
+            y: ribbon.y - 12 - height
+            width: Math.min(ribbon.width, confirmRow.implicitWidth + 32)
+            height: 56
+            radius: 28
+            color: Theme.floating
+            visible: screen.confirmingEnd && !screen.stopped && screen.editing < 0
+            Row {
+                id: confirmRow
+                anchors.centerIn: parent
+                spacing: 8
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: qsTr("End this ride?")
+                    color: Theme.text
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: 15
+                    rightPadding: 6
+                }
+                PulseButton {
+                    width: 110
+                    height: 44
+                    fill: Theme.accent
+                    pressedRadius: 16
+                    Accessible.name: qsTr("End ride")
+                    onClicked: screen.endRide()
+                    contentItem: Text {
+                        text: qsTr("End ride")
+                        color: Theme.accentInk
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                PulseButton {
+                    width: 110
+                    height: 44
                     fill: Theme.chip
                     pressedRadius: 16
-                    Accessible.name: qsTr("Finish ride")
-                    onClicked: screen.finishRequested()
+                    Accessible.name: qsTr("Keep riding")
+                    onClicked: screen.confirmingEnd = false
                     contentItem: Text {
-                        text: qsTr("Finish")
+                        text: qsTr("Keep riding")
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: 14
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -884,14 +1175,7 @@ Item {
             fill: morphed ? Theme.chip : Theme.accent
             Accessible.name: screen.startPhase === "count" ? qsTr("Cancel the start")
                              : (screen.startPhase === "go" ? qsTr("Pause ride") : qsTr("Start ride"))
-            onClicked: {
-                if (screen.startPhase === "count")
-                    screen.cancelCountdown()
-                else if (screen.startPhase === "go")
-                    screen.source.togglePause()
-                else
-                    screen.startCountdown()
-            }
+            onClicked: screen.mainControl()
             Behavior on width {
                 enabled: !Theme.reduceMotion
                 Spring { token: "fast" }

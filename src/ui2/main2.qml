@@ -82,6 +82,23 @@ ApplicationWindow {
         property string user_nickname: ""
         // Bikemodo has no embedded sign-in page: Strava and intervals.icu open in the browser
         property bool strava_auth_external_webbrowser: false
+        // QZ starts recording as soon as the bike connects; Bikemodo waits for Start ride
+        property bool pause_on_start: false
+    }
+
+    // once, on the first start of Bikemodo: rides begin when the rider presses Start ride, so
+    // the first ride does not include the time before it (the rider can still change it)
+    Settings {
+        id: firstRun
+        category: "ui2"
+        property bool pauseOnStartSet: false
+    }
+    Component.onCompleted: {
+        if (!firstRun.pauseOnStartSet) {
+            qzSettings.pause_on_start = true
+            qzSettings.sync()
+            firstRun.pauseOnStartSet = true
+        }
     }
 
     function connectInBrowser() {
@@ -121,8 +138,17 @@ ApplicationWindow {
         mode = live.connected ? "ride" : "launcher"
     }
 
-    // Android back: close the launcher or the summary, step back in the app, never leave a ride,
-    // and on Today ask for a second press within 2 s before closing, as QZ does
+    // back to the app from a ride that is paused or has not started: it stays as it is, and the
+    // Ride button comes back to it (a demo is left behind, the next one starts fresh)
+    function leaveRide() {
+        if (mode === "demo")
+            demoRide.running = false
+        mode = "home"
+    }
+
+    // Android back: close the launcher or the summary, step back in the app, leave a ride only
+    // while it is paused or not started (never a moving one), and on Today ask for a second
+    // press within 2 s before closing, as QZ does
     onClosing: {
         if (Qt.platform.os !== "android")
             return
@@ -131,6 +157,9 @@ ApplicationWindow {
             close.accepted = false
         } else if (mode === "ride" || mode === "demo") {
             close.accepted = false
+            var shown = mode === "demo" ? demoRide : live
+            if (shown.paused || shown.stopped)
+                leaveRide()
         } else if (shell.goBack()) {
             close.accepted = false
         } else if (!backToExit.running) {
@@ -160,6 +189,7 @@ ApplicationWindow {
     RideSim {
         id: demoRide
         running: false
+        miles: qzSettings.miles_unit
     }
 
     function copyRide(source) {
@@ -177,22 +207,53 @@ ApplicationWindow {
         mode = "demo"
     }
 
+    // End ride: the numbers are copied before the engine stops (a stopped ride reads as zeros),
+    // and only a ride that is still going is ended, so a second End or a late stop request
+    // cannot save it twice or show an empty summary
     function finishRide() {
-        finishedDemo = mode === "demo"
-        if (finishedDemo) {
+        if (mode === "demo") {
+            if (demoRide.stopped)
+                return
+            finishedDemo = true
             finishedRide = copyRide(demoRide)
-            demoRide.running = false
+            demoRide.end()
             mode = "summary"
             return
         }
+        live.refresh()
+        if (live.stopped)
+            return
+        finishedDemo = false
         finishedRide = copyRide(live)
-        home.stop_clicked()
+        finishing = true
+        live.end()
+        finishing = false
         // with the effort question on, the ride is saved only by finalizeFitSave
         if (core !== null && core.rpeFeelPopupEnabled())
             core.finalizeFitSave(-1, -1)
         if (core !== null)
             core.save_screenshot()
         mode = "summary"
+    }
+
+    // the engine ended the ride on the ride screen by itself (a workout program at its end, the
+    // bike's own stop button): show its summary as End would, from rideMetrics, which still holds
+    // the totals (LiveSource reads zeros once stopped). finishRide sets finishing while it ends one.
+    property bool finishing: false
+    Connections {
+        target: live
+        function onStoppedChanged() {
+            if (!live.stopped || window.finishing || window.mode !== "ride" || window.metricsObject === null
+                    || window.metricsObject.elapsed <= 0)
+                return
+            window.finishedDemo = false
+            window.finishedRide = window.copyRide(window.metricsObject)
+            if (window.core !== null && window.core.rpeFeelPopupEnabled())
+                window.core.finalizeFitSave(-1, -1)
+            if (window.core !== null)
+                window.core.save_screenshot()
+            window.mode = "summary"
+        }
     }
 
     // the web page, a keyboard or a template can ask for a start or a stop
@@ -295,6 +356,7 @@ ApplicationWindow {
                 sourceComponent: RideScreen {
                     source: window.mode === "demo" ? demoRide : live
                     onFinishRequested: window.finishRide()
+                    onLeaveRequested: window.leaveRide()
                 }
             }
 

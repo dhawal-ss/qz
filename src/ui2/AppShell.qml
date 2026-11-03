@@ -9,6 +9,8 @@ import "sig"
 // left with Ride on top and You in it. A tab switch fades through: the open page fades out
 // quickly, then the new one fades in as it grows from 96%. The pages stay alive.
 // The shell keeps clear of the system bars and the camera cutout with the insets it is given.
+// Whenever a sheet or a full page covers the open tab (each page says so with `covering`), or the
+// keyboard is up, the bottom pill steps aside: it fades and slides down, and comes back after.
 Item {
     id: shell
 
@@ -35,6 +37,8 @@ Item {
     signal pelotonConnect()
     signal intervalsConnect()
     signal refreshDevices()
+    // miles or kilometers picked in You; the shell already shows it, main2 may store it too
+    signal unitsPicked(bool miles)
 
     readonly property bool rail: width >= 600
     // the room the floating rail takes on the left: its margin, its width and a gap
@@ -44,6 +48,27 @@ Item {
     // what a page that scrolls under the bottom pill keeps free at its end, over the bottom inset
     readonly property int navClearance: rail ? 16 : 64 + navLift + 16
     readonly property string initial: nickname !== "" ? nickname.charAt(0).toUpperCase() : "B"
+
+    // a sheet or a full page over the open tab. Pages say so with `covering`; Today and Progress
+    // also count while they customize, Goals while a badge or the weekly recap is open, Rides
+    // while a ride fills a phone screen. A page that lacks a property simply does not cover.
+    function covers(page) {
+        return page !== null && page !== undefined && (page.covering === true || page.customizing === true)
+    }
+    readonly property bool covering: {
+        if (shownTab === "today")
+            return covers(todayScreen)
+        if (shownTab === "rides")
+            return covers(rides) || (!rail && rides.detailOpen === true)
+        if (shownTab === "progress")
+            return covers(progressScreen)
+        if (shownTab === "goals")
+            return covers(goalsScreen) || goalsScreen.recapOpen === true
+                   || (goalsScreen.badgeId !== undefined && goalsScreen.badgeId !== "")
+        if (shownTab === "you")
+            return covers(youLoader.item)
+        return false
+    }
 
     readonly property var destinations: {
         var list = [
@@ -116,7 +141,20 @@ Item {
         return name === shownTab ? 0.96 + 0.04 * enterFade : 1
     }
 
-    Component.onCompleted: shownTab = tab
+    // what a sheet or full page keeps free at its end: only the bottom inset, as the floating nav
+    // steps aside while it is open. A page that declares `sheetClearance` gets it bound.
+    readonly property real sheetClearance: insetBottom
+    function bindSheetClearance(page) {
+        if (page !== null && page !== undefined && page.sheetClearance !== undefined)
+            page.sheetClearance = Qt.binding(function () { return shell.sheetClearance })
+    }
+
+    Component.onCompleted: {
+        shownTab = tab
+        var list = [todayScreen, rides, progressScreen, goalsScreen]
+        for (var i = 0; i < list.length; i++)
+            bindSheetClearance(list[i])
+    }
 
     function openRide(id) {
         tab = "rides"
@@ -253,6 +291,7 @@ Item {
                 item.core = Qt.binding(function () { return shell.core })
                 item.metrics = Qt.binding(function () { return shell.metrics })
                 item.bottomClearance = Qt.binding(function () { return shell.navClearance + shell.insetBottom })
+                shell.bindSheetClearance(item)
             }
         }
         Connections {
@@ -263,6 +302,11 @@ Item {
             function onPelotonConnect() { shell.pelotonConnect() }
             function onIntervalsConnect() { shell.intervalsConnect() }
             function onRefreshDevicesRequested() { shell.refreshDevices() }
+            function onMilesPicked(miles) {
+                // every page reads shell.miles; main2's own Settings would not see the change
+                shell.miles = miles
+                shell.unitsPicked(miles)
+            }
         }
     }
 
@@ -281,12 +325,21 @@ Item {
                       : shell.height - shell.insetBottom - shell.navLift - height
         width: implicitWidth
         height: implicitHeight
-        // the ride analysis takes the whole phone screen, as on the board; the nav steps aside
-        readonly property bool stepAside: (!shell.rail && shell.tab === "rides" && rides.detailOpen)
-                                          || (shell.tab === "goals" && goalsScreen.covering)
-        opacity: stepAside ? 0 : 1
+        // the nav never covers what the rider needs: a sheet or a full page over the tab (the ride
+        // analysis on a phone, Customize, the goal setup...) or the keyboard moves the pill aside.
+        // The rail sits beside the pages, so it only leaves for the full pages of Goals.
+        readonly property bool stepAside: shell.rail ? (shell.shownTab === "goals" && goalsScreen.covering === true)
+                                                     : (shell.covering || Qt.inputMethod.visible)
+        // how far it slides: off the bottom edge, or off the left edge for the rail
+        property real away: stepAside ? 1 : 0
+        opacity: 1 - away
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: Theme.reduceMotion ? 0 : Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve } }
+        enabled: !stepAside
+        transform: Translate {
+            x: nav.vertical ? -nav.away * (nav.width + 12 + shell.insetLeft) : 0
+            y: nav.vertical ? 0 : nav.away * (nav.height + shell.navLift + shell.insetBottom)
+        }
+        Behavior on away { NumberAnimation { duration: Theme.reduceMotion ? 0 : Theme.effectsTime + 50; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve } }
         onPicked: shell.tab = name
         onRideRequested: shell.rideRequested()
     }

@@ -1,11 +1,13 @@
 import QtQuick 2.15
 import ".."
 import "../sig"
+import "../learn"
 import "../Format.js" as Format
 import "Badges.js" as Badges
 
 // Badges: the earned ones newest first, then the few closest to being earned, and every other
-// one behind See all. A tap opens the badge. A quiet section: a cap label, no box.
+// one behind See all. A tap opens the badge. A quiet section: a cap label, no box. The label
+// opens the Learn sheet of badges (learn()).
 Column {
     id: badgeCard
 
@@ -13,6 +15,7 @@ Column {
     property bool miles: false
 
     signal openBadge(string id)
+    signal learn()
 
     property bool showAll: false
 
@@ -32,9 +35,11 @@ Column {
     Item {
         width: parent.width
         height: 24
-        CapLabel {
+        LearnLabel {
+            x: -8
             anchors.verticalCenter: parent.verticalCenter
-            text: qsTr("Badges")
+            caption: qsTr("Badges")
+            onClicked: badgeCard.learn()
         }
         Text {
             anchors.right: parent.right

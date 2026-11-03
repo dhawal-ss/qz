@@ -10,6 +10,9 @@ import ".."
 // Touch: a sideways drag scrubs the crosshair (pans when zoomed in), press and hold then drag
 // always scrubs, a pinch zooms, a tap shows or hides the crosshair, a double tap shows the
 // whole ride. Vertical drags are left to the page, so it still scrolls over the charts.
+// With `learnable` a tap opens the chart's Learn sheet instead (learn(), after the time of a
+// double tap, so a double tap still shows the whole ride); a tap while the crosshair shows still
+// hides it, and a held or sideways touch still scrubs.
 //
 // For the hero chart of a ride: `filled` paints the power as soft areas in their zone colors,
 // `overlay` lays a second metric (heart rate) over it as a thin line on its own scale, and a
@@ -44,9 +47,21 @@ Item {
     property real reveal: 1
 
     property int topStrip: 22
+    property bool learnable: false
 
-    Accessible.role: Accessible.Graphic
+    signal learn()
+
+    Accessible.role: learnable ? Accessible.Button : Accessible.Graphic
     Accessible.name: qsTr("%1 chart, average %2, highest %3").arg(name).arg(valueText(shownAverage)).arg(valueText(stats.hi))
+                     + (learnable ? ". " + qsTr("Tap to learn more") : "")
+    Accessible.onPressAction: if (learnable) chart.learn()
+
+    // a single tap waits out a double tap before it opens the Learn sheet
+    Timer {
+        id: learnLater
+        interval: 260
+        onTriggered: chart.learn()
+    }
 
     // the whole ride once: highest, lowest reading and average, before the factor
     readonly property var stats: {
@@ -687,11 +702,30 @@ Item {
             onClicked: {
                 if (mode !== "" || !chart.view)
                     return
-                chart.view.cursor = chart.view.cursor >= 0 ? -1 : chart.fractionAt(mouse.x)
+                if (chart.view.cursor >= 0)
+                    chart.view.cursor = -1
+                else if (chart.learnable)
+                    learnLater.restart()
+                else
+                    chart.view.cursor = chart.fractionAt(mouse.x)
             }
             onDoubleClicked: {
+                learnLater.stop()
                 if (chart.view)
                     chart.view.reset()
+            }
+
+            // the pressed state of a chart that is a button: gone as soon as the touch scrubs
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -6
+                radius: 18
+                color: Qt.rgba(1, 1, 1, 0.05)
+                opacity: chart.learnable && touch.pressed && touch.mode === "" ? 1 : 0
+                Behavior on opacity {
+                    enabled: !Theme.reduceMotion
+                    NumberAnimation { duration: Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }
+                }
             }
             // ctrl and the wheel zoom on a desktop; the plain wheel still scrolls the page
             onWheel: {

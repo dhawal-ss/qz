@@ -4,7 +4,7 @@ import "../sig"
 import "../Format.js" as Format
 
 // Everything so far, and the next rung of the distance ladder, as a quiet section. A tap opens
-// Goals.
+// its Learn sheet (learn()), which leads on to Goals.
 Column {
     id: lifetimeCard
 
@@ -13,6 +13,7 @@ Column {
     property bool miles: false
 
     signal openGoals()
+    signal learn()
 
     readonly property real share: milestone ? Math.max(0, Math.min(1, ((lifetime.distance || 0) - milestone.from)
                                                                         / Math.max(1, milestone.rung - milestone.from))) : 1
@@ -34,9 +35,9 @@ Column {
         radius: 18
         pressedScale: 0.985
         Accessible.name: lifetimeCard.milestone
-                         ? qsTr("All your rides, %1. Next milestone %2. Open your goals").arg(Format.distance(lifetimeCard.lifetime.distance || 0, lifetimeCard.miles)).arg(lifetimeCard.rungName(lifetimeCard.milestone.rung))
-                         : qsTr("All your rides, %1. Open your goals").arg(Format.distance(lifetimeCard.lifetime.distance || 0, lifetimeCard.miles))
-        onClicked: lifetimeCard.openGoals()
+                         ? qsTr("All your rides, %1. Next milestone %2. Tap to learn more").arg(Format.distance(lifetimeCard.lifetime.distance || 0, lifetimeCard.miles)).arg(lifetimeCard.rungName(lifetimeCard.milestone.rung))
+                         : qsTr("All your rides, %1. Tap to learn more").arg(Format.distance(lifetimeCard.lifetime.distance || 0, lifetimeCard.miles))
+        onClicked: lifetimeCard.learn()
         contentItem: Column {
             id: lifeColumn
             spacing: 14

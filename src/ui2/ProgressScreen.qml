@@ -3,6 +3,9 @@ import Qt.labs.settings 1.0
 import "."
 import "sig"
 import "progress"
+import "learn"
+import "Format.js" as Format
+import "learn/Learn.js" as Learn
 import "progress/Progress.js" as Progress
 import "progress/Fitness.js" as Fitness
 import "progress/Hub.js" as Hub
@@ -15,7 +18,11 @@ import "goals/Streak.js" as Streak
 // the period before, the weekly volume with its 4 week average, a year of consistency, every
 // record and this week, month or year against the last. One column on phones, two from 720 wide,
 // each section going to the shorter column. A new period draws the charts in again and rolls
-// the numbers; everything rises in each time the screen shows.
+// the numbers; everything rises in each time the screen shows. "Your year in one picture" shows
+// the hours of each of the last 12 months with the biggest one lit.
+// Tap to learn: every chart, big number and section label opens a Learn sheet
+// (learn/LearnSheet.qml) with what it is, what the rider's own numbers say, why it matters and
+// one thing to try; holding or dragging a chart still reads it out.
 Item {
     id: progressPage
     objectName: "progressScreen"
@@ -26,6 +33,9 @@ Item {
     property string initial: "B"
     // the end of the page the floating navigation covers: the content scrolls under it
     property real bottomClearance: 0
+    // what a sheet keeps free at its end (the bottom inset; the shell binds it, the floating
+    // navigation steps aside while a sheet covers the page)
+    property real sheetClearance: 0
 
     signal openYou()
     signal openRide(int id)
@@ -38,8 +48,9 @@ Item {
     // the charts draw in again
     signal replay()
 
-    readonly property var cardIds: ["insight", "fitness", "ftp", "curve", "volume", "consistency", "records", "compare"]
+    readonly property var cardIds: ["insight", "fitness", "ftp", "curve", "volume", "year", "consistency", "records", "compare"]
     readonly property var cardTitles: ({
+        year: qsTr("Your year in one picture"),
         insight: qsTr("This period"),
         fitness: qsTr("Fitness and form"),
         ftp: qsTr("FTP"),
@@ -62,6 +73,17 @@ Item {
     property var streakResult: ({ streak: 0, freezes: 0, toNextFreeze: 0 })
     // Fitness.series() from half a year before the year shown, so the year starts warmed up
     property var series: []
+
+    // the Learn sheet: open, what it shows, and the facts each section last gave, so a related
+    // link back to a section still has the rider's numbers
+    property bool learnOpen: false
+    property var learnEntry: null
+    property var learnStore: ({})
+    // the entries the page fills itself, and those of the sections that are shown
+    readonly property var learnIds: ["period", "fitness", "fatigue", "form", "tss", "zones", "if", "bests", "streak", "freezes"]
+                                    .concat(Object.keys(learnStore))
+    // a sheet covers the page: the shell can move the floating navigation aside
+    readonly property bool covering: customizing || learnOpen
 
     readonly property bool pro: detailLevel === "pro"
     readonly property bool hasRides: library !== null && library.rideCount > 0
@@ -117,6 +139,61 @@ Item {
         streakResult = Streak.run(weeks, { kind: goalKind, goal: goalValue, rest: restWeeks, now: now })
     }
 
+    // what the Learn sheet of an entry says about this rider: what a section gave, else what the
+    // page knows itself
+    function factsFor(id) {
+        var f = learnStore[id] ? JSON.parse(JSON.stringify(learnStore[id])) : {}
+        f.rides = library ? library.rideCount : 0
+        if ((id === "fitness" || id === "fatigue" || id === "form") && series.length > 0 && f.ctl === undefined) {
+            var n = series.length
+            var last = series[n - 1]
+            var before = series[Math.max(0, n - 29)]
+            f.ctl = last.ctl
+            f.atl = last.atl
+            f.tsb = last.tsb
+            f.state = Fitness.formLabel(last.ctl, last.tsb)
+            f.change = last.ctl - before.ctl
+            f.days = 28
+        }
+        if (id === "period") {
+            f.headline = insightWords.headline
+            f.line = insightWords.line
+        }
+        if (id === "streak") {
+            f.streak = streakResult.streak
+            f.goalText = goalKind === "rides" ? qsTr("%1 rides").arg(Math.round(goalValue))
+                         : (goalKind === "kj" ? Format.big(goalValue) + " kJ"
+                         : (goalKind === "km" ? Format.distance(goalValue, miles) : Math.round(goalValue) + " min"))
+        }
+        if (id === "freezes") {
+            f.freezes = streakResult.freezes || 0
+            f.toNext = streakResult.toNextFreeze || 0
+        }
+        if (id === "bests" && library) {
+            var curve = library.powerCurve(0, 0)
+            for (var i = 0; i < curve.length; i++)
+                f["b" + curve[i].seconds] = curve[i].watts
+        }
+        return f
+    }
+
+    // a section tells what its Learn sheet would say, each time its data changes
+    function remember(id, facts) {
+        var store = {}
+        for (var key in learnStore)
+            store[key] = learnStore[key]
+        store[id] = facts
+        learnStore = store
+    }
+
+    // opens the Learn sheet of an entry; facts are what the section knows (kept for later)
+    function openLearn(id, facts) {
+        if (facts)
+            remember(id, facts)
+        learnEntry = Learn.entry(id, factsFor(id))
+        learnOpen = true
+    }
+
     function setPeriod(p) {
         if (p === period)
             return
@@ -155,7 +232,7 @@ Item {
     // about how tall each section is, to send each one to the shorter column; fixed, so Simple
     // and Pro never move a section (a new column list would make every section again)
     function weightOf(cardId) {
-        var w = { insight: 1.4, fitness: 4, ftp: 2, curve: 3.4, volume: 2.8, consistency: 2.6,
+        var w = { insight: 1.4, fitness: 4, ftp: 2, curve: 3.4, volume: 2.8, year: 2.6, consistency: 2.6,
                   records: 8, compare: 4 }
         return w[cardId] || 3
     }
@@ -186,6 +263,8 @@ Item {
             return curveSection
         if (cardId === "volume")
             return volumeSection
+        if (cardId === "year")
+            return yearSection
         if (cardId === "consistency")
             return consistencySection
         if (cardId === "records")
@@ -199,6 +278,10 @@ Item {
 
     // Android back closes the sheet first
     function goBack() {
+        if (learnOpen) {
+            learnOpen = false
+            return true
+        }
         if (customizing) {
             customizing = false
             return true
@@ -211,8 +294,10 @@ Item {
         reload()
     }
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
+            learnOpen = false
             return
+        }
         readSettings()
         refresh()
         entered()
@@ -247,9 +332,17 @@ Item {
 
     Component {
         id: insightSection
-        InsightBlock {
-            headline: progressPage.insightWords.headline
-            line: progressPage.insightWords.line
+        LearnTap {
+            name: progressPage.insightWords.headline + " " + progressPage.insightWords.line
+            pressedScale: 0.98
+            fill: "transparent"
+            onClicked: progressPage.openLearn("period", null)
+            InsightBlock {
+                width: parent.width
+                headline: progressPage.insightWords.headline
+                line: progressPage.insightWords.line
+                Accessible.ignored: true
+            }
         }
     }
     Component {
@@ -259,6 +352,7 @@ Item {
             all: progressPage.series
             range: Hub.days(progressPage.period)
             pro: progressPage.pro
+            onLearn: progressPage.openLearn(key, facts)
             Connections {
                 target: progressPage
                 function onReplay() { fitnessChart.play() }
@@ -268,19 +362,31 @@ Item {
     }
     Component {
         id: ftpSection
-        FtpTrend {
-            id: ftpTrend
-            library: progressPage.library
-            period: progressPage.period
-            pro: progressPage.pro
-            setting: progressPage.ftpSetting
-            Component.onCompleted: refresh()
-            Connections {
-                target: progressPage
-                function onReload() { ftpTrend.refresh() }
-                function onPeriodReload() { ftpTrend.refresh() }
-                function onReplay() { ftpTrend.play() }
-                function onEntered() { ftpTrend.play() }
+        LearnTap {
+            id: ftpTap
+            name: qsTr("FTP, %1 watts estimated").arg(Math.round(ftpTrend.current))
+            onClicked: progressPage.openLearn("ftp", ftpFacts())
+            function ftpFacts() {
+                return { current: ftpTrend.current, firstValue: ftpTrend.firstStep ? ftpTrend.firstStep.value : 0,
+                         sinceText: ftpTrend.firstStep ? Format.monthNames[new Date(ftpTrend.firstStep.start).getMonth()] : "",
+                         setting: progressPage.ftpSetting }
+            }
+            FtpTrend {
+                id: ftpTrend
+                width: parent.width
+                onStepsChanged: progressPage.remember("ftp", ftpTap.ftpFacts())
+                library: progressPage.library
+                period: progressPage.period
+                pro: progressPage.pro
+                setting: progressPage.ftpSetting
+                Component.onCompleted: refresh()
+                Connections {
+                    target: progressPage
+                    function onReload() { ftpTrend.refresh() }
+                    function onPeriodReload() { ftpTrend.refresh() }
+                    function onReplay() { ftpTrend.play() }
+                    function onEntered() { ftpTrend.play() }
+                }
             }
         }
     }
@@ -293,6 +399,8 @@ Item {
             period: progressPage.period
             pro: progressPage.pro
             onOpenRide: progressPage.openRide(id)
+            onLearn: progressPage.openLearn(key, facts)
+            onPointsChanged: progressPage.remember("curve", powerCurve.learnFacts())
             Component.onCompleted: refresh()
             Connections {
                 target: progressPage
@@ -305,36 +413,80 @@ Item {
     }
     Component {
         id: volumeSection
-        VolumeCard {
-            id: volumeCard
+        LearnTap {
+            id: volumeTap
+            name: qsTr("Weekly volume")
+            onClicked: progressPage.openLearn("volume", volumeFacts())
+            // last week against the 4 week average, in words
+            function volumeFacts() {
+                var v = volumeCard
+                if (!v.lastWeek)
+                    return {}
+                var last = v.value(v.lastWeek)
+                var avg = v.averages.length > 0 ? v.averages[v.averages.length - 1] : 0
+                function words(x) {
+                    return v.shownMetric === "seconds" ? Format.hours(x * 3600) : v.bigText(x) + " " + v.unitText()
+                }
+                return { last: last, avg: avg, lastText: words(last), avgText: avg > 0 ? words(avg) : "" }
+            }
+            VolumeCard {
+                id: volumeCard
+                width: parent.width
+                onWeeksChanged: progressPage.remember("volume", volumeTap.volumeFacts())
+                library: progressPage.library
+                miles: progressPage.miles
+                period: progressPage.period
+                pro: progressPage.pro
+                Component.onCompleted: refresh()
+                Connections {
+                    target: progressPage
+                    function onReload() { volumeCard.refresh() }
+                    function onPeriodReload() { volumeCard.refresh() }
+                    function onReplay() { volumeCard.play() }
+                    function onEntered() { volumeCard.play() }
+                }
+            }
+        }
+    }
+    Component {
+        id: yearSection
+        YearCard {
+            id: yearCard
             library: progressPage.library
-            miles: progressPage.miles
-            period: progressPage.period
-            pro: progressPage.pro
-            Component.onCompleted: refresh()
+            onClicked: progressPage.openLearn("year", yearCard.learnFacts())
+            onMonthsChanged: progressPage.remember("year", yearCard.learnFacts())
+            Component.onCompleted: {
+                refresh()
+                play()
+            }
             Connections {
                 target: progressPage
-                function onReload() { volumeCard.refresh() }
-                function onPeriodReload() { volumeCard.refresh() }
-                function onReplay() { volumeCard.play() }
-                function onEntered() { volumeCard.play() }
+                function onReload() { yearCard.refresh() }
+                function onReplay() { yearCard.play() }
+                function onEntered() { yearCard.play() }
             }
         }
     }
     Component {
         id: consistencySection
-        ConsistencyCard {
-            id: consistencyCard
-            library: progressPage.library
-            streak: progressPage.streakResult.streak
-            freezes: progressPage.streakResult.freezes
-            toNextFreeze: progressPage.streakResult.toNextFreeze
-            Component.onCompleted: refresh()
-            Connections {
-                target: progressPage
-                function onReload() { consistencyCard.refresh() }
-                function onReplay() { consistencyCard.play() }
-                function onEntered() { consistencyCard.play() }
+        LearnTap {
+            name: qsTr("Consistency, %1 active weeks of 52").arg(consistencyCard.activeWeeks)
+            onClicked: progressPage.openLearn("consistency", { activeWeeks: consistencyCard.activeWeeks })
+            ConsistencyCard {
+                id: consistencyCard
+                width: parent.width
+                onActiveWeeksChanged: progressPage.remember("consistency", { activeWeeks: consistencyCard.activeWeeks })
+                library: progressPage.library
+                streak: progressPage.streakResult.streak
+                freezes: progressPage.streakResult.freezes
+                toNextFreeze: progressPage.streakResult.toNextFreeze
+                Component.onCompleted: refresh()
+                Connections {
+                    target: progressPage
+                    function onReload() { consistencyCard.refresh() }
+                    function onReplay() { consistencyCard.play() }
+                    function onEntered() { consistencyCard.play() }
+                }
             }
         }
     }
@@ -347,6 +499,8 @@ Item {
             weight: progressPage.weight
             pro: progressPage.pro
             onOpenRide: progressPage.openRide(id)
+            onLearn: progressPage.openLearn(key, facts)
+            onAllPowerRowsChanged: progressPage.remember("records", recordsBoard.learnFacts())
             Component.onCompleted: refresh()
             Connections {
                 target: progressPage
@@ -356,15 +510,26 @@ Item {
     }
     Component {
         id: compareSection
-        PeriodCompare {
-            id: periodCompare
-            library: progressPage.library
-            miles: progressPage.miles
-            pro: progressPage.pro
-            Component.onCompleted: refresh()
-            Connections {
-                target: progressPage
-                function onReload() { periodCompare.refresh() }
+        LearnTap {
+            id: compareTap
+            name: qsTr("Compare periods")
+            function compareFacts() {
+                return { span: periodCompare.span === "week" ? qsTr("week") : (periodCompare.span === "month" ? qsTr("month") : qsTr("year")),
+                         nowText: Format.hours(periodCompare.now.seconds || 0), beforeText: Format.hours(periodCompare.before.seconds || 0) }
+            }
+            onClicked: progressPage.openLearn("compare", compareFacts())
+            PeriodCompare {
+                id: periodCompare
+                width: parent.width
+                onBeforeChanged: progressPage.remember("compare", compareTap.compareFacts())
+                library: progressPage.library
+                miles: progressPage.miles
+                pro: progressPage.pro
+                Component.onCompleted: refresh()
+                Connections {
+                    target: progressPage
+                    function onReload() { periodCompare.refresh() }
+                }
             }
         }
     }
@@ -542,6 +707,17 @@ Item {
                 }
             }
         }
+    }
+
+    LearnSheet {
+        anchors.fill: parent
+        z: 2
+        open: progressPage.learnOpen
+        entry: progressPage.learnEntry
+        known: progressPage.learnIds
+        bottomInset: progressPage.sheetClearance
+        onClose: progressPage.learnOpen = false
+        onRelated: progressPage.openLearn(id, null)
     }
 
     CustomizeSheet {

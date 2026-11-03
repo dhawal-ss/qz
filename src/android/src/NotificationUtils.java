@@ -16,7 +16,7 @@ public class NotificationUtils {
 
     public static final int NOTIFICATION_ID = 1337;
     private static final String NOTIFICATION_CHANNEL_ID = "org.cagnulen.qdomyoszwift";
-    private static final String NOTIFICATION_CHANNEL_NAME = "org.cagnulen.qdomyoszwift";
+    private static final String NOTIFICATION_CHANNEL_NAME = "Bikemodo";
 
     public static Pair<Integer, Notification> getNotification(Context context) {
         createNotificationChannel(context);

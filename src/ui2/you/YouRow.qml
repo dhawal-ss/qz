@@ -25,7 +25,7 @@ PulseButton {
     implicitHeight: Math.max(glyph !== "" ? 68 : 58, texts.implicitHeight + 26)
     radius: washed ? 24 : 16
     pressedScale: 0.98
-    fill: washed ? Qt.rgba(201 / 255, 184 / 255, 1, 0.08)
+    fill: washed ? Theme.accentWash(0.08)
                  : (highlighted ? Theme.pressed : (pressed ? Theme.control : Qt.rgba(0, 0, 0, 0)))
     Accessible.name: title + (value !== "" ? ", " + value : "") + (detail !== "" ? ", " + detail : "")
     Accessible.checkable: trailing === "check"

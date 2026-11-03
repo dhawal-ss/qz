@@ -221,6 +221,27 @@ QVector<int> recordSteps(const QVector<double> &values) {
     return steps;
 }
 
+QVector<RideSample> joinParts(const QList<QVector<RideSample>> &parts, QList<int> *partStarts) {
+    QVector<RideSample> out;
+    double distance = 0;
+    double calories = 0;
+    for (const QVector<RideSample> &part : parts) {
+        if (partStarts)
+            partStarts->append(out.size());
+        for (RideSample s : part) {
+            s.distance += distance;
+            s.calories += calories;
+            s.second = out.size();
+            out.append(s);
+        }
+        if (!out.isEmpty()) {
+            distance = out.last().distance;
+            calories = out.last().calories;
+        }
+    }
+    return out;
+}
+
 QDate weekMonday(const QDate &date) {
     return date.addDays(1 - date.dayOfWeek());
 }

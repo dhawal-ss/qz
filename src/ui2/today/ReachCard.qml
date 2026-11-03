@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import ".."
 import "../sig"
+import "../learn"
 import "../Format.js" as Format
 import "../moments/Moments.js" as Moments
 
@@ -13,14 +14,17 @@ Column {
 
     signal rideRequested()
     signal openRide(int id)
+    signal learn()
 
     readonly property color tint: reach ? Theme.zoneColors[Moments.recordTone(reach.seconds) - 1] : Theme.accent
     readonly property string effortName: reach ? Format.effort(reach.seconds) : ""
 
     spacing: 4
 
-    CapLabel {
-        text: qsTr("Record within reach")
+    LearnLabel {
+        x: -8
+        caption: qsTr("Record within reach")
+        onClicked: reachCard.learn()
     }
     PulseButton {
         width: reachCard.width

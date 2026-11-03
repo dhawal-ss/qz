@@ -4,14 +4,18 @@
 #include <QAtomicInt>
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QThread>
 #include <QVariantList>
 #include <QVariantMap>
 
 class RideLibraryWorker;
 
-// The finished rides of the Pulse interface (src/ui2): one row per .fit file of the fit folder,
-// with its numbers, laps and samples worked out once and kept in bikemodo-library.sqlite.
+// The finished rides of the Pulse interface (src/ui2), with their numbers, laps and samples worked
+// out once and kept in bikemodo-library.sqlite. A ride is made of one or more parts, one per .fit
+// file: a ride saved again after a pause or a restart of the app joins the ride before it when it
+// starts within ui2/mergeGapMinutes (default 10, 0 never) of its end, and the rider can merge or
+// split rides by hand. Every method below speaks of whole rides.
 // The .fit files stay the source: the database can be deleted and is filled again from them.
 // Reading happens on the UI thread, parsing and writing in a worker thread.
 class RideLibrary : public QObject {
@@ -47,6 +51,12 @@ class RideLibrary : public QObject {
     // [{key, value, start, rideId, history: [{start, value, rideId}]}]
     Q_INVOKABLE QVariantList rideRecords();
     Q_INVOKABLE void rescan();
+    // joins a ride to the one before it (when that one ended at most 3 h before): the ride then
+    // carries the id of the one before it. False when there is nothing to join.
+    Q_INVOKABLE bool mergeWithPrevious(int id);
+    // makes every part of a ride a ride of its own again, and keeps them apart from now on.
+    // False when the ride has one part.
+    Q_INVOKABLE bool splitRide(int id);
 
   signals:
     void changed();
@@ -59,6 +69,7 @@ class RideLibrary : public QObject {
     void jobDone();
     void onInserted();
     void onProgress(int indexed, int toIndex);
+    void setLinks(const QStringList &paths, int mode);
 
     QString m_fitDir;
     QString m_dbPath;
@@ -79,6 +90,8 @@ class RideLibraryWorker : public QObject {
 
     void scan(const QString &fitDir);
     void importFile(const QString &path);
+    // mode 1 joins each of these parts to the part before it, 0 keeps them apart
+    void setLinks(const QStringList &paths, int mode);
 
     QAtomicInt stopRequested;
 
@@ -91,6 +104,7 @@ class RideLibraryWorker : public QObject {
     bool openDatabase();
     bool indexFile(const QString &path);
     void removeFile(const QString &path);
+    bool regroup();
     void updateRecords();
 
     QString m_dbPath;

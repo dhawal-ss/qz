@@ -4,18 +4,28 @@ import "."
 import "sig"
 import "calendar"
 import "today"
+import "learn"
 import "Format.js" as Format
 import "progress/Progress.js" as Progress
 import "goals/Streak.js" as Streak
 import "today/Insights.js" as Insights
 import "today/Coach.js" as Coach
+import "today/Patterns.js" as Patterns
+import "progress/Fitness.js" as Fitness
+import "learn/Learn.js" as Learn
 
 // Home, in the Signature language: the date and You at the top, the rider's form as one number
 // in the breathing Pulse (today/Coach.js says how it is worked out), what a coach would say about
 // it, ONE raised card with the ride to do now, and then the week as Pulse shapes and quiet
 // sections on hairlines that the rider can hide and reorder (Customize): insights, the latest
 // ride, a record within reach, best power, this day last year, all the rides so far and the
-// year. Everything rises in, one block after the other, each time the screen shows.
+// year, and three pictures of the rider: this week against the usual week, the effort mix of
+// 30 days and when the rider rides best (today/Patterns.js). Everything rises in, one block after
+// the other, each time the screen shows. A rider with no rides yet sees those pictures as
+// samples in graphite, labelled "After your first ride".
+// Tap to learn: the hero, every picture and every section label open a Learn sheet
+// (learn/LearnSheet.qml) that says what it is, what the rider's own numbers say, why it matters
+// and one thing to try.
 // On wide windows the hero and the card stay on the left and the rest goes to a right column.
 Item {
     id: todayPage
@@ -31,6 +41,9 @@ Item {
     property string initial: "B"
     // the end of the page the floating navigation covers: the content scrolls under it
     property real bottomClearance: 0
+    // what a sheet keeps free at its end (the bottom inset; the shell binds it, the floating
+    // navigation steps aside while a sheet covers the page)
+    property real sheetClearance: 0
 
     signal rideRequested()
     signal demoRequested()
@@ -41,9 +54,12 @@ Item {
     // each time the screen shows: the blocks rise in again
     signal entered()
 
-    readonly property var cardIds: ["week", "insights", "latest", "reach", "bests", "onthisday", "lifetime", "year"]
+    readonly property var cardIds: ["week", "usual", "insights", "latest", "mix", "reach", "bests", "whenbest", "onthisday", "lifetime", "year"]
     readonly property var cardTitles: ({
         week: qsTr("This week"),
+        usual: qsTr("This week vs your usual"),
+        mix: qsTr("Effort mix"),
+        whenbest: qsTr("When you ride best"),
         insights: qsTr("For you today"),
         latest: qsTr("Latest ride"),
         reach: qsTr("Record within reach"),
@@ -77,6 +93,21 @@ Item {
     property var suggestion: Coach.suggest(ready, null, "")
     property bool swapped: false
     property var weekDays: Coach.weekDays([], Date.now())
+    // Patterns.usual(), Patterns.whenBest(), Patterns.mix(); samples for a rider with no rides
+    property var usual: Patterns.usualSample()
+    property var whenData: Patterns.whenSample()
+    property var mixData: Patterns.mixSample()
+    // Streak.run() of the weekly goal: the streak and the freezes
+    property var streakInfo: ({ streak: 0, freezes: 0, toNextFreeze: 0 })
+
+    // the Learn sheet: open, what it shows, and where its button leads ("" for none)
+    property bool learnOpen: false
+    property var learnEntry: null
+    property string learnTab: ""
+    readonly property var learnIds: ["readiness", "fitness", "fatigue", "form", "week", "usual", "whenbest", "mix", "reach",
+                                     "bests", "lifetime", "heatmap", "streak", "freezes", "zones", "tss", "if"]
+    // a sheet covers the page: the shell can move the floating navigation aside
+    readonly property bool covering: customizing || learnOpen
 
     readonly property var plan: swapped ? suggestion.other : suggestion.main
     readonly property bool formShown: ready.hasForm === true
@@ -104,6 +135,12 @@ Item {
             return firstComponent
         if (cardId === "week")
             return weekComponent
+        if (cardId === "usual")
+            return usualComponent
+        if (cardId === "mix")
+            return mixComponent
+        if (cardId === "whenbest")
+            return whenComponent
         if (cardId === "insights")
             return insightsComponent
         if (cardId === "latest")
@@ -117,6 +154,90 @@ Item {
         if (cardId === "lifetime")
             return lifetimeComponent
         return yearComponent
+    }
+
+    function goalWords() {
+        if (goalKind === "rides")
+            return goalValue === 1 ? qsTr("1 ride") : qsTr("%1 rides").arg(Math.round(goalValue))
+        if (goalKind === "kj")
+            return Format.big(goalValue) + " kJ"
+        if (goalKind === "km")
+            return Format.distance(goalValue, miles)
+        return Math.round(goalValue) + " min"
+    }
+
+    // fitness and fatigue of today and four weeks before, from every day ridden
+    function fitnessFacts(f) {
+        var days = library ? library.days(0, 0) : []
+        if (days.length === 0)
+            return f
+        var first = days[0].day
+        for (var i = 1; i < days.length; i++)
+            first = Math.min(first, days[i].day)
+        var line = Fitness.series(days, first, Date.now())
+        var last = line[line.length - 1]
+        var before = line[Math.max(0, line.length - 29)]
+        f.ctl = last.ctl
+        f.atl = last.atl
+        f.tsb = last.tsb
+        f.state = Fitness.formLabel(last.ctl, last.tsb)
+        f.change = last.ctl - before.ctl
+        f.days = Math.min(28, line.length - 1)
+        return f
+    }
+
+    // what the Learn sheet of an entry says about this rider
+    function factsFor(id) {
+        var f = { rides: rideCount, estimated: false }
+        if (id === "readiness")
+            return { rides: rideCount, hasForm: formShown, ready: ready.ready, word: ready.word, tsb: ready.tsb, recent: ready.recent,
+                     state: Fitness.formLabel(ready.ctl, ready.tsb), weekText: Coach.goalText(weekValue, goalValue, goalKind, miles) }
+        if (id === "fitness" || id === "fatigue" || id === "form")
+            return fitnessFacts(f)
+        if (id === "week") {
+            var rode = 0
+            for (var i = 0; i < weekDays.length; i++)
+                if (weekDays[i].zone > 0)
+                    rode++
+            return { rides: rideCount, rodeDays: rode, goalText: Coach.goalText(weekValue, goalValue, goalKind, miles),
+                     met: goalValue > 0 && weekValue >= goalValue - 1e-9 }
+        }
+        if (id === "usual") {
+            var u = JSON.parse(JSON.stringify(usual))
+            u.rides = rideCount
+            u.sample = rideCount === 0
+            return u
+        }
+        if (id === "whenbest")
+            return { rides: rideCount, sample: rideCount === 0 || !whenData.enough,
+                     dayName: whenData.bestDay >= 0 ? Patterns.dayNames[whenData.bestDay] : "",
+                     slotName: whenData.bestSlot >= 0 ? Patterns.slotNames[whenData.bestSlot] : "" }
+        if (id === "mix")
+            return { rides: rideCount, sample: rideCount === 0, easy: mixData.easy, moderate: mixData.moderate, hard: mixData.hard }
+        if (id === "reach" && found.reach)
+            return { rides: rideCount, effort: Format.effort(found.reach.seconds), target: found.reach.target, current: found.reach.best }
+        if (id === "bests") {
+            for (var b = 0; b < bests.length; b++)
+                f["b" + bests[b].seconds] = bests[b].watts
+            return f
+        }
+        if (id === "lifetime")
+            return { rides: lifetime.rides || 0, seconds: lifetime.seconds || 0,
+                     nextText: found.milestone ? qsTr("%1 to go to the next milestone.").arg(Format.distance(found.milestone.remaining, miles)) : "" }
+        if (id === "heatmap")
+            return { rides: rideCount, rideDays: library ? library.days(Date.now() - 365 * 86400000, 0).length : 0 }
+        if (id === "streak")
+            return { rides: rideCount, streak: streakInfo.streak, goalText: goalWords() }
+        if (id === "freezes")
+            return { rides: rideCount, freezes: streakInfo.freezes || 0, toNext: streakInfo.toNextFreeze || 0 }
+        return f
+    }
+
+    // opens the Learn sheet of an entry with the rider's own numbers
+    function openLearn(id) {
+        learnEntry = Learn.entry(id, factsFor(id))
+        learnTab = id === "week" || id === "lifetime" || id === "streak" || id === "freezes" ? "goals" : ""
+        learnOpen = true
     }
 
     // where an insight leads
@@ -180,6 +301,10 @@ Item {
 
     // Android back closes the sheet first
     function goBack() {
+        if (learnOpen) {
+            learnOpen = false
+            return true
+        }
         if (customizing) {
             customizing = false
             return true
@@ -196,6 +321,12 @@ Item {
             return bests.length > 0
         if (cardId === "onthisday")
             return found.onThisDay !== null
+        if (cardId === "usual")
+            return usual.weeks > 0
+        if (cardId === "whenbest")
+            return whenData.enough
+        if (cardId === "mix")
+            return mixData.total > 0
         return true
     }
 
@@ -206,7 +337,8 @@ Item {
         // the coach line already welcomes the rider back
         var told = ["welcome"]
         if (rideCount === 0) {
-            ids = ["week", "first"]
+            // what each picture will look like, as samples; the history being read in first
+            ids = library && library.busy ? ["week", "first", "usual", "mix", "whenbest"] : ["week", "usual", "mix", "whenbest"]
         } else {
             for (var i = 0; i < cards.length; i++) {
                 var cardId = cards[i].id
@@ -244,6 +376,10 @@ Item {
             coachWords = Coach.words(ready)
             suggestion = Coach.suggest(ready, null, "")
             weekDays = Coach.weekDays([], now)
+            usual = Patterns.usualSample()
+            whenData = Patterns.whenSample()
+            mixData = Patterns.mixSample()
+            streakInfo = { streak: 0, freezes: 0, toNextFreeze: 0 }
             layout()
             return
         }
@@ -262,7 +398,8 @@ Item {
         var allDays = library.days(0, 0)
         var weeks = Streak.perWeek(allDays)
         weekValue = Streak.measure(weeks[Streak.weekKey(now)], goalKind)
-        goalStreak = Streak.run(weeks, { kind: goalKind, goal: goalValue, rest: restWeeks, now: now }).streak
+        streakInfo = Streak.run(weeks, { kind: goalKind, goal: goalValue, rest: restWeeks, now: now })
+        goalStreak = streakInfo.streak
         found = Insights.build({
             rides: recent,
             days: allDays,
@@ -278,14 +415,19 @@ Item {
         coachWords = Coach.words(ready)
         suggestion = Coach.suggest(ready, found.reach, found.reach ? Format.effort(found.reach.seconds) : "")
         weekDays = Coach.weekDays(recent, now)
+        usual = Patterns.usual(recent, now)
+        whenData = Patterns.whenBest(recent, now)
+        mixData = Patterns.mix(recent, now)
         layout()
     }
 
     onLibraryChanged: refresh()
     onMilesChanged: refreshLater.restart()
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
+            learnOpen = false
             return
+        }
         readSettings()
         refresh()
         entered()
@@ -326,7 +468,46 @@ Item {
             days: todayPage.weekDays
             summary: Coach.goalText(todayPage.weekValue, todayPage.goalValue, todayPage.goalKind, todayPage.miles)
             met: todayPage.goalValue > 0 && todayPage.weekValue >= todayPage.goalValue - 1e-9
-            onOpenGoals: todayPage.openTab("goals")
+            onLearn: todayPage.openLearn("week")
+        }
+    }
+    Component {
+        id: usualComponent
+        UsualCard {
+            id: usualCard
+            usual: todayPage.usual
+            sample: todayPage.rideCount === 0
+            onClicked: todayPage.openLearn("usual")
+            Connections {
+                target: todayPage
+                function onEntered() { usualCard.grow() }
+            }
+        }
+    }
+    Component {
+        id: mixComponent
+        MixCard {
+            id: mixCard
+            mix: todayPage.mixData
+            sample: todayPage.rideCount === 0
+            onClicked: todayPage.openLearn("mix")
+            Connections {
+                target: todayPage
+                function onEntered() { mixCard.play() }
+            }
+        }
+    }
+    Component {
+        id: whenComponent
+        WhenCard {
+            id: whenCard
+            when: todayPage.whenData
+            sample: todayPage.rideCount === 0
+            onClicked: todayPage.openLearn("whenbest")
+            Connections {
+                target: todayPage
+                function onEntered() { whenCard.grow() }
+            }
         }
     }
     Component {
@@ -351,6 +532,7 @@ Item {
             reach: todayPage.found.reach
             onRideRequested: todayPage.rideRequested()
             onOpenRide: todayPage.openRide(id)
+            onLearn: todayPage.openLearn("reach")
         }
     }
     Component {
@@ -358,6 +540,7 @@ Item {
         BestsCard {
             bests: todayPage.bests
             onOpenRide: todayPage.openRide(id)
+            onLearn: todayPage.openLearn("bests")
         }
     }
     Component {
@@ -376,15 +559,17 @@ Item {
             lifetime: todayPage.lifetime
             milestone: todayPage.found.milestone
             miles: todayPage.miles
-            onOpenGoals: todayPage.openTab("goals")
+            onLearn: todayPage.openLearn("lifetime")
         }
     }
     Component {
         id: yearComponent
         Column {
-            spacing: 12
-            CapLabel {
-                text: qsTr("Your year")
+            spacing: 8
+            LearnLabel {
+                x: -8
+                caption: qsTr("Your year")
+                onClicked: todayPage.openLearn("heatmap")
             }
             CalendarHeatmap {
                 width: parent.width
@@ -506,11 +691,17 @@ Item {
                     cue: todayPage
                     order: 0
                     width: parent.width
-                    Item {
+                    // the hero is the button to its Learn sheet
+                    LearnTap {
                         width: parent.width
                         height: 136
+                        fill: "transparent"
+                        pressedScale: 0.96
+                        name: hero.summary
+                        onClicked: todayPage.openLearn("readiness")
                         PulseHero {
                             id: hero
+                            Accessible.ignored: true
                             objectName: "todayHero"
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: 136
@@ -640,6 +831,22 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    LearnSheet {
+        anchors.fill: parent
+        z: 2
+        open: todayPage.learnOpen
+        entry: todayPage.learnEntry
+        known: todayPage.learnIds
+        bottomInset: todayPage.sheetClearance
+        actionLabel: todayPage.learnTab === "goals" ? qsTr("See your goals") : ""
+        onClose: todayPage.learnOpen = false
+        onRelated: todayPage.openLearn(id)
+        onAct: {
+            todayPage.learnOpen = false
+            todayPage.openTab(todayPage.learnTab)
         }
     }
 
