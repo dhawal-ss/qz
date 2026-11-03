@@ -932,6 +932,7 @@ jobs:
             arch: x86_64
             android-version: "Android 17"
             flaky: true
+            slim-apk: true
     
     steps:
       - name: Checkout code
@@ -956,6 +957,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # The debug APK holds the libraries of 4 ABIs, over 550 MB, which is about all the default
+      # data partition of the Android 17 image takes. Keep only the emulator's ABI and sign again.
+      - name: Keep only the emulator ABI in the APK
+        if: ${{ matrix.slim-apk }}
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          cd apk-debug
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            if [ "$abi" != "${{ matrix.arch }}" ]; then zip -q -d android-debug.apk "lib/$abi/*"; fi
+          done
+          "$BT/zipalign" -p -f 4 android-debug.apk aligned.apk
+          keytool -genkeypair -keystore ci-debug.keystore -storepass android -keypass android -alias ci -keyalg RSA -keysize 2048 -validity 365 -dname "CN=CI Debug" -noprompt
+          "$BT/apksigner" sign --ks ci-debug.keystore --ks-pass pass:android --ks-key-alias ci --v4-signing-enabled false --out android-debug.apk aligned.apk
+          rm -f aligned.apk ci-debug.keystore
+          "$BT/apksigner" verify android-debug.apk
+          ls -la
+
       # The Android 17 SDK and system image use android-37.0, not android-37.
       # Keep matrix.api-level = 37 for test names/artifacts but provide the
       # package identifier to the emulator runner when installing the SDK.
@@ -967,8 +986,6 @@ jobs:
           arch: ${{ matrix.arch }}
           profile: Nexus 6
           disable-animations: true
-          # the debug APK for 4 ABIs is over 500 MB, more than the default data partition holds
-          disk-size: 4096M
           script: |
             # Display available space
             df -h
@@ -977,9 +994,8 @@ jobs:
             echo "Files in apk-debug directory:"
             ls -la apk-debug/
 
-            # Install the APK: copied first, since streaming the 500 MB APK breaks off on Android 17,
-            # and tried again when the package service of the new emulator drops the first attempt
-            for attempt in 1 2 3; do adb install --no-streaming apk-debug/android-debug.apk && break; if [ "$attempt" = 3 ]; then exit 1; fi; sleep 20; done
+            # Install the APK (prints the free space and the package manager log when it fails)
+            adb install apk-debug/android-debug.apk || { adb shell df -h /data; adb logcat -d -b crash | tail -100; adb logcat -d | grep -iE 'PackageManager|PackageInstaller|system_server|watchdog' | tail -100; exit 1; }
 
             # Grant runtime (dangerous) permissions
             echo "Granting runtime permissions..."
