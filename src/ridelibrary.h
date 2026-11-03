@@ -24,6 +24,9 @@ class RideLibrary : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(int indexed READ indexed NOTIFY progressChanged)
     Q_PROPERTY(int toIndex READ toIndex NOTIFY progressChanged)
+    // a ride the app did not save because it was closed or killed during it, found in QZ's minute
+    // backups: {path, start, seconds}, or empty
+    Q_PROPERTY(QVariantMap unfinished READ unfinished NOTIFY unfinishedChanged)
 
   public:
     // appDir is homeform::getWritableAppDir(): the .fit files are in its fit folder
@@ -34,6 +37,7 @@ class RideLibrary : public QObject {
     bool busy() const { return m_pendingJobs > 0; }
     int indexed() const { return m_indexed; }
     int toIndex() const { return m_toIndex; }
+    QVariantMap unfinished() const { return m_unfinished; }
 
     // adds a .fit file that was just saved
     void importFile(const QString &path);
@@ -57,11 +61,16 @@ class RideLibrary : public QObject {
     // makes every part of a ride a ride of its own again, and keeps them apart from now on.
     // False when the ride has one part.
     Q_INVOKABLE bool splitRide(int id);
+    // copies the unfinished ride into the fit folder as a ride of its own, or lets it go; either
+    // way it, and every backup older than it, is not offered again
+    Q_INVOKABLE void recoverUnfinished();
+    Q_INVOKABLE void dismissUnfinished();
 
   signals:
     void changed();
     void busyChanged();
     void progressChanged();
+    void unfinishedChanged();
 
   private:
     static QString databasePath(const QString &appDir);
@@ -69,10 +78,14 @@ class RideLibrary : public QObject {
     void jobDone();
     void onInserted();
     void onProgress(int indexed, int toIndex);
+    void onUnfinishedFound(const QVariantMap &ride);
     void setLinks(const QStringList &paths, int mode);
+    void forgetUnfinished();
 
+    QString m_appDir;
     QString m_fitDir;
     QString m_dbPath;
+    QVariantMap m_unfinished;
     QThread m_thread;
     RideLibraryWorker *m_worker = nullptr;
     int m_rideCount = 0;
@@ -92,6 +105,9 @@ class RideLibraryWorker : public QObject {
     void importFile(const QString &path);
     // mode 1 joins each of these parts to the part before it, 0 keeps them apart
     void setLinks(const QStringList &paths, int mode);
+    // the newest backup in appDir written before the app started (before) and after the last one the
+    // rider dismissed, that no saved ride covers: sends unfinishedFound, with an empty map when none
+    void findUnfinished(const QString &appDir, qint64 before, qint64 dismissedUntil);
 
     QAtomicInt stopRequested;
 
@@ -99,6 +115,7 @@ class RideLibraryWorker : public QObject {
     void progress(int indexed, int toIndex);
     void inserted();
     void jobDone();
+    void unfinishedFound(const QVariantMap &ride);
 
   private:
     bool openDatabase();

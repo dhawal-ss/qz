@@ -38,7 +38,8 @@ Rectangle {
                 width: parent.width - length.width - 12
                 spacing: 6
                 CapLabel {
-                    text: suggestion.firstRide ? qsTr("Your first ride") : qsTr("Suggested")
+                    // an idea, not a workout: Start ride does not load its blocks yet
+                    text: suggestion.firstRide ? qsTr("Your first ride") : qsTr("Idea for today")
                 }
                 Text {
                     id: planName
@@ -52,7 +53,7 @@ Rectangle {
                     maximumLineCount: 2
                     elide: Text.ElideRight
                     Accessible.role: Accessible.Heading
-                    Accessible.name: qsTr("Suggested ride: %1, %2 minutes").arg(text).arg(suggestion.plan ? suggestion.plan.minutes : 0)
+                    Accessible.name: qsTr("Idea for today: %1, %2 minutes").arg(text).arg(suggestion.plan ? suggestion.plan.minutes : 0)
                 }
             }
             Text {
@@ -105,7 +106,7 @@ Rectangle {
             fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
             pressedRadius: 20
             pressedScale: 0.97
-            Accessible.name: qsTr("Start ride")
+            Accessible.name: suggestion.firstRide ? qsTr("Start ride") : qsTr("Start a free ride and follow this idea by feel")
             onClicked: suggestion.rideRequested()
             contentItem: Item {
                 Row {
@@ -119,7 +120,7 @@ Rectangle {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: qsTr("Start ride")
+                        text: suggestion.firstRide ? qsTr("Start ride") : qsTr("Start a free ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
                         font.pixelSize: 18

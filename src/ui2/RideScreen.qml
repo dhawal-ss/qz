@@ -195,10 +195,19 @@ Item {
     // true once the saved layout is in: changes after that are the rider's, and they move
     property bool settled: false
 
+    // while the screen is locked every control but the lock only says so
+    function lockedOut() {
+        if (!locked)
+            return false
+        touched = true
+        toast(qsTr("Locked. Tap the lock to use the controls."))
+        return true
+    }
+
     // Pause or Resume, never a new ride; a second tap within half a second is ignored so a
     // bump on the handlebar cannot pause and resume at once
     function pauseResume() {
-        if (bounced())
+        if (lockedOut() || bounced())
             return
         toggleRide()
     }
@@ -225,7 +234,7 @@ Item {
     // the big button of the ride controls, the pause button of the level dock and the Start ride
     // pill: start (3, 2, 1), cancel the count, pause or resume; a bump right after is ignored
     function mainControl() {
-        if (bounced())
+        if (lockedOut() || bounced())
             return
         if (startPhase === "count")
             cancelCountdown()
@@ -245,16 +254,21 @@ Item {
         onTriggered: screen.pausedFor = Math.max(0, Math.round((Date.now() - screen.source.pausedAt) / 1000))
     }
 
+    // a second Lap within a second is a double tap, not a lap of one second
+    property real lastLap: 0
     function lapRide() {
-        touched = true
-        if (stopped)
+        if (lockedOut())
             return
+        touched = true
+        if (stopped || Date.now() - lastLap < 1000)
+            return
+        lastLap = Date.now()
         source.lap()
         toast(qsTr("Lap %1").arg(source.laps))
     }
 
     function askEnd() {
-        if (stopped)
+        if (lockedOut() || stopped)
             return
         editing = -1
         confirmingEnd = true
@@ -263,7 +277,7 @@ Item {
 
     function endRide() {
         confirmingEnd = false
-        if (stopped)
+        if (lockedOut() || stopped)
             return
         finishRequested()
     }
@@ -272,6 +286,8 @@ Item {
     // bike has a hand knob: the dock turns into the ride controls, for this bike from now on.
     property int levelBefore: 0
     function pressLevel(up) {
+        if (lockedOut())
+            return
         touched = true
         if (up)
             source.levelUp()
@@ -470,7 +486,10 @@ Item {
                 visible: screen.idle && screen.startPhase === "" && screen.editing < 0
                 fill: Theme.control
                 Accessible.name: screen.stopped ? qsTr("Back") : qsTr("Back, the ride stays paused")
-                onClicked: screen.leaveRequested()
+                onClicked: {
+                    if (screen.stopped || !screen.lockedOut())
+                        screen.leaveRequested()
+                }
                 contentItem: Item {
                     Icon {
                         anchors.centerIn: parent

@@ -22,15 +22,21 @@ YouPage {
         return qsTr("%1 to %2 bpm").arg(starts[zone - 2]).arg(starts[zone - 1] - 1)
     }
 
+    // also in Theme, so the ride screen uses the new steps at once
     function setStep(i, percent) {
-        if (i === 0)
+        if (i === 0) {
             qz.heart_rate_zone1 = percent
-        else if (i === 1)
+            Theme.savedZones.heart_rate_zone1 = percent
+        } else if (i === 1) {
             qz.heart_rate_zone2 = percent
-        else if (i === 2)
+            Theme.savedZones.heart_rate_zone2 = percent
+        } else if (i === 2) {
             qz.heart_rate_zone3 = percent
-        else
+            Theme.savedZones.heart_rate_zone3 = percent
+        } else {
             qz.heart_rate_zone4 = percent
+            Theme.savedZones.heart_rate_zone4 = percent
+        }
     }
 
     YouText {

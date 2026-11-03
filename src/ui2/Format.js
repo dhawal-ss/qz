@@ -20,9 +20,10 @@ function duration(seconds) {
 
 // 12 h 40 min, 40 min: for totals, never with seconds
 function hours(seconds) {
-    var s = Math.max(0, Math.round(seconds || 0))
-    var h = Math.floor(s / 3600)
-    var m = Math.round((s % 3600) / 60)
+    // rounded to whole minutes first, so 1 h 59 min 30 s reads 2 h 0 min, not 1 h 60 min
+    var total = Math.round(Math.max(0, seconds || 0) / 60)
+    var h = Math.floor(total / 60)
+    var m = total % 60
     if (h > 0)
         return h + " h " + m + " min"
     return m + " min"

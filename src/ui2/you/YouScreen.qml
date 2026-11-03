@@ -52,8 +52,12 @@ Item {
     readonly property bool connected: metrics !== null && metrics.connected === true
     readonly property string deviceName: metrics !== null && metrics.deviceName ? metrics.deviceName : ""
     readonly property real heartRate: metrics !== null && metrics.heartRate ? metrics.heartRate : 0
-    // watts are an estimate unless a connected bike says it measures them
-    readonly property bool powerEstimated: !(connected && metrics.powerEstimated === false)
+    // watts are an estimate when the bike says so; while no bike is there, what the last one said
+    // (main2.qml keeps it in ui2/lastPowerEstimated)
+    readonly property bool powerEstimated: {
+        var fresh = tick
+        return connected ? metrics.powerEstimated === true : flag(prefStore.value("lastPowerEstimated", false), false)
+    }
     readonly property bool lbs: qzStore.miles_unit && !qzStore.weight_kg_unit
     readonly property int maxHeartRate: Math.round(qzStore.heart_max_override_enable ? qzStore.heart_max_override_value : 220 - qzStore.age)
     readonly property string nickname: qzStore.user_nickname.trim()
@@ -387,7 +391,8 @@ Item {
                         valueSize: 30
                         items: [
                             { value: String(Math.round(screen.qz.ftp)), unit: qsTr("W"), label: qsTr("FTP"), estimated: screen.powerEstimated },
-                            { value: String(screen.maxHeartRate), unit: qsTr("bpm"), label: qsTr("Max heart rate") }
+                            { value: String(screen.maxHeartRate), unit: qsTr("bpm"), label: qsTr("Max heart rate"),
+                              estimated: !screen.qz.heart_max_override_enable }
                         ]
                     }
                 }

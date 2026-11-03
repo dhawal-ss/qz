@@ -44,6 +44,12 @@ const int defaultMergeGapMinutes = 10;
 // a ride can be merged by hand with the ride before it when that one ended at most this long before
 const qint64 manualMergeGapSeconds = 3 * 3600;
 
+// the unfinished ride: the time of the newest backup the rider recovered or let go (backups up to it
+// are not offered again), how far back a backup is still offered, and how long it must be
+const QString recoveryKey = QStringLiteral("ui2/recoveryDismissedMs");
+const qint64 recoveryMaxAgeMs = qint64(7) * 24 * 3600 * 1000;
+const int recoveryMinSeconds = 60;
+
 // rides: one per ride, with everything the lists and the summary of a ride show. Its id is the
 // id of its first part, its file_path the file of that part.
 //   power_zone_s, hr_zone_s: json arrays of seconds in the 7 power and 5 heart rate zones
@@ -218,7 +224,9 @@ QVariantMap rideMap(const QSqlQuery &query) {
     ride[QStringLiteral("gapSeconds")] = query.value(20).toInt();
     ride[QStringLiteral("end")] = query.value(21).toLongLong();
     const QVariant previousGap = query.value(22);
-    ride[QStringLiteral("canMergePrevious")] = !previousGap.isNull() && previousGap.toLongLong() <= manualMergeGapSeconds;
+    // a ride that overlaps the one before it is another recording, not a part of it
+    ride[QStringLiteral("canMergePrevious")] = !previousGap.isNull() && previousGap.toLongLong() >= -1 &&
+                                               previousGap.toLongLong() <= manualMergeGapSeconds;
     return ride;
 }
 
@@ -419,6 +427,8 @@ RideSample toSample(const SessionLine &line, const RideSample &previous) {
 } // namespace
 
 RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(parent) {
+    const qint64 startedAt = QDateTime::currentMSecsSinceEpoch();
+    m_appDir = appDir;
     m_fitDir = appDir + QStringLiteral("fit");
     m_dbPath = databasePath(appDir);
     qDebug() << "ride library:" << m_dbPath;
@@ -436,10 +446,20 @@ RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(paren
     connect(m_worker, &RideLibraryWorker::progress, this, &RideLibrary::onProgress);
     connect(m_worker, &RideLibraryWorker::inserted, this, &RideLibrary::onInserted);
     connect(m_worker, &RideLibraryWorker::jobDone, this, &RideLibrary::jobDone);
+    connect(m_worker, &RideLibraryWorker::unfinishedFound, this, &RideLibrary::onUnfinishedFound);
     m_thread.start(QThread::LowPriority);
 
-    // after homeform has moved the old .fit files into the fit folder
-    QTimer::singleShot(0, this, &RideLibrary::rescan);
+    // after homeform has moved the old .fit files into the fit folder; the backups are looked at
+    // once the rides are read, so a backup of a ride that was saved is not offered
+    QTimer::singleShot(0, this, [this, startedAt]() {
+        rescan();
+        RideLibraryWorker *worker = m_worker;
+        const QString dir = m_appDir;
+        const qint64 dismissedUntil = QSettings().value(recoveryKey, 0).toLongLong();
+        QMetaObject::invokeMethod(
+            m_worker, [worker, dir, startedAt, dismissedUntil]() { worker->findUnfinished(dir, startedAt, dismissedUntil); },
+            Qt::QueuedConnection);
+    });
 }
 
 RideLibrary::~RideLibrary() {
@@ -499,6 +519,41 @@ void RideLibrary::onProgress(int indexed, int toIndex) {
     emit progressChanged();
 }
 
+void RideLibrary::onUnfinishedFound(const QVariantMap &ride) {
+    m_unfinished = ride;
+    emit unfinishedChanged();
+}
+
+void RideLibrary::forgetUnfinished() {
+    QSettings().setValue(recoveryKey, m_unfinished.value(QStringLiteral("mtime")).toLongLong());
+    m_unfinished.clear();
+    emit unfinishedChanged();
+}
+
+// The backup goes into the fit folder under the name homeform gives a saved ride, from its start.
+void RideLibrary::recoverUnfinished() {
+    if (m_unfinished.isEmpty())
+        return;
+    const QString source = m_unfinished.value(QStringLiteral("path")).toString();
+    const QString name = QDateTime::fromMSecsSinceEpoch(m_unfinished.value(QStringLiteral("start")).toLongLong())
+                             .toString()
+                             .replace(QStringLiteral(":"), QStringLiteral("_"));
+    QDir().mkpath(m_fitDir);
+    QString target = m_fitDir + QStringLiteral("/") + name + QStringLiteral(".fit");
+    for (int i = 2; QFile::exists(target); i++)
+        target = m_fitDir + QStringLiteral("/") + name + QStringLiteral(" (") + QString::number(i) + QStringLiteral(").fit");
+    if (QFile::copy(source, target))
+        importFile(target);
+    else
+        qDebug() << "ride library: cannot recover" << source << "to" << target;
+    forgetUnfinished();
+}
+
+void RideLibrary::dismissUnfinished() {
+    if (!m_unfinished.isEmpty())
+        forgetUnfinished();
+}
+
 void RideLibrary::rescan() {
     jobStarted();
     RideLibraryWorker *worker = m_worker;
@@ -519,7 +574,8 @@ bool RideLibrary::mergeWithPrevious(int id) {
     query.bindValue(QStringLiteral(":id"), id);
     if (!query.exec() || !query.next())
         return false;
-    if (query.value(0).isNull() || query.value(0).toLongLong() > manualMergeGapSeconds)
+    if (query.value(0).isNull() || query.value(0).toLongLong() < -1 ||
+        query.value(0).toLongLong() > manualMergeGapSeconds)
         return false;
     const int firstPart = jsonList(query.value(1).toString()).value(0).toInt();
     QSqlQuery part(db);
@@ -983,6 +1039,60 @@ void RideLibraryWorker::setLinks(const QStringList &paths, int mode) {
     emit jobDone();
 }
 
+// QZ writes the ride so far every minute, in turn to 0QZ-backup-<start of the app>.fit and
+// 1QZ-backup-..., next to the fit folder, and keeps writing it after the ride ends until the next
+// one starts. A backup no saved part covers for more than half of it is a ride the app never saved.
+void RideLibraryWorker::findUnfinished(const QString &appDir, qint64 before, qint64 dismissedUntil) {
+    QVariantMap found;
+    if (openDatabase()) {
+        QSqlDatabase db = QSqlDatabase::database(workerConnection);
+        const QFileInfoList backups = QDir(appDir).entryInfoList(QStringList() << QStringLiteral("*QZ-backup-*.fit"),
+                                                                 QDir::Files, QDir::Time);
+        for (const QFileInfo &info : backups) {
+            const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
+            // written since the app started, so not from a ride that was cut short
+            if (mtime >= before)
+                continue;
+            // the newest first: from here on all are older than what the rider has seen
+            if (mtime <= dismissedUntil || before - mtime > recoveryMaxAgeMs)
+                break;
+
+            QList<SessionLine> lines;
+            FIT_SPORT sport = FIT_SPORT_INVALID;
+            try {
+                qfit::open(info.absoluteFilePath(), &lines, &sport);
+            } catch (...) {
+                lines.clear();
+            }
+            if (lines.size() < recoveryMinSeconds)
+                continue;
+            const qint64 start = lines.first().time.toMSecsSinceEpoch();
+            const qint64 end = lines.last().time.toMSecsSinceEpoch() + 1000;
+
+            bool covered = false;
+            QSqlQuery query(db);
+            query.prepare(QStringLiteral("SELECT start_ms, end_ms FROM parts WHERE start_ms < :end AND end_ms > :start"));
+            query.bindValue(QStringLiteral(":start"), start);
+            query.bindValue(QStringLiteral(":end"), end);
+            if (query.exec()) {
+                while (query.next() && !covered) {
+                    const qint64 overlap = qMin(end, query.value(1).toLongLong()) - qMax(start, query.value(0).toLongLong());
+                    covered = overlap * 2 > end - start;
+                }
+            }
+            if (covered)
+                continue;
+
+            found.insert(QStringLiteral("path"), info.absoluteFilePath());
+            found.insert(QStringLiteral("mtime"), mtime);
+            found.insert(QStringLiteral("start"), start);
+            found.insert(QStringLiteral("seconds"), lines.size());
+            break;
+        }
+    }
+    emit unfinishedFound(found);
+}
+
 // Forgets the part of a file. Its ride is fixed by regroup().
 void RideLibraryWorker::removeFile(const QString &path) {
     QSqlDatabase db = QSqlDatabase::database(workerConnection);
@@ -1130,6 +1240,25 @@ bool RideLibraryWorker::regroup() {
     }
     query.finish();
 
+    // the same ride saved twice (saved again on quit, or a file copied in): a part that shares more
+    // than half of the shorter one's time with the part before it is a copy, and only the longer of
+    // the two counts. The copy stays in parts, so it is not read again at every start.
+    QList<Part> kept;
+    for (const Part &part : parts) {
+        if (!kept.isEmpty()) {
+            const Part &previous = kept.last();
+            const qint64 overlap = qMin(previous.end, part.end) - part.start;
+            const qint64 shorter = qMin(previous.end - previous.start, part.end - part.start);
+            if (shorter > 0 && overlap * 2 > shorter) {
+                if (part.end - part.start > previous.end - previous.start)
+                    kept.last() = part;
+                continue;
+            }
+        }
+        kept.append(part);
+    }
+    parts = kept;
+
     QList<QList<Part>> groups;
     for (int i = 0; i < parts.size(); i++) {
         const Part &part = parts.at(i);
@@ -1138,8 +1267,10 @@ bool RideLibraryWorker::regroup() {
             const int mode = links.value(part.path, -1);
             // a part may start in the second the one before ended; more overlap is another recording
             const qint64 gap = part.start - parts.at(i - 1).end;
+            // a merge by hand holds only while the part before is still close: when that one is gone,
+            // the part does not jump to an older ride
             if (mode == 1)
-                join = true;
+                join = gap >= -1000 && gap <= manualMergeGapSeconds * 1000;
             else if (mode == -1)
                 join = gapLimitMs > 0 && gap >= -1000 && gap <= gapLimitMs;
         }

@@ -479,6 +479,13 @@ Item {
             return qsTr("%1 min ago").arg(pausedMinutes)
         return qsTr("%1 ago").arg(Format.hours(pausedMinutes * 60))
     }
+    // a ride the app was closed or killed during, from QZ's backups: the banner offers to keep it
+    readonly property var unfinished: library && library.unfinished && library.unfinished.seconds > 0 ? library.unfinished : null
+    readonly property bool showRecover: unfinished !== null && !ridePaused
+    readonly property string unfinishedWords: unfinished === null ? ""
+        : qsTr("%1, %2. The app closed before it was saved.").arg(Format.hours(unfinished.seconds))
+                                                                   .arg(Format.day(unfinished.start) + " " + Format.time(unfinished.start))
+
     // past the gap after which a new ride would start (ui2/mergeGapMinutes, 0 never merges), Resume
     // still goes on with this one: the banner says so. Read with value(), You may have changed it.
     readonly property bool pastMergeGap: {
@@ -713,14 +720,15 @@ Item {
                 }
             }
 
-            // the ride paused and left: back to it, or end it
+            // the ride paused and left: back to it, or end it. Or a ride the app never saved: keep it,
+            // or let it go
             Item {
                 id: pausedBanner
                 objectName: "pausedBanner"
                 y: header.y + header.height + 8
                 width: content.leftWidth
-                height: todayPage.ridePaused ? bannerBody.height : 0
-                visible: todayPage.ridePaused
+                height: todayPage.ridePaused || todayPage.showRecover ? bannerBody.height : 0
+                visible: todayPage.ridePaused || todayPage.showRecover
                 Rectangle {
                     id: bannerBody
                     width: parent.width
@@ -741,7 +749,7 @@ Item {
                                 width: 10
                                 height: 10
                                 radius: 5
-                                color: Theme.recording
+                                color: todayPage.ridePaused ? Theme.recording : Theme.accent
                             }
                             Column {
                                 id: bannerWords
@@ -750,10 +758,11 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 1
                                 Accessible.role: Accessible.StaticText
-                                Accessible.name: qsTr("Ride paused %1").arg(todayPage.pausedAgo.toLowerCase())
+                                Accessible.name: todayPage.ridePaused ? qsTr("Ride paused %1").arg(todayPage.pausedAgo.toLowerCase())
+                                                                      : qsTr("Unfinished ride. %1").arg(todayPage.unfinishedWords)
                                 Text {
                                     width: parent.width
-                                    text: qsTr("Ride paused")
+                                    text: todayPage.ridePaused ? qsTr("Ride paused") : qsTr("Unfinished ride")
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
                                     font.pixelSize: 15
@@ -762,11 +771,13 @@ Item {
                                 }
                                 Text {
                                     width: parent.width
-                                    text: todayPage.pausedAgo
+                                    text: todayPage.ridePaused ? todayPage.pausedAgo : todayPage.unfinishedWords
                                     color: Theme.text2
                                     font.family: Theme.bodyMedium
                                     font.pixelSize: 13
-                                    elide: Text.ElideRight
+                                    // the paused line is short; the unfinished one says what happened
+                                    elide: todayPage.ridePaused ? Text.ElideRight : Text.ElideNone
+                                    wrapMode: todayPage.ridePaused ? Text.NoWrap : Text.WordWrap
                                     Accessible.ignored: true
                                 }
                             }
@@ -783,11 +794,17 @@ Item {
                                     bottomInset: 2
                                     pressedRadius: 14
                                     fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
-                                    Accessible.name: qsTr("Resume your paused ride")
-                                    onClicked: todayPage.rideRequested()
+                                    Accessible.name: todayPage.ridePaused ? qsTr("Resume your paused ride")
+                                                                          : qsTr("Keep the unfinished ride with your rides")
+                                    onClicked: {
+                                        if (todayPage.ridePaused)
+                                            todayPage.rideRequested()
+                                        else if (todayPage.library)
+                                            todayPage.library.recoverUnfinished()
+                                    }
                                     contentItem: Text {
                                         id: resumeText
-                                        text: qsTr("Resume")
+                                        text: todayPage.ridePaused ? qsTr("Resume") : qsTr("Keep")
                                         color: Theme.accentInk
                                         font.family: Theme.bodySemibold
                                         font.pixelSize: 14
@@ -803,11 +820,17 @@ Item {
                                     bottomInset: 2
                                     pressedRadius: 14
                                     fill: pressed ? Theme.chip : Theme.control
-                                    Accessible.name: qsTr("End the paused ride and save it")
-                                    onClicked: todayPage.endRideRequested()
+                                    Accessible.name: todayPage.ridePaused ? qsTr("End the paused ride and save it")
+                                                                          : qsTr("Let the unfinished ride go")
+                                    onClicked: {
+                                        if (todayPage.ridePaused)
+                                            todayPage.endRideRequested()
+                                        else if (todayPage.library)
+                                            todayPage.library.dismissUnfinished()
+                                    }
                                     contentItem: Text {
                                         id: endText
-                                        text: qsTr("End")
+                                        text: todayPage.ridePaused ? qsTr("End") : qsTr("Dismiss")
                                         color: Theme.text
                                         font.family: Theme.bodySemibold
                                         font.pixelSize: 14
@@ -835,7 +858,7 @@ Item {
             // the hero, the coach and the ride to do now
             Column {
                 id: lead
-                y: pausedBanner.y + pausedBanner.height + (todayPage.ridePaused ? 14 : 0)
+                y: pausedBanner.y + pausedBanner.height + (pausedBanner.height > 0 ? 14 : 0)
                 width: content.leftWidth
 
                 Rise {

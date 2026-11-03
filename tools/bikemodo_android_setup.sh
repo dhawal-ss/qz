@@ -68,6 +68,11 @@ if [ ! -x "$TOOLS/gradle-9.3.1/bin/gradle" ]; then
 fi
 
 echo "== local debug key (each local build installs over the last one)"
+# BIKEMODO_KEYSTORE=/path/to/debug.keystore uses the key CI signs with (alias bikemodo, password
+# android), so local and CI builds install over each other
+if [ -n "${BIKEMODO_KEYSTORE:-}" ]; then
+  cp "$BIKEMODO_KEYSTORE" "$TOOLS/debug.keystore"
+fi
 if [ ! -f "$TOOLS/debug.keystore" ]; then
   keytool -genkeypair -keystore "$TOOLS/debug.keystore" -storepass android -keypass android \
     -alias bikemodo -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Bikemodo Local Debug" -noprompt

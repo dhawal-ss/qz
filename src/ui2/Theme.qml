@@ -40,6 +40,16 @@ QtObject {
         category: "ui2"
         property string accentChoice: "lavender"
         property int weekStart: 1
+        property bool heartZonesSet: false
+    }
+    // QZ's four heart zone steps (heart_rate_zone1..4): the share of max heart rate, in percent,
+    // where zones 2 to 5 start. Saved rides are worked out from the same keys (ridestats.cpp), and
+    // the Zones page writes here as well as to its own copy when the rider changes them.
+    readonly property Settings savedZones: Settings {
+        property real heart_rate_zone1: 70.0
+        property real heart_rate_zone2: 80.0
+        property real heart_rate_zone3: 90.0
+        property real heart_rate_zone4: 100.0
     }
     property string accentChoice: savedLook.accentChoice
     readonly property var accentEntry: {
@@ -60,7 +70,22 @@ QtObject {
     // JavaScript files get it through Format.firstDay, which this keeps in step.
     property int weekStart: Number(savedLook.weekStart) === 0 ? 0 : 1
     onWeekStartChanged: Format.setFirstDay(weekStart)
-    Component.onCompleted: Format.setFirstDay(weekStart)
+    Component.onCompleted: {
+        Format.setFirstDay(weekStart)
+        // once: QZ's untouched steps (70/80/90/100) put zone 5 at max heart rate and above, so
+        // Bikemodo starts zones 2 to 5 at 60, 70, 80 and 90 percent. Steps the rider set are kept.
+        if (!savedLook.heartZonesSet) {
+            if (Math.round(savedZones.heart_rate_zone1) === 70 && Math.round(savedZones.heart_rate_zone2) === 80
+                    && Math.round(savedZones.heart_rate_zone3) === 90 && Math.round(savedZones.heart_rate_zone4) === 100) {
+                savedZones.heart_rate_zone1 = 60
+                savedZones.heart_rate_zone2 = 70
+                savedZones.heart_rate_zone3 = 80
+                savedZones.heart_rate_zone4 = 90
+                savedZones.sync()
+            }
+            savedLook.heartZonesSet = true
+        }
+    }
 
     // zones: fill color and the lighter color of the hero numeral
     readonly property var zoneColors: ["#8ab4ff", "#5fd8c6", "#b9e66e", "#ffcb52", "#ff8f52", "#ff5e7e", "#c487ff"]
@@ -69,7 +94,8 @@ QtObject {
     readonly property var heartZoneNames: [qsTr("Easy"), qsTr("Endurance"), qsTr("Tempo"), qsTr("Threshold"), qsTr("Max")]
     // where each zone starts, as a share of FTP (power) or of max heart rate
     readonly property var powerZoneStarts: [0.555, 0.755, 0.905, 1.055, 1.205, 1.505]
-    readonly property var heartZoneStarts: [0.6, 0.7, 0.8, 0.9]
+    readonly property var heartZoneStarts: [savedZones.heart_rate_zone1 / 100, savedZones.heart_rate_zone2 / 100,
+                                            savedZones.heart_rate_zone3 / 100, savedZones.heart_rate_zone4 / 100]
 
     // type: each role is its own static cut of Google Sans Flex (see tools/build_ui2_fonts.py)
     readonly property FontLoader displayFont: FontLoader { source: "fonts/PulseDisplay.ttf" }

@@ -149,9 +149,12 @@ YouPage {
         }
     }
 
+    // QZ asks for Health Connect access when the app starts and adds every saved ride once it is
+    // allowed (CustomQtActivity, homeform::fit_save_clicked): this says so
     Item {
+        visible: Qt.platform.os === "android"
         width: parent.width
-        height: Math.max(76, healthText.implicitHeight + 28)
+        height: visible ? Math.max(76, healthText.implicitHeight + 28) : 0
 
         Column {
             id: healthText
@@ -168,7 +171,7 @@ YouPage {
             }
             Text {
                 width: parent.width
-                text: qsTr("Not available yet. Rides are not written to Health Connect.")
+                text: qsTr("Every ride you save is added to Health Connect once you allow it. Bikemodo asks when it first starts. Change or remove access any time in the Health Connect app.")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
                 font.pixelSize: Theme.labelSize

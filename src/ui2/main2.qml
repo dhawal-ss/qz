@@ -5,6 +5,7 @@ import QtMultimedia 5.15
 import Qt.labs.settings 1.0
 import AndroidStatusBar 1.0
 import "."
+import "rides"
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
@@ -84,20 +85,30 @@ ApplicationWindow {
         property bool strava_auth_external_webbrowser: false
         // QZ starts recording as soon as the bike connects; Bikemodo waits for Start ride
         property bool pause_on_start: false
+        // QZ saves the ride when the app closes only with this on
+        property bool fit_file_saved_on_quit: false
     }
 
     // once, on the first start of Bikemodo: rides begin when the rider presses Start ride, so
-    // the first ride does not include the time before it (the rider can still change it)
+    // the first ride does not include the time before it (the rider can still change it).
+    // And once: a ride still open when the app closes is saved, not lost (the library keeps only
+    // one ride when it is saved again later).
     Settings {
         id: firstRun
         category: "ui2"
         property bool pauseOnStartSet: false
+        property bool saveOnQuitSet: false
     }
     Component.onCompleted: {
         if (!firstRun.pauseOnStartSet) {
             qzSettings.pause_on_start = true
             qzSettings.sync()
             firstRun.pauseOnStartSet = true
+        }
+        if (!firstRun.saveOnQuitSet) {
+            qzSettings.fit_file_saved_on_quit = true
+            qzSettings.sync()
+            firstRun.saveOnQuitSet = true
         }
     }
 
@@ -146,13 +157,20 @@ ApplicationWindow {
         mode = "home"
     }
 
+    // a ride with time on it that has not ended: closing the app first asks to end and save it
+    readonly property bool rideOpen: live.elapsed > 0 && !live.stopped
+    property bool askingToClose: false
+
     // Android back: close the launcher or the summary, step back in the app, leave a ride only
     // while it is paused or not started (never a moving one), and on Today ask for a second
-    // press within 2 s before closing, as QZ does
+    // press within 2 s before closing, as QZ does; with a ride still open, ask about it instead
     onClosing: {
         if (Qt.platform.os !== "android")
             return
-        if (mode === "launcher" || mode === "summary") {
+        if (askingToClose) {
+            askingToClose = false
+            close.accepted = false
+        } else if (mode === "launcher" || mode === "summary") {
             mode = "home"
             close.accepted = false
         } else if (mode === "ride" || mode === "demo") {
@@ -162,6 +180,9 @@ ApplicationWindow {
                 leaveRide()
         } else if (shell.goBack()) {
             close.accepted = false
+        } else if (rideOpen) {
+            close.accepted = false
+            askingToClose = true
         } else if (!backToExit.running) {
             close.accepted = false
             backToExit.start()
@@ -184,6 +205,19 @@ ApplicationWindow {
         metrics: window.metricsObject
         core: window.core
         home: home
+    }
+
+    // whether the last bike that connected measures its watts or works them out: You marks FTP as
+    // estimated from it while no bike is there
+    Settings {
+        id: powerMemory
+        category: "ui2"
+        property bool lastPowerEstimated: false
+    }
+    Connections {
+        target: live
+        function onConnectedChanged() { if (live.connected) powerMemory.lastPowerEstimated = live.powerEstimated }
+        function onPowerEstimatedChanged() { if (live.connected) powerMemory.lastPowerEstimated = live.powerEstimated }
     }
 
     RideSim {
@@ -239,14 +273,15 @@ ApplicationWindow {
         mode = "summary"
     }
 
-    // the engine ended the ride on the ride screen by itself (a workout program at its end, the
-    // bike's own stop button): show its summary as End would, from rideMetrics, which still holds
-    // the totals (LiveSource reads zeros once stopped). finishRide sets finishing while it ends one.
+    // the engine ended the ride by itself (a workout program at its end, the bike's own stop
+    // button, the web page), on the ride screen or while the rider was elsewhere in the app: save it
+    // and show its summary as End would, from rideMetrics, which still holds the totals (LiveSource
+    // reads zeros once stopped). finishRide sets finishing while it ends one.
     property bool finishing: false
     Connections {
         target: live
         function onStoppedChanged() {
-            if (!live.stopped || window.finishing || window.mode !== "ride" || window.metricsObject === null
+            if (!live.stopped || window.finishing || window.mode === "demo" || window.metricsObject === null
                     || window.metricsObject.elapsed <= 0)
                 return
             window.finishedDemo = false
@@ -407,5 +442,20 @@ ApplicationWindow {
             font.family: Theme.bodyMedium
             font.pixelSize: 14
         }
+    }
+
+    // Back on Today with a ride still open: end and save it, or keep it and stay
+    JoinSheet {
+        anchors.fill: parent
+        open: window.askingToClose && window.rideOpen && window.mode === "home"
+        bottomInset: insets.insetBottom
+        title: qsTr("Your ride is still open")
+        words: qsTr("End it to save it before you close Bikemodo. Cancel keeps it paused, ready to resume.")
+        confirmText: qsTr("End and save")
+        onConfirm: {
+            window.askingToClose = false
+            window.finishRide()
+        }
+        onClose: window.askingToClose = false
     }
 }
