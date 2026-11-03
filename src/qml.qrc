@@ -155,6 +155,36 @@
         <file>ui2/Metrics.js</file>
         <file>ui2/Numeral.qml</file>
         <file>ui2/PulseButton.qml</file>
+        <file>ui2/you/YouScreen.qml</file>
+        <file>ui2/you/YouPage.qml</file>
+        <file>ui2/you/YouRow.qml</file>
+        <file>ui2/you/YouSwitch.qml</file>
+        <file>ui2/you/YouField.qml</file>
+        <file>ui2/you/YouChoice.qml</file>
+        <file>ui2/you/YouText.qml</file>
+        <file>ui2/you/YouButton.qml</file>
+        <file>ui2/you/YouIcon.qml</file>
+        <file>ui2/you/BikePage.qml</file>
+        <file>ui2/you/HeartPage.qml</file>
+        <file>ui2/you/BodyPage.qml</file>
+        <file>ui2/you/ZonesPage.qml</file>
+        <file>ui2/you/UnitsPage.qml</file>
+        <file>ui2/you/ConnectionsPage.qml</file>
+        <file>ui2/you/DataPage.qml</file>
+        <file>ui2/you/AboutPage.qml</file>
+        <file>ui2/AppShell.qml</file>
+        <file>ui2/AreaChart.qml</file>
+        <file>ui2/BarChart.qml</file>
+        <file>ui2/Card.qml</file>
+        <file>ui2/Format.js</file>
+        <file>ui2/GoalsScreen.qml</file>
+        <file>ui2/NavButton.qml</file>
+        <file>ui2/PageHeader.qml</file>
+        <file>ui2/ProgressScreen.qml</file>
+        <file>ui2/RideDetail.qml</file>
+        <file>ui2/RidesScreen.qml</file>
+        <file>ui2/SystemInsets.qml</file>
+        <file>ui2/TodayScreen.qml</file>
         <file>ui2/BrandMark.qml</file>
         <file>ui2/PulseShape.qml</file>
         <file>ui2/RideScreen.qml</file>

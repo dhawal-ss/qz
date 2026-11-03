@@ -1,7 +1,8 @@
 import QtQuick 2.15
 import "."
 
-// Before the ride: is the bike there, and a way into the ride or a demo.
+// Before the ride: is the bike there, and a way into the ride or a demo. Opened by the Ride
+// button when the bike is not connected yet.
 Item {
     id: start
 
@@ -13,15 +14,7 @@ Item {
     signal openRide()
     signal openDemo()
     signal searchAgain()
-
-    readonly property string greeting: {
-        var hour = new Date().getHours()
-        if (hour < 5 || hour >= 18)
-            return qsTr("Good evening")
-        if (hour < 12)
-            return qsTr("Good morning")
-        return qsTr("Good afternoon")
-    }
+    signal closeRequested()
 
     Rectangle {
         anchors.fill: parent
@@ -49,31 +42,47 @@ Item {
             y: 32
             spacing: 24
 
-            Row {
-                height: 40
-                spacing: 12
-                Rectangle {
-                    width: 40
-                    height: 40
-                    radius: 12
-                    color: Theme.accentInk
-                    BrandMark {
-                        anchors.fill: parent
-                        anchors.margins: 4
+            Item {
+                width: parent.width
+                height: 48
+                Row {
+                    height: 48
+                    spacing: 12
+                    Rectangle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 40
+                        height: 40
+                        radius: 12
+                        color: Theme.accentInk
+                        BrandMark {
+                            anchors.fill: parent
+                            anchors.margins: 4
+                        }
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Bikemodo"
+                        color: Theme.text
+                        font.family: Theme.display
+                        font.pixelSize: 22
                     }
                 }
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Bikemodo"
-                    color: Theme.text
-                    font.family: Theme.display
-                    font.pixelSize: 22
+                PulseButton {
+                    anchors.right: parent.right
+                    width: 48
+                    height: 48
+                    fill: pressed ? Theme.pressed : "transparent"
+                    Accessible.name: qsTr("Close")
+                    onClicked: start.closeRequested()
+                    contentItem: Item {
+                        Icon { anchors.centerIn: parent; name: "close"; size: 22; color: Theme.text }
+                    }
                 }
             }
 
             Text {
                 width: parent.width
-                text: start.greeting
+                text: start.connected ? qsTr("Ready to ride") : qsTr("Let's find your bike")
                 color: Theme.text
                 font.family: Theme.display
                 font.pixelSize: 34

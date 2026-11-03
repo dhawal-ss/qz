@@ -1215,9 +1215,12 @@ class Listener : public fit::FileIdMesgListener,
                  public fit::MesgListener,
                  public fit::DeveloperFieldDescriptionListener,
                  public fit::RecordMesgListener,
-                 public fit::SessionMesgListener {
+                 public fit::SessionMesgListener,
+                 public fit::LapMesgListener {
   public:
     QList<SessionLine> *sessionOpening = nullptr;
+    QList<FIT_DATE_TIME> lapStartTimes;
+    FIT_DATE_TIME firstRecordTime = FIT_DATE_TIME_INVALID;
     FIT_SPORT *sport = nullptr;
     QString *workoutName = nullptr;
     QString *workoutSource = nullptr;
@@ -1448,6 +1451,9 @@ class Listener : public fit::FileIdMesgListener,
     }
 
     void OnMesg(fit::RecordMesg &record) override {
+        if (firstRecordTime == FIT_DATE_TIME_INVALID) {
+            firstRecordTime = record.GetTimestamp();
+        }
         if (sessionOpening != nullptr) {
             SessionLine s;
             s.heart = record.GetHeartRate();
@@ -1479,6 +1485,12 @@ class Listener : public fit::FileIdMesgListener,
         printf("New Developer Field Description\n");
         printf("   App Version: %d\n", desc.GetApplicationVersion());
         printf("   Field Number: %d\n", desc.GetFieldDefinitionNumber());
+    }
+
+    void OnMesg(fit::LapMesg &mesg) override {
+        if (mesg.IsStartTimeValid()) {
+            lapStartTimes.append(mesg.GetStartTime());
+        }
     }
 
     void OnMesg(fit::SessionMesg &mesg) override {
@@ -1537,6 +1549,12 @@ void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *
 
 void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *sport, QString *workoutName, 
                 QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile) {
+    open(filename, output, sport, workoutName, workoutSource, pelotonWorkoutId, pelotonUrl, trainingProgramFile, nullptr);
+}
+
+void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *sport, QString *workoutName,
+                QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile,
+                QList<int> *lapStarts) {
     std::fstream file;
 #ifdef _WIN32
     file.open(QString(filename).toLocal8Bit().constData(), std::ios::in | std::ios::binary);
@@ -1569,7 +1587,18 @@ void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *
     mesgBroadcaster.AddListener((fit::RecordMesgListener &)listener);
     mesgBroadcaster.AddListener((fit::SessionMesgListener &)listener);
     mesgBroadcaster.AddListener((fit::MesgListener &)listener);
+    if (lapStarts != nullptr) {
+        mesgBroadcaster.AddListener((fit::LapMesgListener &)listener);
+    }
     decode.Read(&s, &mesgBroadcaster, &mesgBroadcaster, &listener);
 
     file.close();
+
+    if (lapStarts != nullptr && listener.firstRecordTime != FIT_DATE_TIME_INVALID) {
+        for (FIT_DATE_TIME start : listener.lapStartTimes) {
+            if (start >= listener.firstRecordTime) {
+                lapStarts->append(int(start - listener.firstRecordTime));
+            }
+        }
+    }
 }

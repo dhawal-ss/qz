@@ -24,6 +24,10 @@ class qfit : public QObject {
     static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport, QString *workoutName);
     static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport, QString *workoutName, 
                      QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile);
+    // lapStarts receives the start of every lap, in seconds since the first record
+    static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport, QString *workoutName,
+                     QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile,
+                     QList<int> *lapStarts);
     
   signals:
 };

@@ -66,6 +66,13 @@ QtObject {
         return heroFonts[i].name
     }
 
+    // window size classes, as in Material 3: compact phones, medium (landscape phones, foldables,
+    // small tablets), expanded (tablets). The shell switches navigation and panes on these.
+    function compact(width) { return width < 600 }
+    function expanded(width) { return width >= 840 }
+    // side margin of the content: 16 on compact windows, 24 above
+    function margin(width) { return width < 600 ? 16 : 24 }
+
     // sizes
     readonly property int labelSize: 13
     readonly property int tertiarySize: 12

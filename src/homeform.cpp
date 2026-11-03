@@ -1,5 +1,6 @@
 #include "homeform.h"
 #include "ridemetrics.h"
+#include "ridelibrary.h"
 #include <QTranslator>
 #include "devices/lifefitnesstreadmill/lifefitnessworkout.h"
 #include "devices/echelonconnectsport/echelonconnectsport.h"
@@ -941,6 +942,8 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
             &homeform::setActivityDescription);
     engine->rootContext()->setContextProperty(QStringLiteral("rootItem"), (QObject *)this);
     engine->rootContext()->setContextProperty(QStringLiteral("rideMetrics"), new RideMetrics(bl, this));
+    rideLibrary = new RideLibrary(getWritableAppDir(), this);
+    engine->rootContext()->setContextProperty(QStringLiteral("rideLibrary"), rideLibrary);
     connect(this, &homeform::restoreDefaultWheelDiameter, this, &homeform::handleRestoreDefaultWheelDiameter);
 
     this->trainProgram = new trainprogram(QList<trainrow>(), bl);
@@ -9973,6 +9976,9 @@ void homeform::fit_save_clicked() {
         if (fitProcessor && workoutModel) {
             fitProcessor->processFile(filename);
             workoutModel->refresh();
+        }
+        if (rideLibrary) {
+            rideLibrary->importFile(filename);
         }
 
 #ifdef Q_OS_ANDROID

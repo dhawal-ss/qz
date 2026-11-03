@@ -455,6 +455,9 @@
 		8798FFD82F868E00003E969D /* mywhooshlink.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8798FFD72F868E00003E969D /* mywhooshlink.cpp */; };
 		872C53D16CE65DEA6123200E /* moc_ridemetrics.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 87C27ED8808925848EFF2234 /* moc_ridemetrics.cpp */; };
 		87B2D3739D3958A3F0F5BAD4 /* ridemetrics.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 87118C220F69AC3CC70250AB /* ridemetrics.cpp */; };
+		875BB97B0570E9334FA63921 /* moc_ridelibrary.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 87A566CDC3B3198418D521E9 /* moc_ridelibrary.cpp */; };
+		87FD7CE08D57878D358AE8BB /* ridelibrary.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 87EF7A92311FAB5883803857 /* ridelibrary.cpp */; };
+		87138D61BD136939F670A349 /* ridestats.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 879F2370DCBD8B97DB5E60AF /* ridestats.cpp */; };
 		8798FFA52F857787003E969D /* moc_lifespanbike.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8798FFA42F857787003E969D /* moc_lifespanbike.cpp */; };
 		8798FFA82F8577B3003E969D /* lifespanbike.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 8798FFA72F8577B3003E969D /* lifespanbike.cpp */; };
 		879A38C8281BD83300F78B2A /* characteristicnotifier2ad9.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 879A38C7281BD83300F78B2A /* characteristicnotifier2ad9.cpp */; };
@@ -1560,6 +1563,11 @@
 		87C27ED8808925848EFF2234 /* moc_ridemetrics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_ridemetrics.cpp; sourceTree = "<group>"; };
 		87755A55EC1BA49D9FDBDFEE /* ridemetrics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ridemetrics.h; path = ../src/ridemetrics.h; sourceTree = SOURCE_ROOT; };
 		87118C220F69AC3CC70250AB /* ridemetrics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ridemetrics.cpp; path = ../src/ridemetrics.cpp; sourceTree = SOURCE_ROOT; };
+		87A566CDC3B3198418D521E9 /* moc_ridelibrary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_ridelibrary.cpp; sourceTree = "<group>"; };
+		873B34F6ECAABB47FB149C52 /* ridelibrary.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ridelibrary.h; path = ../src/ridelibrary.h; sourceTree = SOURCE_ROOT; };
+		87EF7A92311FAB5883803857 /* ridelibrary.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ridelibrary.cpp; path = ../src/ridelibrary.cpp; sourceTree = SOURCE_ROOT; };
+		878AFC2B303E4D921B3203DF /* ridestats.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ridestats.h; path = ../src/ridestats.h; sourceTree = SOURCE_ROOT; };
+		879F2370DCBD8B97DB5E60AF /* ridestats.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = ridestats.cpp; path = ../src/ridestats.cpp; sourceTree = SOURCE_ROOT; };
 		8798FFA42F857787003E969D /* moc_lifespanbike.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_lifespanbike.cpp; sourceTree = "<group>"; };
 		8798FFA62F8577B3003E969D /* lifespanbike.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lifespanbike.h; path = ../src/devices/lifespanbike/lifespanbike.h; sourceTree = SOURCE_ROOT; };
 		8798FFA72F8577B3003E969D /* lifespanbike.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lifespanbike.cpp; path = ../src/devices/lifespanbike/lifespanbike.cpp; sourceTree = SOURCE_ROOT; };
@@ -2482,6 +2490,11 @@
 				87755A55EC1BA49D9FDBDFEE /* ridemetrics.h */,
 				87118C220F69AC3CC70250AB /* ridemetrics.cpp */,
 				87C27ED8808925848EFF2234 /* moc_ridemetrics.cpp */,
+				873B34F6ECAABB47FB149C52 /* ridelibrary.h */,
+				87EF7A92311FAB5883803857 /* ridelibrary.cpp */,
+				87A566CDC3B3198418D521E9 /* moc_ridelibrary.cpp */,
+				878AFC2B303E4D921B3203DF /* ridestats.h */,
+				879F2370DCBD8B97DB5E60AF /* ridestats.cpp */,
 				870F72D52FDEC0FD00181280 /* webtranslation.cpp */,
 				87CCCC932FD2C32200CA53BD /* qrc_translations.cpp */,
 				877486E12FA8E79800A02AFD /* iconsolebike.h */,
@@ -4175,6 +4188,8 @@
 				275D55B5D956B2E5F1B7E46E /* fit_unicode.cpp in Compile Sources */,
 				8798FFD82F868E00003E969D /* mywhooshlink.cpp in Compile Sources */,
 				87B2D3739D3958A3F0F5BAD4 /* ridemetrics.cpp in Compile Sources */,
+				87FD7CE08D57878D358AE8BB /* ridelibrary.cpp in Compile Sources */,
+				87138D61BD136939F670A349 /* ridestats.cpp in Compile Sources */,
 				87F527BE28EEB5AA00A9F8D5 /* qzsettings.cpp in Compile Sources */,
 				8703BAEB273C67A90058E206 /* pafersbike.cpp in Compile Sources */,
 				87061399286D8D6500D2446E /* moc_wobjectdefs.cpp in Compile Sources */,
@@ -4380,6 +4395,7 @@
 				87DA8467284933DE00B550E9 /* moc_fakeelliptical.cpp in Compile Sources */,
 				8798FFD52F868DEE003E969D /* moc_mywhooshlink.cpp in Compile Sources */,
 				872C53D16CE65DEA6123200E /* moc_ridemetrics.cpp in Compile Sources */,
+				875BB97B0570E9334FA63921 /* moc_ridelibrary.cpp in Compile Sources */,
 				87C5F0D726285E7E0067A1B5 /* moc_mimefile.cpp in Compile Sources */,
 				87DBD6642F333E5700342F2B /* sunnyfitstepper.cpp in Compile Sources */,
 				87DBD6652F333E5700342F2B /* moc_sunnyfitstepper.cpp in Compile Sources */,

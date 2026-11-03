@@ -49,6 +49,8 @@
 #endif
 #endif
 
+class RideLibrary;
+
 class DataObject : public QObject {
 
     Q_OBJECT
@@ -1134,6 +1136,7 @@ public:
     bool m_fitImportQuiet = false;
     bool m_fitImportRunning = false;
     WorkoutModel *workoutModel = nullptr;
+    RideLibrary *rideLibrary = nullptr;
     int m_pelotonLoginState = -1;
     int m_pzpLoginState = -1;
     int m_zwiftLoginState = -1;
