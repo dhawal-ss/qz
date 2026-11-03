@@ -183,6 +183,18 @@
         <file>ui2/moments/MomentHero.qml</file>
         <file>ui2/moments/MomentCard.qml</file>
         <file>ui2/moments/ShareCard.qml</file>
+        <file>ui2/progress/Chips.qml</file>
+        <file>ui2/progress/CustomizeSheet.qml</file>
+        <file>ui2/progress/Fitness.js</file>
+        <file>ui2/progress/FitnessChart.qml</file>
+        <file>ui2/progress/PeriodCompare.qml</file>
+        <file>ui2/progress/PowerCurve.qml</file>
+        <file>ui2/progress/Progress.js</file>
+        <file>ui2/progress/RecordRow.qml</file>
+        <file>ui2/progress/RecordsBoard.qml</file>
+        <file>ui2/progress/ScrubArea.qml</file>
+        <file>ui2/progress/StepChart.qml</file>
+        <file>ui2/progress/VolumeCard.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

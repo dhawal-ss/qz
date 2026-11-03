@@ -46,6 +46,8 @@ Item {
     function goBack() {
         if (tab === "rides" && rides.goBack())
             return true
+        if (tab === "progress" && progressScreen.goBack())
+            return true
         if (tab === "you" && youLoader.item && youLoader.item.goBack())
             return true
         if (tab !== "today") {
@@ -97,6 +99,7 @@ Item {
             onOpenYou: shell.tab = "you"
         }
         ProgressScreen {
+            id: progressScreen
             anchors.fill: parent
             visible: shell.tab === "progress"
             library: shell.library

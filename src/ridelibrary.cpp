@@ -424,6 +424,94 @@ QVariantList RideLibrary::days(qint64 fromMs, qint64 toMs) {
     return out;
 }
 
+QVariantList RideLibrary::recordHistory(int seconds) {
+    QVariantList out;
+    QSqlQuery query(QSqlDatabase::database(uiConnection));
+    if (!query.exec(QStringLiteral("SELECT id, start_ms, best FROM rides ORDER BY start_ms, id")))
+        return out;
+    const QString key = QString::number(seconds);
+    QVector<double> watts;
+    QVector<int> ids;
+    QVector<qint64> starts;
+    while (query.next()) {
+        watts.append(jsonObject(query.value(2).toString()).value(key).toDouble());
+        ids.append(query.value(0).toInt());
+        starts.append(query.value(1).toLongLong());
+    }
+    for (int i : RideStatsCalc::recordSteps(watts)) {
+        QVariantMap step;
+        step[QStringLiteral("start")] = starts.at(i);
+        step[QStringLiteral("watts")] = watts.at(i);
+        step[QStringLiteral("rideId")] = ids.at(i);
+        out.append(step);
+    }
+    return out;
+}
+
+QVariantList RideLibrary::rideRecords() {
+    QVariantList out;
+    QSqlQuery query(QSqlDatabase::database(uiConnection));
+    if (!query.exec(QStringLiteral("SELECT id, start_ms, duration_s, kj, distance_km FROM rides ORDER BY start_ms, id")))
+        return out;
+    QVector<int> ids;
+    QVector<qint64> starts;
+    QVector<double> durations, kjs, distances;
+    // weeks in start order, each with its time and its longest ride
+    QVector<QDate> weeks;
+    QVector<double> weekSeconds;
+    QVector<int> weekRide;
+    QVector<double> weekRideSeconds;
+    while (query.next()) {
+        const qint64 start = query.value(1).toLongLong();
+        const double duration = query.value(2).toDouble();
+        ids.append(query.value(0).toInt());
+        starts.append(start);
+        durations.append(duration);
+        kjs.append(query.value(3).toDouble());
+        distances.append(query.value(4).toDouble());
+        const QDate monday = RideStatsCalc::weekMonday(QDateTime::fromMSecsSinceEpoch(start).date());
+        if (weeks.isEmpty() || weeks.last() != monday) {
+            weeks.append(monday);
+            weekSeconds.append(0);
+            weekRide.append(0);
+            weekRideSeconds.append(-1);
+        }
+        weekSeconds.last() += duration;
+        if (duration > weekRideSeconds.last()) {
+            weekRideSeconds.last() = duration;
+            weekRide.last() = ids.last();
+        }
+    }
+
+    // one record: its history, and the last step of it is the record that stands
+    auto addRecord = [&out](const QString &key, const QVector<double> &values, const QVector<qint64> &at,
+                            const QVector<int> &rides) {
+        QVariantList history;
+        for (int i : RideStatsCalc::recordSteps(values)) {
+            QVariantMap step;
+            step[QStringLiteral("start")] = at.at(i);
+            step[QStringLiteral("value")] = values.at(i);
+            step[QStringLiteral("rideId")] = rides.at(i);
+            history.append(step);
+        }
+        if (history.isEmpty())
+            return;
+        QVariantMap record = history.last().toMap();
+        record[QStringLiteral("key")] = key;
+        record[QStringLiteral("history")] = history;
+        out.append(record);
+    };
+    addRecord(QStringLiteral("longest"), durations, starts, ids);
+    addRecord(QStringLiteral("kj"), kjs, starts, ids);
+    addRecord(QStringLiteral("distance"), distances, starts, ids);
+    // a week starts at its local midnight, as the days of days(); its ride is its longest one
+    QVector<qint64> weekStarts;
+    for (const QDate &monday : weeks)
+        weekStarts.append(QDateTime(monday, QTime(0, 0)).toMSecsSinceEpoch());
+    addRecord(QStringLiteral("week"), weekSeconds, weekStarts, weekRide);
+    return out;
+}
+
 bool RideLibraryWorker::openDatabase() {
     if (m_open)
         return true;

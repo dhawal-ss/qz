@@ -41,6 +41,11 @@ class RideLibrary : public QObject {
     Q_INVOKABLE QVariantList powerCurve(qint64 fromMs, qint64 toMs);
     Q_INVOKABLE QVariantMap totals(qint64 fromMs, qint64 toMs);
     Q_INVOKABLE QVariantList days(qint64 fromMs, qint64 toMs);
+    // every time the best of a power curve duration was beaten: [{start, watts, rideId}] in start order
+    Q_INVOKABLE QVariantList recordHistory(int seconds);
+    // longest ride, most kJ, longest distance and biggest week by time:
+    // [{key, value, start, rideId, history: [{start, value, rideId}]}]
+    Q_INVOKABLE QVariantList rideRecords();
     Q_INVOKABLE void rescan();
 
   signals:

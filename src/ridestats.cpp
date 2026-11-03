@@ -209,6 +209,22 @@ RideStats compute(const QVector<RideSample> &samples, const QList<int> &lapStart
     return stats;
 }
 
+QVector<int> recordSteps(const QVector<double> &values) {
+    QVector<int> steps;
+    double best = 0;
+    for (int i = 0; i < values.size(); i++) {
+        if (values.at(i) > best) {
+            steps.append(i);
+            best = values.at(i);
+        }
+    }
+    return steps;
+}
+
+QDate weekMonday(const QDate &date) {
+    return date.addDays(1 - date.dayOfWeek());
+}
+
 // Samples blob: 12 bytes per second, little endian, one record after the other:
 //   power      u16  watts
 //   heart      u8   bpm

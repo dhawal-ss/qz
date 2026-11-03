@@ -2,6 +2,7 @@
 #define RIDESTATS_H
 
 #include <QByteArray>
+#include <QDate>
 #include <QList>
 #include <QVector>
 
@@ -71,6 +72,13 @@ double meanMax(const QVector<double> &prefixSums, int seconds);
 
 // Averages consecutive values into at most points buckets.
 QVector<double> bucketAverage(const QVector<double> &values, int points);
+
+// Indices of the values that beat every value before them and are above 0, in order: the steps of
+// a record. A value equal to the best so far does not beat it.
+QVector<int> recordSteps(const QVector<double> &values);
+
+// Monday of the week holding a date.
+QDate weekMonday(const QDate &date);
 
 // The samples of a ride as stored in the database, see the format in ridestats.cpp.
 QByteArray encodeSamples(const QVector<RideSample> &samples);
