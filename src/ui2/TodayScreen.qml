@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import "."
+import "calendar"
 import "Format.js" as Format
 
 // Home: something new about you first, the ride one tap away. Cards flow in one column on
@@ -38,6 +39,19 @@ Item {
         if (hour < 12)
             return qsTr("Good morning") + who
         return qsTr("Good afternoon") + who
+    }
+
+    // open the first ride of a day
+    function openDay(dayMs) {
+        if (!library)
+            return
+        var list = library.rides(0, 5000)
+        var day = Format.startOfDay(dayMs)
+        for (var i = list.length - 1; i >= 0; i--)
+            if (Format.startOfDay(list[i].start) === day) {
+                openRide(list[i].id)
+                return
+            }
     }
 
     function refresh() {
@@ -417,6 +431,23 @@ Item {
                         font.pixelSize: Theme.labelSize
                         wrapMode: Text.WordWrap
                     }
+                }
+            }
+
+            // the year, one square a day
+            Card {
+                width: parent.width
+                visible: today.rideCount > 0
+                Text {
+                    text: qsTr("Your year")
+                    color: Theme.text2
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: Theme.labelSize
+                }
+                CalendarHeatmap {
+                    width: parent.width
+                    library: today.library
+                    onDayClicked: today.openDay(dayMs)
                 }
             }
         }

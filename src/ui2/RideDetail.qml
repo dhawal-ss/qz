@@ -1,9 +1,11 @@
 import QtQuick 2.15
 import "."
+import "charts"
+import "laps"
 import "Format.js" as Format
 
-// One ride in depth: the numbers, power, heart rate and cadence over the ride, time in zones,
-// best efforts and laps. Phase 2 adds zooming, linked charts and the lap visuals.
+// One ride in depth: the numbers, power, heart rate, cadence, level and speed on one timeline
+// that zooms and reads out under the finger, time in zones, best efforts and laps.
 Item {
     id: detail
 
@@ -13,18 +15,42 @@ Item {
     property bool showBack: true
     property var ride: ({})
     property var samples: ({})
+    // which metrics have data, worked out once per ride
+    property var has: ({})
+    property int loadedId: -1
+    readonly property alias chartView: chartView
 
     signal back()
 
+    // every 1 Hz sample of the ride, read once when the ride changes
     function load() {
         if (!library || rideId < 0) {
             ride = {}
             samples = {}
+            has = {}
+            loadedId = -1
             return
         }
+        if (rideId === loadedId)
+            return
+        loadedId = rideId
         ride = library.ride(rideId)
-        samples = library.samples(rideId, 360)
+        var all = library.samples(rideId, 0)
+        var seconds = all.seconds || []
+        has = { power: hasValues(all.power), heart: hasValues(all.heart), cadence: hasValues(all.cadence),
+                speed: hasValues(all.speed), level: hasValues(all.level) }
+        chartView.duration = seconds.length > 0 ? Math.max(1, seconds[seconds.length - 1]) : Math.max(1, ride.duration || 1)
+        chartView.reset(true)
+        samples = all
         flick.contentY = 0
+    }
+
+    readonly property var lapStarts: {
+        var out = []
+        var list = ride.laps || []
+        for (var i = 0; i < list.length; i++)
+            out.push(list[i].start)
+        return out
     }
 
     function hasValues(list) {
@@ -63,8 +89,13 @@ Item {
     }
 
     onRideIdChanged: load()
-    onLibraryChanged: load()
+    onLibraryChanged: {
+        loadedId = -1
+        load()
+    }
     Component.onCompleted: load()
+
+    ChartView { id: chartView }
 
     Rectangle {
         anchors.fill: parent
@@ -134,64 +165,93 @@ Item {
                 }
             }
 
-            // a metric over the ride, with the clock under it
-            Repeater {
-                model: [
-                    { key: "power", name: qsTr("Power"), unit: "W", color: Theme.accent, avg: detail.ride.avgPower, lowest: false },
-                    { key: "heart", name: qsTr("Heart rate"), unit: "bpm", color: Theme.zoneColors[5], avg: detail.ride.avgHr, lowest: true },
-                    { key: "cadence", name: qsTr("Cadence"), unit: "rpm", color: Theme.zoneColors[1], avg: detail.ride.avgCadence, lowest: false }
-                ]
-                Card {
-                    width: column.width
-                    visible: detail.hasValues(detail.samples[modelData.key])
-                    Row {
-                        spacing: 10
-                        Text {
-                            text: modelData.name
-                            color: Theme.text2
-                            font.family: Theme.bodySemibold
-                            font.pixelSize: Theme.labelSize
-                        }
-                        Text {
-                            text: qsTr("average %1 %2").arg(Format.whole(modelData.avg)).arg(modelData.unit)
-                            color: Theme.text3
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.tertiarySize
-                        }
-                    }
-                    AreaChart {
-                        width: parent.width
-                        height: column.width < 520 ? 120 : 160
-                        values: detail.samples[modelData.key] || []
-                        color: modelData.color
-                        unit: modelData.unit
-                        average: modelData.avg || 0
-                        fromLowest: modelData.lowest
-                    }
-                    Item {
-                        width: parent.width
-                        height: 14
-                        Text {
-                            text: "0:00"
-                            color: Theme.text3
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: 11
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: Format.duration((detail.ride.duration || 0) / 2)
-                            color: Theme.text3
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: 11
-                        }
-                        Text {
-                            anchors.right: parent.right
-                            text: Format.duration(detail.ride.duration || 0)
-                            color: Theme.text3
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: 11
-                        }
-                    }
+            // power, heart rate, cadence, level and speed on one timeline
+            Card {
+                id: chartsCard
+                readonly property real chartHeight: column.width < 520 ? 110 : 150
+                width: column.width
+                visible: detail.has.power === true || detail.has.heart === true || detail.has.cadence === true
+                spacing: 14
+                CursorReadout {
+                    width: parent.width
+                    view: chartView
+                    samples: detail.samples
+                    miles: detail.miles
+                    heart: detail.has.heart === true
+                    cadence: detail.has.cadence === true
+                    speed: detail.has.speed === true
+                    level: detail.has.level === true
+                }
+                TimeChart {
+                    width: parent.width
+                    height: chartsCard.chartHeight
+                    visible: detail.has.power === true
+                    view: chartView
+                    seconds: detail.samples.seconds || []
+                    values: detail.samples.power || []
+                    name: qsTr("Power")
+                    unit: "W"
+                    color: Theme.accent
+                    average: detail.ride.avgPower || 0
+                    zoneColored: true
+                    ftp: detail.ride.ftp || 0
+                    laps: detail.lapStarts
+                }
+                TimeChart {
+                    width: parent.width
+                    height: chartsCard.chartHeight
+                    visible: detail.has.heart === true
+                    view: chartView
+                    seconds: detail.samples.seconds || []
+                    values: detail.samples.heart || []
+                    name: qsTr("Heart rate")
+                    unit: "bpm"
+                    color: Theme.zoneColors[5]
+                    average: detail.ride.avgHr || 0
+                    fromLowest: true
+                    laps: detail.lapStarts
+                }
+                TimeChart {
+                    width: parent.width
+                    height: chartsCard.chartHeight
+                    visible: detail.has.cadence === true
+                    view: chartView
+                    seconds: detail.samples.seconds || []
+                    values: detail.samples.cadence || []
+                    name: qsTr("Cadence")
+                    unit: "rpm"
+                    color: Theme.zoneColors[1]
+                    average: detail.ride.avgCadence || 0
+                    laps: detail.lapStarts
+                }
+                TimeChart {
+                    width: parent.width
+                    height: chartsCard.chartHeight
+                    visible: detail.has.level === true
+                    view: chartView
+                    seconds: detail.samples.seconds || []
+                    values: detail.samples.level || []
+                    name: qsTr("Level")
+                    color: Theme.zoneColors[3]
+                    laps: detail.lapStarts
+                }
+                TimeChart {
+                    width: parent.width
+                    height: chartsCard.chartHeight
+                    visible: detail.has.speed === true
+                    view: chartView
+                    seconds: detail.samples.seconds || []
+                    values: detail.samples.speed || []
+                    name: qsTr("Speed")
+                    unit: detail.miles ? "mph" : "km/h"
+                    factor: detail.miles ? 0.621371 : 1
+                    decimals: 1
+                    color: Theme.zoneColors[0]
+                    laps: detail.lapStarts
+                }
+                TimeAxis {
+                    width: parent.width
+                    view: chartView
                 }
             }
 
@@ -304,45 +364,23 @@ Item {
                 }
             }
 
-            // laps
-            Card {
+            // laps: ribbon, bars, table and pacing; picking a lap zooms the charts to it
+            LapsSection {
                 width: column.width
-                visible: (detail.ride.laps || []).length > 1
-                Text {
-                    text: qsTr("Laps")
-                    color: Theme.text2
-                    font.family: Theme.bodySemibold
-                    font.pixelSize: Theme.labelSize
-                }
-                Repeater {
-                    model: [{ header: true }].concat(detail.ride.laps || [])
-                    Row {
-                        width: parent.width
-                        height: 30
-                        readonly property bool head: modelData.header === true
-                        readonly property real cell: (width - 36) / 4
-                        Text {
-                            width: 36
-                            text: parent.head ? "#" : modelData.index + 1
-                            color: Theme.text3
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.labelSize
-                        }
-                        Repeater {
-                            model: parent.head ? [qsTr("Time"), qsTr("Power"), qsTr("Heart rate"), qsTr("Cadence")]
-                                               : [Format.duration(modelData.duration), Format.whole(modelData.avgPower) + " W",
-                                                  modelData.avgHr > 0 ? Format.whole(modelData.avgHr) : "-",
-                                                  Format.whole(modelData.avgCadence)]
-                            Text {
-                                width: parent.cell
-                                text: modelData
-                                color: parent.head ? Theme.text3 : Theme.text
-                                font.family: parent.head ? Theme.bodyMedium : Theme.bodySemibold
-                                font.pixelSize: Theme.labelSize
-                                horizontalAlignment: Text.AlignRight
-                            }
-                        }
+                ride: detail.ride
+                samples: detail.samples
+                miles: detail.miles
+                onLapSelected: {
+                    if (index < 0) {
+                        chartView.reset(false)
+                        return
                     }
+                    var lap = detail.ride.laps[index]
+                    var s = detail.samples.seconds || []
+                    var a = s[lap.start] || lap.start
+                    var b = s[lap.start + lap.duration - 1] || (lap.start + lap.duration)
+                    chartView.place(a / chartView.duration, Math.max(chartView.minSpan, (b - a) / chartView.duration))
+                    flick.contentY = 0
                 }
             }
         }

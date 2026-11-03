@@ -172,6 +172,13 @@
         <file>ui2/you/ConnectionsPage.qml</file>
         <file>ui2/you/DataPage.qml</file>
         <file>ui2/you/AboutPage.qml</file>
+        <file>ui2/charts/ChartView.qml</file>
+        <file>ui2/charts/TimeChart.qml</file>
+        <file>ui2/charts/TimeAxis.qml</file>
+        <file>ui2/charts/CursorReadout.qml</file>
+        <file>ui2/laps/LapsSection.qml</file>
+        <file>ui2/calendar/CalendarHeatmap.qml</file>
+        <file>ui2/calendar/MonthCalendar.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

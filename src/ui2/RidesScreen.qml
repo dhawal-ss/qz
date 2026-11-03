@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import "."
+import "calendar"
 import "Format.js" as Format
 
 // Every ride, newest first, grouped by month. Tapping one opens its detail: over the list on
@@ -27,6 +28,16 @@ Item {
             return true
         }
         return false
+    }
+
+    // the first ride of a tapped day
+    function openDay(dayMs) {
+        var day = Format.startOfDay(dayMs)
+        for (var i = rideModel.count - 1; i >= 0; i--)
+            if (Format.startOfDay(rideModel.get(i).start) === day) {
+                selectedId = rideModel.get(i).rideId
+                return
+            }
     }
 
     function refresh() {
@@ -69,6 +80,17 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
         bottomMargin: 24
 
+        // the header grows once the calendar knows its size: stay at the top until the rider scrolls
+        property bool scrolled: false
+        onMovementStarted: scrolled = true
+        Connections {
+            target: list.headerItem
+            function onHeightChanged() {
+                if (!list.scrolled)
+                    list.positionViewAtBeginning()
+            }
+        }
+
         header: Column {
             x: list.margin
             width: list.width - list.margin * 2
@@ -82,6 +104,13 @@ Item {
                 initial: rides.initial
                 onOpenYou: rides.openYou()
             }
+            CalendarHeatmap {
+                width: parent.width
+                visible: rideModel.count > 0
+                library: rides.library
+                onDayClicked: rides.openDay(dayMs)
+            }
+            Item { width: 1; height: rideModel.count > 0 ? 8 : 0 }
             Text {
                 width: parent.width
                 visible: rideModel.count === 0
