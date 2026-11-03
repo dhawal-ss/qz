@@ -181,7 +181,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "org.cagnulen.qdomyoszwift"
+        // Bikemodo installs next to QZ; the Java classes keep the org.cagnulen.qdomyoszwift namespace
+        applicationId = "app.bikemodo"
         resConfig "en"
         minSdk 21
         targetSdk 37

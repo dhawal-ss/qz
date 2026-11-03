@@ -155,6 +155,7 @@
         <file>ui2/Metrics.js</file>
         <file>ui2/Numeral.qml</file>
         <file>ui2/PulseButton.qml</file>
+        <file>ui2/BrandMark.qml</file>
         <file>ui2/PulseShape.qml</file>
         <file>ui2/RideScreen.qml</file>
         <file>ui2/RideSim.qml</file>

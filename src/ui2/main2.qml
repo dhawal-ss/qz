@@ -2,10 +2,9 @@ import QtQuick 2.15
 import QtQuick.Window 2.15
 import QtQuick.Controls 2.15
 import QtMultimedia 5.15
-import Qt.labs.settings 1.0
 import "."
 
-// The root of the Pulse interface, used instead of main.qml when pulse_ui_enabled is on.
+// The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
 // so both declare the same signals as main.qml and Home.qml, with the same types.
 ApplicationWindow {
@@ -14,7 +13,7 @@ ApplicationWindow {
     visible: true
     width: 915
     height: 412
-    title: "qDomyos-Zwift"
+    title: "Bikemodo"
     color: Theme.bg
 
     signal gpx_open_clicked(url name)
@@ -69,11 +68,6 @@ ApplicationWindow {
             if (typeof rideMetrics !== "undefined")
                 window.metricsObject = rideMetrics
         }
-    }
-
-    Settings {
-        id: interfaceSetting
-        property bool pulse_ui_enabled: true
     }
 
     // homeform drives this player when a workout comes with a video
@@ -183,12 +177,6 @@ ApplicationWindow {
             onOpenRide: window.mode = "ride"
             onOpenDemo: window.openDemo()
             onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
-            onUseClassic: {
-                interfaceSetting.pulse_ui_enabled = false
-                // written now: restart() quits right away
-                interfaceSetting.sync()
-                window.restart()
-            }
         }
 
         Loader {

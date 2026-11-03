@@ -1,7 +1,7 @@
 import QtQuick 2.15
 import "."
 
-// Before the ride: is the bike there, and a way into the ride, a demo or the classic interface.
+// Before the ride: is the bike there, and a way into the ride or a demo.
 Item {
     id: start
 
@@ -13,7 +13,6 @@ Item {
     signal openRide()
     signal openDemo()
     signal searchAgain()
-    signal useClassic()
 
     readonly property string greeting: {
         var hour = new Date().getHours()
@@ -50,32 +49,25 @@ Item {
             y: 32
             spacing: 24
 
-            Item {
-                width: parent.width
+            Row {
                 height: 40
+                spacing: 12
+                Rectangle {
+                    width: 40
+                    height: 40
+                    radius: 12
+                    color: Theme.accentInk
+                    BrandMark {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                    }
+                }
                 Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "Pulse"
+                    text: "Bikemodo"
                     color: Theme.text
                     font.family: Theme.display
-                    font.pixelSize: 20
-                }
-                PulseButton {
-                    anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                    width: classicLabel.implicitWidth + 32
-                    height: 36
-                    fill: Theme.control
-                    Accessible.name: qsTr("Switch to the classic interface")
-                    onClicked: start.useClassic()
-                    contentItem: Text {
-                        id: classicLabel
-                        text: qsTr("Classic interface")
-                        color: Theme.text2
-                        font.family: Theme.bodySemibold
-                        font.pixelSize: 13
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
+                    font.pixelSize: 22
                 }
             }
 
@@ -176,15 +168,6 @@ Item {
                         font.pixelSize: Theme.tertiarySize
                     }
                 }
-            }
-
-            Text {
-                width: parent.width
-                text: qsTr("Settings, workouts and history stay in the classic interface for now.")
-                color: Theme.text3
-                font.family: Theme.bodyMedium
-                font.pixelSize: Theme.tertiarySize
-                wrapMode: Text.WordWrap
             }
         }
     }

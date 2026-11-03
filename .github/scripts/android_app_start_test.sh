@@ -3,8 +3,9 @@
 # Starts QZ and waits until its process is up, instead of one check after a fixed sleep:
 # a start sent while the emulator is still busy after boot is sometimes lost, so it is retried once.
 
-PKG=org.cagnulen.qdomyoszwift
-ACTIVITY=$PKG/$PKG.CustomQtActivity
+PKG=app.bikemodo
+# the app ID changed to Bikemodo, the activity class kept its QZ package
+ACTIVITY=$PKG/org.cagnulen.qdomyoszwift.CustomQtActivity
 WAIT=90   # seconds to wait for the process after each start
 
 # On failure save the diagnostics first: the job stops here and does not reach its own logcat lines

@@ -980,22 +980,22 @@ jobs:
 
             # Grant runtime (dangerous) permissions
             echo "Granting runtime permissions..."
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.ACCESS_FINE_LOCATION || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.ACCESS_COARSE_LOCATION || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.BLUETOOTH_ADVERTISE || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.BLUETOOTH_CONNECT || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.BLUETOOTH_SCAN || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.READ_EXTERNAL_STORAGE || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.WRITE_EXTERNAL_STORAGE || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.CAMERA || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.RECORD_AUDIO || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.READ_PHONE_STATE || true
-            adb shell pm grant org.cagnulen.qdomyoszwift android.permission.POST_NOTIFICATIONS || true
+            adb shell pm grant app.bikemodo android.permission.ACCESS_FINE_LOCATION || true
+            adb shell pm grant app.bikemodo android.permission.ACCESS_COARSE_LOCATION || true
+            adb shell pm grant app.bikemodo android.permission.BLUETOOTH_ADVERTISE || true
+            adb shell pm grant app.bikemodo android.permission.BLUETOOTH_CONNECT || true
+            adb shell pm grant app.bikemodo android.permission.BLUETOOTH_SCAN || true
+            adb shell pm grant app.bikemodo android.permission.READ_EXTERNAL_STORAGE || true
+            adb shell pm grant app.bikemodo android.permission.WRITE_EXTERNAL_STORAGE || true
+            adb shell pm grant app.bikemodo android.permission.CAMERA || true
+            adb shell pm grant app.bikemodo android.permission.RECORD_AUDIO || true
+            adb shell pm grant app.bikemodo android.permission.READ_PHONE_STATE || true
+            adb shell pm grant app.bikemodo android.permission.POST_NOTIFICATIONS || true
 
             # Enable special app ops permissions
-            adb shell appops set org.cagnulen.qdomyoszwift MANAGE_EXTERNAL_STORAGE allow || true
-            adb shell appops set org.cagnulen.qdomyoszwift SYSTEM_ALERT_WINDOW allow || true
-            adb shell appops set org.cagnulen.qdomyoszwift WRITE_SETTINGS allow || true
+            adb shell appops set app.bikemodo MANAGE_EXTERNAL_STORAGE allow || true
+            adb shell appops set app.bikemodo SYSTEM_ALERT_WINDOW allow || true
+            adb shell appops set app.bikemodo WRITE_SETTINGS allow || true
 
             echo "All permissions granted successfully"
 
@@ -1027,7 +1027,7 @@ jobs:
             sh .github/scripts/android_back_button_test.sh
 
             # Check if the package is installed
-            adb shell pm list packages | grep org.cagnulen.qdomyoszwift
+            adb shell pm list packages | grep app.bikemodo
 
             # Save logcat for debugging
             echo "Saving logcat for analysis..."
