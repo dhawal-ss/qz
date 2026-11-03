@@ -977,8 +977,9 @@ jobs:
             echo "Files in apk-debug directory:"
             ls -la apk-debug/
 
-            # Install the APK
-            adb install apk-debug/android-debug.apk
+            # Install the APK: copied first, since streaming the 500 MB APK breaks off on Android 17,
+            # and tried again when the package service of the new emulator drops the first attempt
+            for attempt in 1 2 3; do adb install --no-streaming apk-debug/android-debug.apk && break; if [ "$attempt" = 3 ]; then exit 1; fi; sleep 20; done
 
             # Grant runtime (dangerous) permissions
             echo "Granting runtime permissions..."
