@@ -3,6 +3,7 @@ import QtQuick.Window 2.15
 import QtQuick.Controls 2.15
 import QtMultimedia 5.15
 import Qt.labs.settings 1.0
+import AndroidStatusBar 1.0
 import "."
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
@@ -101,14 +102,18 @@ ApplicationWindow {
         value: uiSettings.reduceMotion
     }
 
-    // system bars and the camera cutout; a preview without the C++ type gets none
-    Loader {
+    // system bars and the camera cutout in dp, from QZ's AndroidStatusBar (CustomQtActivity.java
+    // sends them). Same rules as main.qml: Android 12 and later draw under the bars, and in
+    // landscape the cutout counts too so content stays clear of the camera.
+    QtObject {
         id: insets
-        source: "SystemInsets.qml"
-        readonly property int insetTop: item ? item.insetTop : 0
-        readonly property int insetBottom: item ? item.insetBottom : 0
-        readonly property int insetLeft: item ? item.insetLeft : 0
-        readonly property int insetRight: item ? item.insetRight : 0
+        readonly property bool active: Qt.platform.os === "android" && AndroidStatusBar.apiLevel >= 31
+        readonly property bool landscape: Screen.orientation === Qt.LandscapeOrientation
+                                          || Screen.orientation === Qt.InvertedLandscapeOrientation
+        readonly property int insetTop: active ? AndroidStatusBar.height : 0
+        readonly property int insetBottom: active ? AndroidStatusBar.navigationBarHeight : 0
+        readonly property int insetLeft: active && landscape ? AndroidStatusBar.leftInset : 0
+        readonly property int insetRight: active && landscape ? AndroidStatusBar.rightInset : 0
     }
 
     // the Ride button: straight into the ride once the bike is there, else find it first

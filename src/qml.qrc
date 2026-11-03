@@ -190,7 +190,6 @@
         <file>ui2/ProgressScreen.qml</file>
         <file>ui2/RideDetail.qml</file>
         <file>ui2/RidesScreen.qml</file>
-        <file>ui2/SystemInsets.qml</file>
         <file>ui2/TodayScreen.qml</file>
         <file>ui2/BrandMark.qml</file>
         <file>ui2/PulseShape.qml</file>
