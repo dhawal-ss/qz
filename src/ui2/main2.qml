@@ -302,7 +302,13 @@ ApplicationWindow {
                 visible: window.mode === "summary"
                 ride: window.finishedRide
                 demo: window.finishedDemo
+                library: window.libraryObject
+                core: window.core
                 onDone: window.mode = "home"
+                onOpenRide: {
+                    window.mode = "home"
+                    shell.openRide(id)
+                }
             }
         }
     }
