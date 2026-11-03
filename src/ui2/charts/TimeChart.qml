@@ -10,6 +10,11 @@ import ".."
 // Touch: a sideways drag scrubs the crosshair (pans when zoomed in), press and hold then drag
 // always scrubs, a pinch zooms, a tap shows or hides the crosshair, a double tap shows the
 // whole ride. Vertical drags are left to the page, so it still scrolls over the charts.
+//
+// For the hero chart of a ride: `filled` paints the power as soft areas in their zone colors,
+// `overlay` lays a second metric (heart rate) over it as a thin line on its own scale, and a
+// band (bandStart to bandEnd, ride seconds) marks the best stretch with its label at the top
+// right; the band pans and zooms with the rest. `reveal` (0 to 1) wipes the ink in.
 Item {
     id: chart
 
@@ -26,8 +31,19 @@ Item {
     property bool zoneColored: false
     property real ftp: 0
     property var laps: []               // start of each lap, in seconds
+    property bool showAverage: true
+    property bool filled: false
+    property var overlay: []            // a second metric on the same seconds, e.g. heart rate
+    property string overlayName: ""
+    property string overlayShort: ""    // its name in the bubble: "HR"
+    property real bandStart: -1
+    property real bandEnd: -1
+    property color bandColor: Theme.accent
+    property string bandLabel: ""
+    property string bandValue: ""
+    property real reveal: 1
 
-    readonly property int topStrip: 22
+    property int topStrip: 22
 
     Accessible.role: Accessible.Graphic
     Accessible.name: qsTr("%1 chart, average %2, highest %3").arg(name).arg(valueText(shownAverage)).arg(valueText(stats.hi))
@@ -76,12 +92,27 @@ Item {
         }
         return out
     }
+    // the overlay keeps to the upper part of the plot, over the power
+    readonly property var overlayStats: {
+        var hi = 0
+        var lo = -1
+        for (var i = 0; i < overlay.length; i++) {
+            var v = overlay[i]
+            if (!(v > 0))
+                continue
+            hi = Math.max(hi, v)
+            if (lo < 0 || v < lo)
+                lo = v
+        }
+        var span = Math.max(10, hi - Math.max(0, lo))
+        return { hi: hi + span * 0.15, lo: Math.max(0, lo) - span * 0.55 }
+    }
     readonly property real shownAverage: average >= 0 ? average : stats.mean
     readonly property real scaleTop: niceTop(Math.max(1, stats.hi * factor))
     readonly property real scaleBottom: fromLowest ? Math.max(0, Math.floor((stats.lo * factor - 5) / 10) * 10) : 0
 
     // the line, its fill and the zone pieces for the current window; rebuilt with the window
-    property var drawn: ({ line: [], area: [], zones: [[], [], [], [], [], [], []] })
+    property var drawn: ({ line: [], area: [], zones: [[], [], [], [], [], [], []], areas: ["", "", "", "", "", "", ""], over: [] })
 
     // round the top of the scale up to a value that reads well
     function niceTop(v) {
@@ -94,6 +125,11 @@ Item {
 
     function valueText(v) {
         return (v * factor).toFixed(decimals) + (unit !== "" ? " " + unit : "")
+    }
+
+    function yOfOverlay(v) {
+        var span = Math.max(1, overlayStats.hi - overlayStats.lo)
+        return plot.height * (1 - (v - overlayStats.lo) / span)
     }
 
     function yOf(v) {
@@ -151,7 +187,7 @@ Item {
         var n = Math.min(seconds.length, values.length)
         var zones = [[], [], [], [], [], [], []]
         if (!view || w < 2 || h < 2 || n < 2) {
-            drawn = { line: [], area: [], zones: zones }
+            drawn = { line: [], area: [], zones: zones, areas: ["", "", "", "", "", "", ""], over: [] }
             return
         }
         var total = Math.max(1, view.duration)
@@ -165,8 +201,24 @@ Item {
         var per = count / buckets
         var zoned = zoneColored && ftp > 0
         var line = []
+        var over = []
+        var hasOverlay = overlay.length >= n
         var run = null
         var runZone = -1
+
+        // the overlay averaged over the same samples as a bucket of the line
+        function overlayPoint(from, to) {
+            var sum = 0
+            var used = 0
+            for (var k = from; k < to; k++) {
+                if (overlay[k] > 0) {
+                    sum += overlay[k]
+                    used++
+                }
+            }
+            if (used > 0)
+                over.push(Qt.point(((seconds[from] + seconds[to - 1]) / 2 / total - vs) / span * w, yOfOverlay(sum / used)))
+        }
 
         function emit(points, value) {
             for (var p = 0; p < points.length; p++)
@@ -190,6 +242,8 @@ Item {
 
         if (per <= 2) {
             for (var i = i0; i <= i1; i++) {
+                if (hasOverlay)
+                    overlayPoint(i, i + 1)
                 if (fromLowest && values[i] <= 0)
                     continue
                 emit([point(i)], values[i])
@@ -228,11 +282,26 @@ Item {
                         used++
                     }
                 }
+                if (hasOverlay && to > from)
+                    overlayPoint(from, to)
                 if (used === 0)
                     continue
-                // lowest and highest in the order they happened
+                // lowest and highest in the order they happened; the filled look takes the
+                // average, so the areas read smooth
                 var pts = lo === hi ? [point(lo)] : (lo < hi ? [point(lo), point(hi)] : [point(hi), point(lo)])
-                emit(pts, sum / used)
+                var zoneValue = sum / used
+                if (filled) {
+                    pts = [Qt.point(((seconds[from] + seconds[to - 1]) / 2 / total - vs) / span * w, yOf(sum / used))]
+                    // the zone of the half minute around the bucket, so short wobbles across a
+                    // zone line do not cut the area into slivers
+                    var aroundFrom = Math.max(0, from - 15)
+                    var aroundTo = Math.min(n, to + 15)
+                    var around = 0
+                    for (var c2 = aroundFrom; c2 < aroundTo; c2++)
+                        around += values[c2]
+                    zoneValue = around / Math.max(1, aroundTo - aroundFrom)
+                }
+                emit(pts, zoneValue)
             }
         }
 
@@ -241,7 +310,25 @@ Item {
             area.push(Qt.point(line[line.length - 1].x, h))
             area.push(Qt.point(line[0].x, h))
         }
-        drawn = { line: line, area: area, zones: zones }
+        // each zone piece closed down to the bottom, for the filled look: one SVG path per zone
+        // (a ShapePath fills every closed piece of it)
+        var areas = ["", "", "", "", "", "", ""]
+        if (zoned && filled) {
+            for (var zi = 0; zi < 7; zi++) {
+                var svg = ""
+                for (var r = 0; r < zones[zi].length; r++) {
+                    var piece = zones[zi][r]
+                    if (piece.length < 2)
+                        continue
+                    svg += "M" + piece[0].x.toFixed(1) + " " + h.toFixed(1)
+                    for (var q = 0; q < piece.length; q++)
+                        svg += "L" + piece[q].x.toFixed(1) + " " + piece[q].y.toFixed(1)
+                    svg += "L" + piece[piece.length - 1].x.toFixed(1) + " " + h.toFixed(1) + "Z"
+                }
+                areas[zi] = svg
+            }
+        }
+        drawn = { line: line, area: area, zones: zones, areas: areas, over: over }
     }
 
     onSecondsChanged: schedule()
@@ -249,6 +336,8 @@ Item {
     onZoneColoredChanged: schedule()
     onFtpChanged: schedule()
     onFactorChanged: schedule()
+    onOverlayChanged: schedule()
+    onFilledChanged: schedule()
     onViewChanged: schedule()
     Connections {
         target: chart.view
@@ -260,6 +349,7 @@ Item {
     // the name on the left and the top of the scale on the right, above the line
     Text {
         y: 2
+        visible: chart.overlayName === ""
         width: parent.width - topLabel.implicitWidth - 12
         text: chart.name
         color: Theme.text2
@@ -267,8 +357,48 @@ Item {
         font.pixelSize: 11
         elide: Text.ElideRight
     }
+    // the overlay's legend in place of the name
+    Row {
+        visible: chart.overlayName !== ""
+        y: 2
+        spacing: 6
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: 16
+            height: 1.4
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.7)
+        }
+        Text {
+            text: chart.overlayName
+            color: Theme.text2
+            font.family: Theme.bodyMedium
+            font.pixelSize: 12
+        }
+    }
+    // the band's label at the top right: what it is, then its value in its color
+    Column {
+        visible: chart.bandLabel !== ""
+        anchors.right: parent.right
+        y: 0
+        spacing: 2
+        Text {
+            anchors.right: parent.right
+            text: chart.bandLabel
+            color: Theme.text3
+            font.family: Theme.bodyMedium
+            font.pixelSize: 12
+        }
+        Text {
+            anchors.right: parent.right
+            text: chart.bandValue
+            color: chart.bandColor
+            font.family: Theme.bodySemibold
+            font.pixelSize: 14
+        }
+    }
     Text {
         id: topLabel
+        visible: chart.bandLabel === ""
         anchors.right: parent.right
         y: 2
         text: chart.scaleTop + (chart.unit !== "" ? " " + chart.unit : "")
@@ -295,6 +425,41 @@ Item {
             }
         }
 
+        // the band of the best stretch, under the ink, with a line in its color above it
+        Item {
+            id: band
+            readonly property bool shown: chart.view !== null && chart.bandStart >= 0 && chart.bandEnd > chart.bandStart
+            readonly property real x0: shown ? chart.xOfFraction(chart.bandStart / Math.max(1, chart.view.duration)) : 0
+            readonly property real x1: shown ? chart.xOfFraction(chart.bandEnd / Math.max(1, chart.view.duration)) : 0
+            visible: shown && x1 > 0 && x0 < plot.width
+            x: Math.max(0, x0)
+            width: Math.max(1, Math.min(plot.width, x1) - x)
+            height: plot.height
+            Rectangle {
+                anchors.fill: parent
+                color: Qt.rgba(1, 1, 1, 0.045)
+            }
+            Rectangle {
+                y: -5
+                width: parent.width
+                height: 2
+                radius: 1
+                color: chart.bandColor
+            }
+        }
+
+        // the top of the scale on its grid line, when the band label has the top right
+        Text {
+            visible: chart.bandLabel !== ""
+            z: 2
+            x: 0
+            y: 3
+            text: chart.scaleTop + (chart.unit !== "" ? " " + chart.unit : "")
+            color: Theme.text3
+            font.family: Theme.bodyMedium
+            font.pixelSize: 11
+        }
+
         // lap starts
         Repeater {
             model: chart.view ? chart.laps : []
@@ -311,13 +476,16 @@ Item {
 
         Item {
             id: ink
-            anchors.fill: parent
+            width: parent.width * Math.max(0, Math.min(1, chart.reveal))
+            height: parent.height
             clip: true
             layer.enabled: true
             layer.samples: 4
 
             Shape {
-                anchors.fill: parent
+                width: plot.width
+                height: plot.height
+                visible: !chart.filled
                 ShapePath {
                     strokeWidth: -1
                     fillGradient: LinearGradient {
@@ -329,7 +497,8 @@ Item {
                 }
             }
             Shape {
-                anchors.fill: parent
+                width: plot.width
+                height: plot.height
                 visible: !(chart.zoneColored && chart.ftp > 0)
                 ShapePath {
                     strokeColor: chart.color
@@ -345,10 +514,17 @@ Item {
                 model: chart.zoneColored && chart.ftp > 0 ? 7 : 0
                 Shape {
                     id: zoneShape
-                    anchors.fill: parent
+                    width: plot.width
+                    height: plot.height
+                    ShapePath {
+                        strokeWidth: -1
+                        // the zone color at about 42%, as #aarrggbb
+                        fillColor: chart.filled ? "#6b" + String(Theme.zoneColors[index]).substring(1) : "transparent"
+                        PathSvg { path: chart.filled && chart.drawn.areas[index] !== "" ? chart.drawn.areas[index] : "M0 0Z" }
+                    }
                     ShapePath {
                         strokeColor: Theme.zoneColors[index]
-                        strokeWidth: 1.6
+                        strokeWidth: chart.filled ? 1.2 : 1.6
                         fillColor: "transparent"
                         joinStyle: ShapePath.RoundJoin
                         capStyle: ShapePath.RoundCap
@@ -356,10 +532,24 @@ Item {
                     }
                 }
             }
+            // the overlay, a thin light line
+            Shape {
+                width: plot.width
+                height: plot.height
+                visible: chart.drawn.over.length > 1
+                ShapePath {
+                    strokeColor: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.7)
+                    strokeWidth: 1.4
+                    fillColor: "transparent"
+                    joinStyle: ShapePath.RoundJoin
+                    capStyle: ShapePath.RoundCap
+                    PathPolyline { path: chart.drawn.over }
+                }
+            }
         }
 
         Rectangle {
-            visible: chart.shownAverage > 0 && chart.drawn.line.length > 1
+            visible: chart.showAverage && chart.shownAverage > 0 && chart.drawn.line.length > 1
             width: plot.width
             height: 1
             y: Math.round(chart.yOf(chart.shownAverage))
@@ -419,7 +609,14 @@ Item {
         Text {
             id: bubbleText
             anchors.centerIn: parent
-            text: crosshair.gap ? "-" : chart.valueText(crosshair.value)
+            text: {
+                var main = crosshair.gap ? "-" : chart.valueText(crosshair.value)
+                if (chart.overlay.length === 0 || crosshair.at < 0)
+                    return main
+                var o = chart.overlay[crosshair.at] || 0
+                return chart.view.clock(chart.seconds[crosshair.at] || 0) + "   " + main
+                       + (o > 0 ? "   " + chart.overlayShort + " " + Math.round(o) : "")
+            }
             color: Theme.text
             font.family: Theme.bodySemibold
             font.pixelSize: 11

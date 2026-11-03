@@ -26,33 +26,25 @@ YouPage {
         text: qsTr("Where rides are saved")
     }
 
+    // the folder, on a hairline
     Item {
         width: parent.width
-        height: folderCard.height + 8
-
-        Rectangle {
-            id: folderCard
+        height: folderText.implicitHeight + 24
+        Text {
+            id: folderText
             x: 12
             width: parent.width - 24
-            height: folderColumn.height + 36
-            radius: 24
-            color: Theme.card
-
-            Column {
-                id: folderColumn
-                x: 20
-                y: 18
-                width: parent.width - 40
-                spacing: 4
-                Text {
-                    width: parent.width
-                    text: page.folder !== "" ? page.folder : qsTr("The fit folder")
-                    color: Theme.text
-                    font.family: Theme.bodyMedium
-                    font.pixelSize: Theme.bodySize
-                    wrapMode: Text.WrapAnywhere
-                }
-            }
+            anchors.verticalCenter: parent.verticalCenter
+            text: page.folder !== "" ? page.folder : qsTr("The fit folder")
+            color: Theme.text
+            font.family: Theme.bodyMedium
+            font.pixelSize: Theme.bodySize
+            wrapMode: Text.WrapAnywhere
+        }
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 12; rightMargin: 12 }
+            height: 1
+            color: Theme.hairline
         }
     }
 

@@ -1,11 +1,21 @@
 import QtQuick 2.15
+import Qt.labs.settings 1.0
 import "."
+import "sig"
 import "charts"
 import "laps"
+import "rides"
 import "Format.js" as Format
+import "rides/Analysis.js" as Analysis
 
-// One ride in depth: the numbers, power, heart rate, cadence, level and speed on one timeline
-// that zooms and reads out under the finger, time in zones, best efforts and laps.
+// One ride in depth, in the Signature language: the ride's name and day, what a coach would
+// say about it (the record it set, else the most notable thing) with that one number big in its
+// zone, the power with heart rate over it and the best stretch marked, the key numbers on
+// hairlines, time in zones, the power curve against the 90 days before, what changed against
+// a similar ride, aerobic durability, the laps as work blocks, and sharing. Simple shows what
+// most rides need; Pro adds every chart (linked: they zoom and read out together), the power
+// curve, durability and the lap views. The screen wears one tint: the zone of its hero number,
+// else the zone the ride counts in. Everything is worked out once when the ride changes.
 Item {
     id: detail
 
@@ -13,6 +23,14 @@ Item {
     property int rideId: -1
     property bool miles: false
     property bool showBack: true
+    // the power of the rides is estimated (a bike without a power meter): numbers from it say "est."
+    property bool powerEstimated: false
+    // rootItem, for the folder a shared picture is saved in
+    property var core: null
+    // the rides of the library, newest first, when the caller has them (else read here)
+    property var rideList: []
+    // the end of the page the floating navigation covers
+    property real bottomClearance: 0
     property var ride: ({})
     property var samples: ({})
     // which metrics have data, worked out once per ride
@@ -20,9 +38,34 @@ Item {
     property int loadedId: -1
     readonly property alias chartView: chartView
 
-    signal back()
+    // Analysis.headline(), the best stretch, the 90 days before, durability, the sentences, the laps
+    property var story: ({ sentence: "", value: "", unit: "", label: "", sub: "", zone: 0, seconds: 0, power: false })
+    property var segment: null
+    property var curve90: []
+    property var durable: null
+    property var changes: []
+    property var blocks: ({ blocks: [], work: false })
+    property int pickedLap: -1
+    property bool pro: false
+    property bool sharing: false
+    // the share card: one bar per minute (or few minutes) of power, and where it was saved
+    property var shareBars: []
+    property int shareMinutes: 1
+    property string savedImage: ""
+    property bool saveFailed: false
+    // the charts and bars wipe in, 0 to 1
+    property real reveal: 1
 
-    // every 1 Hz sample of the ride, read once when the ride changes
+    readonly property int rideZone: Analysis.rideZone(ride.intensity)
+    readonly property int tintZone: story.zone > 0 ? story.zone : rideZone
+    readonly property color tint: Theme.zoneColors[Math.max(1, Math.min(7, tintZone)) - 1]
+    readonly property bool estimated: powerEstimated || ride.powerEstimated === true
+
+    signal back()
+    // each time a ride shows: the blocks rise in
+    signal entered()
+
+    // every 1 Hz sample of the ride, read once when the ride changes, and all that follows from it
     function load() {
         if (!library || rideId < 0) {
             ride = {}
@@ -34,15 +77,41 @@ Item {
         if (rideId === loadedId)
             return
         loadedId = rideId
-        ride = library.ride(rideId)
+        readLevel()
+        sharing = false
+        pickedLap = -1
+        var r = library.ride(rideId)
         var all = library.samples(rideId, 0)
         var seconds = all.seconds || []
         has = { power: hasValues(all.power), heart: hasValues(all.heart), cadence: hasValues(all.cadence),
                 speed: hasValues(all.speed), level: hasValues(all.level) }
-        chartView.duration = seconds.length > 0 ? Math.max(1, seconds[seconds.length - 1]) : Math.max(1, ride.duration || 1)
+        chartView.duration = seconds.length > 0 ? Math.max(1, seconds[seconds.length - 1]) : Math.max(1, r.duration || 1)
         chartView.reset(true)
+
+        var day = 86400000
+        var list = rideList.length > 0 ? rideList : library.rides(0, 2000)
+        var similar = Analysis.similarRide(r, list)
+        var spread = Analysis.cadenceSpread(all)
+        var similarSpread = similar ? Analysis.cadenceSpread(library.samples(similar.id, 0)) : 0
+        curve90 = r.start ? library.powerCurve(r.start - 90 * day, r.start) : []
+        story = Analysis.headline({
+            ride: r, before: r.start ? library.powerCurve(0, r.start) : [], prior90: curve90,
+            month: Analysis.sameMonth(list, r), spread: spread, similarSpread: similarSpread, ftp: r.ftp || 0, now: Date.now()
+        })
+        var length = story.seconds > 0 ? story.seconds : ((r.duration || 0) >= 1200 ? 300 : 60)
+        var stretch = has.power ? Analysis.bestWindow(all, length) : null
+        if (stretch !== null)
+            stretch.seconds = length
+        segment = stretch
+        durable = has.power && has.heart ? Analysis.durability(all) : null
+        changes = Analysis.changes(r, similar, spread, similarSpread, Date.now())
+        blocks = Analysis.workBlocks(r.laps || [], r.avgPower || 0, r.ftp || 0)
+        ride = r
         samples = all
         flick.contentY = 0
+        wipeIn.restart()
+        entered()
+        proCue.entered()
     }
 
     readonly property var lapStarts: {
@@ -62,327 +131,847 @@ Item {
         return false
     }
 
-    function isRecord(seconds) {
-        var list = ride.records || []
-        for (var i = 0; i < list.length; i++)
-            if (list[i] === seconds)
-                return true
-        return false
+    // Simple or Pro, shared with Progress and You; Qt.labs.settings does not tell the others,
+    // so it is read each time a ride shows
+    function readLevel() {
+        pro = String(uiStore.value("detailLevel", "simple")) === "pro"
+    }
+    function setPro(on) {
+        if (on === pro)
+            return
+        pro = on
+        uiStore.setValue("detailLevel", on ? "pro" : "simple")
+        if (on)
+            proCue.entered()
+    }
+    onProChanged: levelToggle.currentIndex = pro ? 1 : 0
+
+    // a lap picked in the blocks or the lap views zooms the charts to it; -1 shows the whole ride
+    function pickLap(index) {
+        pickedLap = index
+        lapsSection.selectedLap = index
+        if (index < 0 || !ride.laps || index >= ride.laps.length) {
+            chartView.reset(false)
+            return
+        }
+        var lap = ride.laps[index]
+        var s = samples.seconds || []
+        var a = s[lap.start] || lap.start
+        var b = s[lap.start + lap.duration - 1] || (lap.start + lap.duration)
+        chartView.place(a / chartView.duration, Math.max(chartView.minSpan, (b - a) / chartView.duration))
+        var target = Math.max(0, chartBlock.y - 16)
+        if (Theme.reduceMotion) {
+            flick.contentY = target
+            return
+        }
+        scrollTo.to = target
+        scrollTo.restart()
     }
 
-    readonly property var zoneTotal: {
+    // the ride as the share card draws it: one bar per minute of power, 120 at most
+    function openShare() {
+        var minutes = Math.max(1, Math.round((ride.duration || 0) / 60))
+        var count = Math.min(120, minutes)
+        shareMinutes = Math.max(1, Math.round(minutes / count))
+        var power = Analysis.buckets(samples.power || [], count)
+        if (power.length < 2)
+            power = ride.spark || []
+        var ftp = ride.ftp || 0
+        shareBars = power.map(function (w) { return { watts: w, zone: ftp > 0 ? Theme.powerZone(w, ftp) : 0 } })
+        savedImage = ""
+        saveFailed = false
+        sharing = true
+    }
+
+    function saveImage() {
+        if (!shareLoader.item)
+            return
+        var folder = core !== null && core !== undefined ? core.getWritableAppDir() : ""
+        var path = folder + "bikemodo-" + Qt.formatDateTime(new Date(), "yyyyMMdd-hhmmss") + ".png"
+        shareLoader.item.card.save(path, function (ok, where) {
+            detail.savedImage = ok ? where : ""
+            detail.saveFailed = !ok
+        })
+    }
+
+    // A headline on two lines that read well: after a full stop when there is one in the middle,
+    // else at the space nearest the middle. Plain string work, no patterns.
+    function balanced(sentence) {
+        var words = sentence.split(" ")
+        if (words.length < 4)
+            return sentence
+        var stop = sentence.indexOf(". ")
+        if (stop > 0 && stop < sentence.length - 3)
+            return sentence.substring(0, stop + 1) + "\n" + sentence.substring(stop + 2)
+        var middle = sentence.length / 2
+        var best = -1
+        for (var i = 0; i < sentence.length; i++)
+            if (sentence.charAt(i) === " " && (best < 0 || Math.abs(i - middle) < Math.abs(best - middle)))
+                best = i
+        return best < 0 ? sentence : sentence.substring(0, best) + "\n" + sentence.substring(best + 1)
+    }
+
+    function dayLine() {
+        if (!ride.start)
+            return ""
+        var d = new Date(ride.start)
+        var format = d.getFullYear() === new Date().getFullYear() ? "dddd d MMMM" : "dddd d MMMM yyyy"
+        return Qt.formatDate(d, format) + ", " + Analysis.shortDuration(ride.duration || 0)
+    }
+
+    readonly property var keyItems: {
+        var out = []
+        var r = ride
+        if (!r.start)
+            return out
+        var power = r.avgPower > 0
+        out.push({ label: qsTr("Time"), value: Analysis.shortDuration(r.duration || 0), unit: "" })
+        if (power)
+            out.push({ label: qsTr("Work"), value: Format.big(r.kj || 0), unit: "kJ", estimated: estimated })
+        if (!pro)
+            out.push({ label: qsTr("Distance"), value: Format.distance(r.distance || 0, miles).split(" ")[0], unit: miles ? "mi" : "km" })
+        if (power)
+            out.push({ label: qsTr("Avg power"), value: Format.whole(r.avgPower), unit: "W", estimated: estimated })
+        if (pro && r.np > 0) {
+            out.push({ label: qsTr("Normalized power"), value: Format.whole(r.np), unit: "W", estimated: estimated })
+            out.push({ label: qsTr("Intensity factor"), value: (r.intensity || 0).toFixed(2), unit: "", estimated: estimated })
+            out.push({ label: qsTr("Training load"), value: Format.whole(r.tss), unit: "TSS", estimated: estimated })
+        }
+        if (r.avgHr > 0)
+            out.push({ label: qsTr("Avg heart rate"), value: Format.whole(r.avgHr), unit: "bpm" })
+        if (r.avgCadence > 0)
+            out.push({ label: qsTr("Avg cadence"), value: Format.whole(r.avgCadence), unit: "rpm" })
+        return out
+    }
+
+    readonly property real zoneTotal: {
         var sum = 0
         var z = ride.powerZones || []
         for (var i = 0; i < z.length; i++)
             sum += z[i]
-        return Math.max(1, sum)
-    }
-
-    readonly property var shownBests: {
-        var want = [5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600]
-        var out = []
-        var list = ride.best || []
-        for (var i = 0; i < list.length; i++)
-            if (want.indexOf(list[i].seconds) >= 0)
-                out.push(list[i])
-        return out
+        return sum
     }
 
     onRideIdChanged: load()
+    // You may have changed the level while the ride stayed open (tablets)
+    onVisibleChanged: if (visible) readLevel()
     onLibraryChanged: {
         loadedId = -1
         load()
     }
-    Component.onCompleted: load()
+    Component.onCompleted: {
+        readLevel()
+        levelToggle.currentIndex = pro ? 1 : 0
+        load()
+    }
 
     ChartView { id: chartView }
+
+    // the Pro sections rise in when they appear
+    QtObject {
+        id: proCue
+        signal entered()
+    }
+
+    Settings {
+        id: uiStore
+        category: "ui2"
+    }
+
+    NumberAnimation {
+        id: wipeIn
+        target: detail
+        property: "reveal"
+        from: Theme.reduceMotion ? 1 : 0
+        to: 1
+        duration: Theme.reduceMotion ? 0 : 1400
+        easing.type: Easing.Bezier
+        easing.bezierCurve: Theme.effectsCurve
+    }
+    NumberAnimation {
+        id: scrollTo
+        target: flick
+        property: "contentY"
+        duration: Theme.slowSpatialTime
+        easing.type: Easing.Bezier
+        easing.bezierCurve: Theme.effectsCurve
+    }
 
     Rectangle {
         anchors.fill: parent
         color: Theme.bg
     }
 
+    // the glow of the hero in the tint, outside the Flickable so it reaches the top of the
+    // screen; it follows the hero as the page scrolls
+    HeroGlow {
+        readonly property point center: {
+            var moved = flick.contentY + column.x + heroRow.y + heroBlock.y
+            return heroRow.mapToItem(detail, heroRow.width * 0.3, heroRow.height / 2)
+        }
+        visible: detail.ride.start !== undefined
+        width: Math.min(520, detail.width * 1.1)
+        height: width
+        x: center.x - width / 2
+        y: center.y - height / 2
+        tint: detail.tint
+        low: 0.22
+        high: 0.34
+        Behavior on tint {
+            enabled: !Theme.reduceMotion
+            ColorAnimation { duration: Theme.colorTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }
+        }
+    }
+
     Flickable {
         id: flick
+        objectName: "rideDetailFlick"
         anchors.fill: parent
-        contentHeight: column.height + 40
+        contentHeight: column.y + column.height + 24 + detail.bottomClearance
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
         Column {
             id: column
-            readonly property real margin: Theme.margin(detail.width)
-            x: margin
-            width: Math.min(detail.width - margin * 2, 920)
-            spacing: 16
+            readonly property real margin: detail.width < 400 ? 16 : 24
+            readonly property bool wide: width >= 560
+            x: Math.max(margin, (detail.width - width) / 2)
+            y: 24
+            width: Math.min(detail.width - margin * 2, 760)
+            spacing: 26
 
-            PageHeader {
+            // back, Simple or Pro, the ride and its day, the headline and the hero number
+            Rise {
+                id: heroBlock
+                cue: detail
+                order: 0
                 width: parent.width
-                title: detail.ride.start ? Format.title(detail.ride) : ""
-                subtitle: detail.ride.start ? Format.day(detail.ride.start) + "  ·  " + Format.time(detail.ride.start) : ""
-                showBack: detail.showBack
-                onBack: detail.back()
-            }
-
-            // the numbers
-            Grid {
-                id: stats
-                width: parent.width
-                columns: width < 520 ? 2 : 4
-                rowSpacing: 18
-                columnSpacing: 12
-                Repeater {
-                    model: [
-                        [Format.duration(detail.ride.duration || 0), qsTr("Time")],
-                        [Format.distance(detail.ride.distance || 0, detail.miles), qsTr("Distance")],
-                        [Format.whole(detail.ride.avgPower) + " W", qsTr("Average power")],
-                        [Format.whole(detail.ride.np) + " W", qsTr("Normalized power")],
-                        [Format.big(detail.ride.kj || 0) + " kJ", qsTr("Work")],
-                        [Format.whole(detail.ride.tss), qsTr("Training load")],
-                        [detail.ride.avgHr > 0 ? Format.whole(detail.ride.avgHr) + " bpm" : "-", qsTr("Average heart rate")],
-                        [Format.whole(detail.ride.avgCadence) + " rpm", qsTr("Average cadence")]
-                    ]
-                    Column {
-                        width: (stats.width - stats.columnSpacing * (stats.columns - 1)) / stats.columns
-                        spacing: 4
-                        Text {
-                            width: parent.width
-                            text: modelData[0]
-                            color: Theme.text
-                            font.family: Theme.display
-                            font.pixelSize: 26
-                            elide: Text.ElideRight
+                Column {
+                    width: parent.width
+                    spacing: 0
+                    Item {
+                        width: parent.width
+                        height: 44
+                        PulseButton {
+                            id: backButton
+                            visible: detail.showBack
+                            x: -2
+                            y: -2
+                            width: 48
+                            height: 48
+                            topInset: 2
+                            bottomInset: 2
+                            leftInset: 2
+                            rightInset: 2
+                            fill: pressed ? Theme.pressed : Theme.control
+                            Accessible.name: qsTr("Back")
+                            onClicked: detail.back()
+                            contentItem: Item {
+                                LineIcon { anchors.centerIn: parent; name: "back"; size: 20 }
+                            }
+                        }
+                        SegmentedToggle {
+                            id: levelToggle
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 171
+                            height: 40
+                            options: [qsTr("Simple"), qsTr("Pro")]
+                            name: qsTr("Detail level")
+                            onPicked: detail.setPro(index === 1)
+                        }
+                    }
+                    Item { width: 1; height: 12 }
+                    Text {
+                        width: parent.width
+                        text: detail.ride.start ? Format.title(detail.ride) : ""
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: 21
+                        font.letterSpacing: -0.2
+                        elide: Text.ElideRight
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    Item { width: 1; height: 6 }
+                    Text {
+                        width: parent.width
+                        text: detail.dayLine()
+                        color: Theme.text2
+                        font.family: Theme.bodyMedium
+                        font.pixelSize: 14
+                        elide: Text.ElideRight
+                    }
+                    Item { width: 1; height: 18 }
+                    Text {
+                        width: parent.width
+                        text: detail.balanced(detail.story.sentence)
+                        color: Theme.text
+                        font.family: Theme.display
+                        font.pixelSize: detail.width < 400 ? 32 : 36
+                        font.letterSpacing: -0.7
+                        lineHeightMode: Text.FixedHeight
+                        lineHeight: Math.round(font.pixelSize * 1.06)
+                        wrapMode: Text.WordWrap
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: detail.story.sentence
+                    }
+                    Item { width: 1; height: 14 }
+                    // the hero: the number of the headline, heavier the harder it was
+                    Item {
+                        id: heroRow
+                        width: parent.width
+                        height: Math.max(heroNumber.height, heroLabels.height + Math.round(heroNumber.height * 0.12))
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: detail.story.label + ", " + detail.story.value + " " + detail.story.unit
+                                         + (detail.story.power && detail.estimated ? " " + qsTr("estimated") : "")
+                                         + (detail.story.sub !== "" ? ", " + detail.story.sub : "")
+                        RollingNumber {
+                            id: heroNumber
+                            anchors.bottom: parent.bottom
+                            value: detail.story.value
+                            color: detail.tint
+                            font.family: Theme.heroFamily(detail.tintZone)
+                            font.pixelSize: Math.round(Math.min(100, Math.max(64, (heroRow.width - 190) / Math.max(2.4, detail.story.value.length * 0.62))))
+                            token: "slow"
+                            Accessible.ignored: true
                         }
                         Text {
-                            width: parent.width
-                            text: modelData[1]
-                            color: Theme.text3
+                            id: heroUnit
+                            x: heroNumber.width + 6
+                            anchors.bottom: heroNumber.bottom
+                            anchors.bottomMargin: Math.round(heroNumber.height * 0.12)
+                            text: detail.story.unit
+                            color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.tertiarySize
-                            elide: Text.ElideRight
+                            font.pixelSize: 18
+                            Accessible.ignored: true
+                        }
+                        Column {
+                            id: heroLabels
+                            x: heroUnit.x + heroUnit.width + 16
+                            width: heroRow.width - x
+                            anchors.bottom: heroUnit.bottom
+                            spacing: 5
+                            // the label wraps when it is long ("Normalized power"), with "est." after it
+                            Text {
+                                width: parent.width
+                                text: detail.story.label + (detail.story.power && detail.estimated
+                                                            ? "<font color=\"" + Theme.text3 + "\" size=\"2\"> " + qsTr("est.") + "</font>" : "")
+                                textFormat: Text.StyledText
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 15
+                                wrapMode: Text.WordWrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                                Accessible.ignored: true
+                            }
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                text: detail.story.sub
+                                color: Theme.text2
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                                Accessible.ignored: true
+                            }
                         }
                     }
                 }
             }
 
-            // power, heart rate, cadence, level and speed on one timeline
-            Card {
-                id: chartsCard
-                readonly property real chartHeight: column.width < 520 ? 110 : 150
-                width: column.width
-                visible: detail.has.power === true || detail.has.heart === true || detail.has.cadence === true
-                spacing: 14
-                CursorReadout {
+            // power with heart rate over it and the best stretch; in Pro the readout and every
+            // other metric on the same timeline
+            Rise {
+                id: chartBlock
+                cue: detail
+                order: 1
+                width: parent.width
+                visible: detail.has.power === true || detail.has.heart === true
+                Column {
                     width: parent.width
-                    view: chartView
-                    samples: detail.samples
-                    miles: detail.miles
-                    heart: detail.has.heart === true
-                    cadence: detail.has.cadence === true
-                    speed: detail.has.speed === true
-                    level: detail.has.level === true
+                    spacing: 12
+                    CursorReadout {
+                        visible: detail.pro
+                        width: parent.width
+                        view: chartView
+                        samples: detail.samples
+                        miles: detail.miles
+                        heart: detail.has.heart === true
+                        cadence: detail.has.cadence === true
+                        speed: detail.has.speed === true
+                        level: detail.has.level === true
+                    }
+                    TimeChart {
+                        id: heroChart
+                        readonly property bool power: detail.has.power === true
+                        width: parent.width
+                        height: column.wide ? 280 : 226
+                        topStrip: 48
+                        view: chartView
+                        seconds: detail.samples.seconds || []
+                        values: power ? (detail.samples.power || []) : (detail.samples.heart || [])
+                        name: power ? qsTr("Power") : qsTr("Heart rate")
+                        unit: power ? "W" : "bpm"
+                        color: power ? detail.tint : Theme.zoneColors[5]
+                        fromLowest: !power
+                        zoneColored: power
+                        filled: power
+                        showAverage: false
+                        ftp: detail.ride.ftp || 0
+                        laps: detail.lapStarts
+                        overlay: power && detail.has.heart === true ? (detail.samples.heart || []) : []
+                        overlayName: power && detail.has.heart === true ? qsTr("Heart rate") : ""
+                        overlayShort: qsTr("HR")
+                        bandStart: detail.segment ? detail.segment.start : -1
+                        bandEnd: detail.segment ? detail.segment.end : -1
+                        bandColor: detail.tint
+                        bandLabel: detail.segment ? qsTr("Best %1").arg(Format.effort(detail.segment.seconds)) : ""
+                        // the same number as the hero when the hero is this stretch
+                        bandValue: detail.segment ? Math.round(detail.story.seconds > 0 && Analysis.wattsAt(detail.ride.best, detail.story.seconds) > 0
+                                                               ? Analysis.wattsAt(detail.ride.best, detail.story.seconds)
+                                                               : detail.segment.watts) + " W" : ""
+                        reveal: detail.reveal
+                        Accessible.name: power
+                                         ? qsTr("Power across the ride%1. Best %2, %3 watts.")
+                                           .arg(detail.has.heart === true ? qsTr(" with heart rate") : "")
+                                           .arg(detail.segment ? Format.effort(detail.segment.seconds) : "")
+                                           .arg(detail.segment ? Math.round(detail.segment.watts) : 0)
+                                         : qsTr("Heart rate across the ride")
+                    }
+                    TimeChart {
+                        visible: detail.pro && detail.has.cadence === true
+                        width: parent.width
+                        height: column.wide ? 140 : 110
+                        view: chartView
+                        seconds: detail.samples.seconds || []
+                        values: detail.samples.cadence || []
+                        name: qsTr("Cadence")
+                        unit: "rpm"
+                        color: Theme.text2
+                        average: detail.ride.avgCadence || 0
+                        laps: detail.lapStarts
+                        reveal: detail.reveal
+                    }
+                    TimeChart {
+                        visible: detail.pro && detail.has.level === true
+                        width: parent.width
+                        height: column.wide ? 140 : 110
+                        view: chartView
+                        seconds: detail.samples.seconds || []
+                        values: detail.samples.level || []
+                        name: qsTr("Level")
+                        color: Theme.text2
+                        laps: detail.lapStarts
+                        reveal: detail.reveal
+                    }
+                    TimeChart {
+                        visible: detail.pro && detail.has.speed === true
+                        width: parent.width
+                        height: column.wide ? 140 : 110
+                        view: chartView
+                        seconds: detail.samples.seconds || []
+                        values: detail.samples.speed || []
+                        name: qsTr("Speed")
+                        unit: detail.miles ? "mph" : "km/h"
+                        factor: detail.miles ? 0.621371 : 1
+                        decimals: 1
+                        color: Theme.text2
+                        laps: detail.lapStarts
+                        reveal: detail.reveal
+                    }
+                    TimeAxis {
+                        width: parent.width
+                        view: chartView
+                    }
                 }
-                TimeChart {
+            }
+
+            // the key numbers on hairlines
+            Rise {
+                cue: detail
+                order: 2
+                width: parent.width
+                visible: detail.keyItems.length > 0
+                Column {
                     width: parent.width
-                    height: chartsCard.chartHeight
-                    visible: detail.has.power === true
-                    view: chartView
-                    seconds: detail.samples.seconds || []
-                    values: detail.samples.power || []
-                    name: qsTr("Power")
-                    unit: "W"
-                    color: Theme.accent
-                    average: detail.ride.avgPower || 0
-                    zoneColored: true
-                    ftp: detail.ride.ftp || 0
-                    laps: detail.lapStarts
-                }
-                TimeChart {
-                    width: parent.width
-                    height: chartsCard.chartHeight
-                    visible: detail.has.heart === true
-                    view: chartView
-                    seconds: detail.samples.seconds || []
-                    values: detail.samples.heart || []
-                    name: qsTr("Heart rate")
-                    unit: "bpm"
-                    color: Theme.zoneColors[5]
-                    average: detail.ride.avgHr || 0
-                    fromLowest: true
-                    laps: detail.lapStarts
-                }
-                TimeChart {
-                    width: parent.width
-                    height: chartsCard.chartHeight
-                    visible: detail.has.cadence === true
-                    view: chartView
-                    seconds: detail.samples.seconds || []
-                    values: detail.samples.cadence || []
-                    name: qsTr("Cadence")
-                    unit: "rpm"
-                    color: Theme.zoneColors[1]
-                    average: detail.ride.avgCadence || 0
-                    laps: detail.lapStarts
-                }
-                TimeChart {
-                    width: parent.width
-                    height: chartsCard.chartHeight
-                    visible: detail.has.level === true
-                    view: chartView
-                    seconds: detail.samples.seconds || []
-                    values: detail.samples.level || []
-                    name: qsTr("Level")
-                    color: Theme.zoneColors[3]
-                    laps: detail.lapStarts
-                }
-                TimeChart {
-                    width: parent.width
-                    height: chartsCard.chartHeight
-                    visible: detail.has.speed === true
-                    view: chartView
-                    seconds: detail.samples.seconds || []
-                    values: detail.samples.speed || []
-                    name: qsTr("Speed")
-                    unit: detail.miles ? "mph" : "km/h"
-                    factor: detail.miles ? 0.621371 : 1
-                    decimals: 1
-                    color: Theme.zoneColors[0]
-                    laps: detail.lapStarts
-                }
-                TimeAxis {
-                    width: parent.width
-                    view: chartView
+                    spacing: 12
+                    Text {
+                        text: qsTr("Key numbers")
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.titleSize
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    KeyGrid {
+                        width: parent.width
+                        items: detail.keyItems
+                    }
                 }
             }
 
             // time in power zones
-            Card {
-                width: column.width
+            Rise {
+                cue: detail
+                order: 3
+                width: parent.width
                 visible: (detail.ride.powerZones || []).length === 7 && detail.zoneTotal > 1
-                Text {
-                    text: qsTr("Time in power zones")
-                    color: Theme.text2
-                    font.family: Theme.bodySemibold
-                    font.pixelSize: Theme.labelSize
-                }
-                Row {
+                Column {
                     width: parent.width
-                    height: 14
-                    spacing: 2
-                    Repeater {
-                        model: detail.ride.powerZones || []
-                        Rectangle {
-                            visible: modelData > 0
-                            width: Math.max(0, (parent.width - 12) * modelData / detail.zoneTotal)
-                            height: parent.height
-                            radius: 4
-                            color: Theme.zoneColors[index]
-                        }
-                    }
-                }
-                Repeater {
-                    model: detail.ride.powerZones || []
+                    spacing: 14
                     Item {
                         width: parent.width
-                        height: 30
-                        visible: modelData > 0
-                        Rectangle {
-                            width: 10; height: 10; radius: 5
-                            anchors.verticalCenter: parent.verticalCenter
-                            color: Theme.zoneColors[index]
-                        }
+                        height: zonesTitle.height
                         Text {
-                            x: 20
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: "Z" + (index + 1) + "  " + Theme.powerZoneNames[index]
+                            id: zonesTitle
+                            text: qsTr("Time in zones")
                             color: Theme.text
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.bodySize
+                            font.family: Theme.bodySemibold
+                            font.pixelSize: Theme.titleSize
+                            Accessible.role: Accessible.Heading
+                            Accessible.name: text
                         }
                         Text {
                             anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: Format.duration(modelData) + "   " + Math.round(100 * modelData / detail.zoneTotal) + "%"
+                            anchors.baseline: zonesTitle.baseline
+                            text: detail.estimated ? qsTr("Power, est.") : qsTr("Power")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.labelSize
+                            font.pixelSize: 13
                         }
+                    }
+                    ZoneRows {
+                        width: parent.width
+                        seconds: detail.ride.powerZones || []
+                        ftp: detail.ride.ftp || 0
+                        grow: Math.min(1, detail.reveal * 1.4)
                     }
                 }
             }
 
-            // best efforts in this ride
-            Card {
-                width: column.width
-                visible: detail.shownBests.length > 0
-                Text {
-                    text: qsTr("Best efforts")
-                    color: Theme.text2
-                    font.family: Theme.bodySemibold
-                    font.pixelSize: Theme.labelSize
-                }
-                Repeater {
-                    model: detail.shownBests
+            // the power curve against the 90 days before
+            Rise {
+                cue: proCue
+                order: 4
+                width: parent.width
+                visible: detail.pro && (detail.ride.best || []).length > 0 && detail.curve90.length > 0
+                Column {
+                    width: parent.width
+                    spacing: 10
                     Item {
                         width: parent.width
-                        height: 34
+                        height: curveTitle.height
                         Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: Format.effort(modelData.seconds)
+                            id: curveTitle
+                            text: qsTr("Power curve")
+                            color: Theme.text
+                            font.family: Theme.bodySemibold
+                            font.pixelSize: Theme.titleSize
+                            Accessible.role: Accessible.Heading
+                            Accessible.name: text
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.baseline: curveTitle.baseline
+                            width: Math.min(implicitWidth, parent.width - curveTitle.width - 12)
+                            text: detail.estimated ? qsTr("Best at each length, est.") : qsTr("Best at each length")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.bodySize
+                            font.pixelSize: 13
+                            elide: Text.ElideRight
                         }
-                        Row {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 10
+                    }
+                    PowerCurve {
+                        width: parent.width
+                        height: column.wide ? 240 : 210
+                        ride: detail.ride.best || []
+                        prior: detail.curve90
+                        tint: detail.tint
+                        rideSeconds: detail.ride.duration || 0
+                        heroSeconds: detail.story.seconds || 0
+                        reveal: detail.reveal
+                    }
+                }
+            }
+
+            // what changed against a similar ride before
+            Rise {
+                cue: detail
+                order: 4
+                width: parent.width
+                visible: detail.changes.length > 0
+                Column {
+                    width: parent.width
+                    Text {
+                        bottomPadding: 6
+                        text: qsTr("What changed")
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.titleSize
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    Repeater {
+                        model: detail.changes
+                        Item {
+                            width: parent.width
+                            height: Math.max(56, sentence.implicitHeight + 20)
                             Rectangle {
-                                visible: detail.isRecord(modelData.seconds)
-                                width: recordText.implicitWidth + 14
-                                height: 20
-                                radius: 10
                                 anchors.verticalCenter: parent.verticalCenter
-                                color: Qt.rgba(1, 203 / 255, 82 / 255, 0.16)
-                                Text {
-                                    id: recordText
+                                width: 36
+                                height: 36
+                                radius: 18
+                                color: Theme.control
+                                LineIcon {
                                     anchors.centerIn: parent
-                                    text: qsTr("Record")
-                                    color: Theme.zoneColors[3]
-                                    font.family: Theme.bodySemibold
-                                    font.pixelSize: 11
+                                    name: modelData.icon
+                                    size: 18
                                 }
                             }
                             Text {
-                                text: Math.round(modelData.watts) + " W"
+                                id: sentence
+                                x: 50
+                                width: parent.width - 50
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.text
                                 color: Theme.text
-                                font.family: Theme.display
-                                font.pixelSize: 20
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 15
+                                lineHeight: 1.2
+                                wrapMode: Text.WordWrap
+                            }
+                            Hairline {
+                                visible: index < detail.changes.length - 1
+                                anchors.bottom: parent.bottom
+                                width: parent.width
                             }
                         }
                     }
                 }
             }
 
-            // laps: ribbon, bars, table and pacing; picking a lap zooms the charts to it
-            LapsSection {
-                width: column.width
-                ride: detail.ride
-                samples: detail.samples
-                miles: detail.miles
-                onLapSelected: {
-                    if (index < 0) {
-                        chartView.reset(false)
-                        return
+            // aerobic durability
+            Rise {
+                cue: proCue
+                order: 5
+                width: parent.width
+                visible: detail.pro && detail.durable !== null
+                Column {
+                    width: parent.width
+                    spacing: 12
+                    Text {
+                        text: qsTr("Aerobic durability")
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.titleSize
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
                     }
-                    var lap = detail.ride.laps[index]
-                    var s = detail.samples.seconds || []
-                    var a = s[lap.start] || lap.start
-                    var b = s[lap.start + lap.duration - 1] || (lap.start + lap.duration)
-                    chartView.place(a / chartView.duration, Math.max(chartView.minSpan, (b - a) / chartView.duration))
-                    flick.contentY = 0
+                    Row {
+                        width: parent.width
+                        spacing: 24
+                        Repeater {
+                            model: detail.durable ? [
+                                [qsTr("Decoupling"), detail.durable.decoupling.toFixed(1), "%"],
+                                [qsTr("Efficiency factor"), detail.durable.ef.toFixed(2), ""]
+                            ] : []
+                            Column {
+                                width: (parent.width - 24) / 2
+                                spacing: 10
+                                Accessible.role: Accessible.StaticText
+                                Accessible.name: modelData[0] + ", " + modelData[1] + modelData[2]
+                                Text {
+                                    text: modelData[0]
+                                    color: Theme.text2
+                                    font.family: Theme.bodyMedium
+                                    font.pixelSize: 13
+                                    Accessible.ignored: true
+                                }
+                                Row {
+                                    spacing: 2
+                                    Numeral {
+                                        id: durableValue
+                                        text: modelData[1]
+                                        color: Theme.text
+                                        font.pixelSize: 34
+                                        font.letterSpacing: -0.9
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        anchors.baseline: durableValue.baseline
+                                        text: modelData[2]
+                                        color: Theme.text2
+                                        font.family: Theme.bodyMedium
+                                        font.pixelSize: 18
+                                        Accessible.ignored: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: detail.durable ? Analysis.durabilityWords(detail.durable.decoupling) : ""
+                        color: Theme.text2
+                        font.family: Theme.bodyMedium
+                        font.pixelSize: 14
+                        lineHeight: 1.2
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
+            // the laps as work blocks; the lap views in Pro
+            Rise {
+                cue: detail
+                order: 5
+                width: parent.width
+                visible: detail.blocks.blocks.length >= 2
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    Item {
+                        width: parent.width
+                        height: lapsTitle.height
+                        Text {
+                            id: lapsTitle
+                            text: qsTr("Laps")
+                            color: Theme.text
+                            font.family: Theme.bodySemibold
+                            font.pixelSize: Theme.titleSize
+                            Accessible.role: Accessible.Heading
+                            Accessible.name: text
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.baseline: lapsTitle.baseline
+                            text: detail.blocks.work ? qsTr("Work blocks") : qsTr("%1 laps").arg(detail.blocks.blocks.length)
+                            color: Theme.text2
+                            font.family: Theme.bodyMedium
+                            font.pixelSize: 13
+                        }
+                    }
+                    WorkBlocks {
+                        width: parent.width
+                        list: detail.blocks.blocks
+                        tint: detail.tint
+                        estimated: detail.estimated
+                        picked: detail.pickedLap
+                        onLapPicked: detail.pickLap(lapIndex)
+                    }
+                }
+            }
+            Rise {
+                cue: proCue
+                order: 6
+                width: parent.width
+                visible: detail.pro && lapsSection.hasLaps
+                LapsSection {
+                    id: lapsSection
+                    width: parent.width
+                    titled: false
+                    ride: detail.ride
+                    samples: detail.samples
+                    miles: detail.miles
+                    onLapSelected: detail.pickLap(index)
+                }
+            }
+
+            // share, and where the ride is kept
+            Rise {
+                cue: detail
+                order: 6
+                width: parent.width
+                visible: detail.ride.start !== undefined
+                Column {
+                    width: parent.width
+                    spacing: 14
+                    PulseButton {
+                        width: Math.min(parent.width, 420)
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        height: 56
+                        fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
+                        pressedRadius: 18
+                        Accessible.name: qsTr("Share")
+                        Accessible.description: qsTr("Make a picture of this ride to share")
+                        onClicked: detail.openShare()
+                        contentItem: Item {
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 8
+                                LineIcon {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    name: "share"
+                                    color: Theme.accentInk
+                                    size: 18
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: qsTr("Share")
+                                    color: Theme.accentInk
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 16
+                                }
+                            }
+                        }
+                    }
+                    Row {
+                        visible: (detail.ride.filePath || "") !== ""
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 6
+                        LineIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "check"
+                            color: Theme.text3
+                            size: 14
+                        }
+                        Text {
+                            text: qsTr("Saved on this phone as a FIT file")
+                            color: Theme.text3
+                            font.family: Theme.bodyMedium
+                            font.pixelSize: 13
+                        }
+                    }
                 }
             }
         }
+    }
+
+    // the share sheet of the moments (moments/ShareSheet.qml), the ride as a fingerprint card;
+    // loaded by its path so this page never waits on it
+    Loader {
+        id: shareLoader
+        anchors.fill: parent
+        active: detail.sharing
+        source: "moments/ShareSheet.qml"
+        onLoaded: {
+            var sheet = item
+            sheet.ride = Qt.binding(function () {
+                return { elapsed: detail.ride.duration || 0, avgPower: detail.ride.avgPower || 0,
+                         distance: (detail.ride.distance || 0) * (detail.miles ? 0.621371 : 1), miles: detail.miles,
+                         kilojoules: detail.ride.kj || 0, tss: detail.ride.tss || 0, powerEstimated: detail.estimated }
+            })
+            sheet.moment = Qt.binding(function () {
+                return { tone: detail.tintZone, title: detail.story.sentence, value: detail.story.value, unit: detail.story.unit,
+                         detail: detail.story.label + (detail.story.sub !== "" ? ", " + detail.story.sub : ""),
+                         kind: detail.story.record ? "record" : "", seconds: detail.story.seconds }
+            })
+            sheet.spark = Qt.binding(function () { return detail.ride.spark || [] })
+            sheet.bars = Qt.binding(function () { return detail.shareBars })
+            sheet.minutesPerBar = Qt.binding(function () { return detail.shareMinutes })
+            sheet.name = Qt.binding(function () { return detail.ride.start ? Format.title(detail.ride) : "" })
+            sheet.when = Qt.binding(function () { return detail.ride.start || Date.now() })
+            sheet.savedImage = Qt.binding(function () { return detail.savedImage })
+            sheet.failed = Qt.binding(function () { return detail.saveFailed })
+        }
+    }
+    Connections {
+        target: shareLoader.item
+        ignoreUnknownSignals: true
+        function onClose() { detail.sharing = false }
+        function onSave() { detail.saveImage() }
     }
 }

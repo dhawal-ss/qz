@@ -1,13 +1,15 @@
 import QtQuick 2.15
 import QtQuick.Shapes 1.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 import "Journeys.js" as Journeys
 
 // A journey: the distance ridden since it started, laid along a real route drawn as a line with
 // its towns (no map, nothing from the network). Without a journey, or while changing it, the card
 // lists them to pick from; a finished one is a badge and the card offers the next.
-Card {
+// A quiet section: a cap label, the route on the page, the journeys to pick as hairline rows.
+Column {
     id: journeyCard
 
     property string journeyId: ""
@@ -21,8 +23,10 @@ Card {
 
     readonly property var journey: Journeys.byId(journeyId)
     readonly property var trip: journey ? Journeys.progress(journey, ridden) : null
-    readonly property color tint: journey ? Theme.zoneColors[journey.tone - 1] : Theme.accent
+    readonly property color tint: Theme.accent
     readonly property bool picking: !journey || choosing
+
+    spacing: 12
 
     function km(v) {
         return miles ? Format.big(v * 0.621371) + " mi" : Format.big(v) + " km"
@@ -45,12 +49,9 @@ Card {
     Item {
         width: parent.width
         height: 24
-        Text {
+        CapLabel {
             anchors.verticalCenter: parent.verticalCenter
             text: qsTr("Journey")
-            color: Theme.text2
-            font.family: Theme.bodySemibold
-            font.pixelSize: Theme.labelSize
         }
     }
 
@@ -68,17 +69,18 @@ Card {
     Column {
         visible: journeyCard.picking
         width: parent.width
-        spacing: 4
+        spacing: 0
         Repeater {
             model: Journeys.journeys
             PulseButton {
                 id: pickRow
                 readonly property bool riddenBefore: Journeys.isDone(journeyCard.finished, modelData.id)
-                width: parent.width
-                height: Math.max(64, pickTexts.implicitHeight + 20)
+                x: -12
+                width: parent.width + 24
+                height: Math.max(64, pickTexts.implicitHeight + 24)
                 radius: 18
-                pressedScale: 0.98
-                fill: pressed ? Theme.pressed : Theme.control
+                pressedScale: 0.985
+                fill: pressed ? Theme.pressed : "transparent"
                 Accessible.name: qsTr("Start %1, about %2").arg(modelData.name).arg(journeyCard.km(Journeys.total(modelData)))
                                  + (riddenBefore ? qsTr(", ridden before") : "")
                 onClicked: {
@@ -124,7 +126,7 @@ Card {
                         anchors.verticalCenter: parent.verticalCenter
                         size: 18
                         name: "check"
-                        color: Theme.zoneColors[2]
+                        color: Theme.accent
                     }
                     Icon {
                         anchors.right: parent.right
@@ -134,6 +136,12 @@ Card {
                         size: 20
                         color: Theme.text3
                     }
+                }
+                Hairline {
+                    x: 12
+                    width: parent.width - 24
+                    anchors.bottom: parent.bottom
+                    visible: index < Journeys.journeys.length - 1
                 }
             }
         }
@@ -145,8 +153,9 @@ Card {
         width: parent.width
         text: journeyCard.journey ? journeyCard.journey.name : ""
         color: Theme.text
-        font.family: Theme.display
-        font.pixelSize: 24
+        font.family: Theme.bodySemibold
+        font.pixelSize: 21
+        font.letterSpacing: -0.2
         wrapMode: Text.WordWrap
     }
 
@@ -199,9 +208,9 @@ Card {
                 width: 10
                 height: 10
                 radius: 5
-                color: behind ? journeyCard.tint : Theme.card
+                color: behind ? journeyCard.tint : Theme.bg
                 border.width: 2
-                border.color: behind ? Theme.card : Theme.dashed
+                border.color: behind ? Theme.bg : Theme.dashed
             }
         }
 
@@ -310,14 +319,12 @@ Card {
 
     PulseButton {
         visible: journeyCard.journey !== null
-        width: changeLabel.implicitWidth + 32
-        height: 48
-        topInset: 4
-        bottomInset: 4
-        radius: 20
         id: changeButton
         readonly property bool finishedNow: journeyCard.trip !== null && journeyCard.trip.done
-        fill: finishedNow && !journeyCard.choosing ? Theme.accent : (pressed ? Theme.pressed : Theme.chip)
+        x: finishedNow && !journeyCard.choosing ? 0 : -12
+        width: changeLabel.implicitWidth + (finishedNow && !journeyCard.choosing ? 40 : 24)
+        height: finishedNow && !journeyCard.choosing ? 48 : 44
+        fill: finishedNow && !journeyCard.choosing ? Theme.accent : (pressed ? Theme.pressed : "transparent")
         Accessible.name: changeLabel.text
         onClicked: journeyCard.choosing = !journeyCard.choosing
         contentItem: Text {
@@ -326,7 +333,7 @@ Card {
                   : (changeButton.finishedNow ? qsTr("Pick the next journey") : qsTr("Change journey"))
             color: changeButton.finishedNow && !journeyCard.choosing ? Theme.accentInk : Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: Theme.labelSize
+            font.pixelSize: 14
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

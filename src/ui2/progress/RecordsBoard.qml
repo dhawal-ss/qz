@@ -1,27 +1,40 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 import "Progress.js" as Progress
 
-// Every record: the best watts for ten durations and the biggest ride and week. Each row says
-// when it was set and how long it has stood, opens that ride from its date, and opens the
-// history of the record (every time it was beaten) with a tap.
-Card {
-    id: card
+// Every record on hairlines: the best watts for five durations (ten on Pro) and the biggest ride
+// and week. Each row says when it was set and how long it has stood, draws every time it was
+// beaten as a sparkline, opens that ride from its date and the full history with a tap.
+// The histories are read in refresh(), which the page calls when the library changes: each power
+// history is a pass over every ride.
+Column {
+    id: board
     objectName: "recordsBoard"
 
     property var library: null
     property bool miles: false
     property real weight: 0          // kg, 0 when the rider has not set it
+    property bool pro: false
 
     signal openRide(int id)
 
-    readonly property var powerDurations: [5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600]
+    readonly property var allDurations: [5, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600]
+    readonly property var simpleDurations: [5, 60, 300, 1200, 3600]
     readonly property var totalKeys: ["longest", "kj", "week", "distance"]
-    property var powerRows: []
+    property var allPowerRows: []
     property var totalRows: []
+    readonly property var powerRows: {
+        if (pro)
+            return allPowerRows
+        var out = []
+        for (var i = 0; i < allPowerRows.length; i++)
+            if (simpleDurations.indexOf(allPowerRows[i].seconds) >= 0)
+                out.push(allPowerRows[i])
+        return out
+    }
     property string expanded: ""     // key of the row whose history is open
-    property var history: []
 
     function totalLabel(key) {
         if (key === "longest")
@@ -47,47 +60,49 @@ Card {
         return key === "week" ? qsTr("Week of %1").arg(Progress.shortDate(start)) : Format.day(start)
     }
 
+    function steps(key, raw) {
+        var out = []
+        for (var i = 0; i < raw.length; i++) {
+            var v = raw[i].watts !== undefined ? raw[i].watts : raw[i].value
+            out.push({ start: raw[i].start, value: v, text: valueText(key, v) })
+        }
+        return out
+    }
+
     function refresh() {
         expanded = ""
-        history = []
         if (!library) {
-            powerRows = []
+            allPowerRows = []
             totalRows = []
             return
         }
         var curve = library.powerCurve(0, 0)
         var rows = []
         for (var i = 0; i < curve.length; i++)
-            if (powerDurations.indexOf(curve[i].seconds) >= 0)
-                rows.push({ key: "p" + curve[i].seconds, seconds: curve[i].seconds, value: curve[i].watts,
-                            start: curve[i].start, rideId: curve[i].rideId })
-        powerRows = rows
+            if (allDurations.indexOf(curve[i].seconds) >= 0) {
+                var key = "p" + curve[i].seconds
+                rows.push({ key: key, seconds: curve[i].seconds, value: curve[i].watts, start: curve[i].start,
+                            rideId: curve[i].rideId, history: steps(key, library.recordHistory(curve[i].seconds)) })
+            }
+        allPowerRows = rows
         var records = library.rideRecords()
         var totals = []
         for (var k = 0; k < totalKeys.length; k++)
             for (var j = 0; j < records.length; j++)
-                if (records[j].key === totalKeys[k])
-                    totals.push(records[j])
+                if (records[j].key === totalKeys[k]) {
+                    var r = records[j]
+                    totals.push({ key: r.key, value: r.value, start: r.start, rideId: r.rideId,
+                                  history: steps(r.key, r.history || []) })
+                }
         totalRows = totals
     }
 
-    // open or close the history of a row; power histories are read only when opened
-    function toggle(row) {
-        if (expanded === row.key) {
-            expanded = ""
-            return
-        }
-        var steps = []
-        var raw = row.key.charAt(0) === "p" ? library.recordHistory(row.seconds) : (row.history || [])
-        for (var i = 0; i < raw.length; i++) {
-            var v = raw[i].watts !== undefined ? raw[i].watts : raw[i].value
-            steps.push({ start: raw[i].start, value: v, text: valueText(row.key, v) })
-        }
-        history = steps
-        expanded = row.key
+    function toggleRow(row) {
+        expanded = expanded === row.key ? "" : row.key
     }
 
     function note(row) {
+        var history = row.history
         var n = history.length
         if (n === 0 || expanded !== row.key)
             return ""
@@ -102,93 +117,63 @@ Card {
         return text
     }
 
-    onLibraryChanged: refresh()
-    onVisibleChanged: if (visible) refresh()
-    Component.onCompleted: refresh()
-    Connections {
-        target: card.library
-        ignoreUnknownSignals: true
-        function onChanged() { card.refresh() }
-    }
+    spacing: 0
 
-    Text {
-        text: qsTr("Records")
-        color: Theme.text2
-        font.family: Theme.bodySemibold
-        font.pixelSize: Theme.labelSize
+    SectionHead {
+        width: parent.width
+        title: qsTr("Records")
+        note: qsTr("All time")
     }
 
     Text {
         width: parent.width
-        visible: card.powerRows.length === 0 && card.totalRows.length === 0
+        topPadding: 12
+        visible: board.allPowerRows.length === 0 && board.totalRows.length === 0
         text: qsTr("Your records start with your first ride.")
-        color: Theme.text3
+        color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: Theme.bodySize
+        font.pixelSize: 14
         wrapMode: Text.WordWrap
     }
 
-    Column {
-        width: parent.width
-        spacing: 0
-        visible: card.powerRows.length > 0
-        Text {
-            text: qsTr("Power")
-            color: Theme.text
-            font.family: Theme.display
-            font.pixelSize: Theme.titleSize
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-        }
-        Repeater {
-            model: card.powerRows
-            RecordRow {
-                id: powerRow
-                label: Progress.effort(modelData.seconds)
-                valueText: card.valueText(modelData.key, modelData.value)
-                dateText: card.dateText(modelData.key, modelData.start)
-                start: modelData.start
-                rideId: modelData.rideId
-                open: card.expanded === modelData.key
-                steps: open ? card.history : []
-                note: card.note(modelData)
-                onToggle: card.toggle(modelData)
-                onOpenRide: card.openRide(id)
-            }
+    Item {
+        width: 1
+        height: 4
+    }
+
+    Repeater {
+        model: board.powerRows
+        RecordRow {
+            id: powerRow
+            label: qsTr("%1 power").arg(Progress.effort(modelData.seconds))
+            valueText: board.valueText(modelData.key, modelData.value)
+            dateText: board.dateText(modelData.key, modelData.start)
+            start: modelData.start
+            rideId: modelData.rideId
+            history: modelData.history
+            open: board.expanded === modelData.key
+            steps: open ? modelData.history : []
+            note: board.note(modelData)
+            onToggle: board.toggleRow(modelData)
+            onOpenRide: board.openRide(id)
         }
     }
 
-    Column {
-        width: parent.width
-        spacing: 0
-        visible: card.totalRows.length > 0
-        Item {
-            width: 1
-            height: 4
-        }
-        Text {
-            text: qsTr("Rides and weeks")
-            color: Theme.text
-            font.family: Theme.display
-            font.pixelSize: Theme.titleSize
-            Accessible.role: Accessible.Heading
-            Accessible.name: text
-        }
-        Repeater {
-            model: card.totalRows
-            RecordRow {
-                id: totalRow
-                label: card.totalLabel(modelData.key)
-                valueText: card.valueText(modelData.key, modelData.value)
-                dateText: card.dateText(modelData.key, modelData.start)
-                start: modelData.start
-                rideId: modelData.rideId
-                open: card.expanded === modelData.key
-                steps: open ? card.history : []
-                note: card.note(modelData)
-                onToggle: card.toggle(modelData)
-                onOpenRide: card.openRide(id)
-            }
+    Repeater {
+        model: board.totalRows
+        RecordRow {
+            id: totalRow
+            label: board.totalLabel(modelData.key)
+            valueText: board.valueText(modelData.key, modelData.value)
+            dateText: board.dateText(modelData.key, modelData.start)
+            start: modelData.start
+            rideId: modelData.rideId
+            history: modelData.history
+            open: board.expanded === modelData.key
+            steps: open ? modelData.history : []
+            note: board.note(modelData)
+            onToggle: board.toggleRow(modelData)
+            onOpenRide: board.openRide(id)
         }
     }
 }

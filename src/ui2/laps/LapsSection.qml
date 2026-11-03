@@ -1,11 +1,14 @@
 import QtQuick 2.15
 import QtQuick.Shapes 1.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 
 // The laps of a ride. A strip of the whole ride split into laps picks one out; under it the laps
 // show as bars of their average power, as a table against the ride average, or as power lines
 // laid over each other from their own start (pacing). Pacing needs the full 1 Hz samples.
+// Quiet structure: no box, hairlines and a connected switch; `titled: false` leaves the title
+// to the page.
 Item {
     id: laps
 
@@ -15,6 +18,7 @@ Item {
     // "bars", "table" or "pacing"
     property string view: "bars"
     property int selectedLap: -1
+    property bool titled: true
 
     // a lap of the strip was tapped; -1 when the tap let it go again
     signal lapSelected(int index)
@@ -212,20 +216,21 @@ Item {
         return qsTr("Average power of each lap: %1").arg(parts.join(", "))
     }
 
-    Card {
+    Column {
         id: card
         width: parent.width
         spacing: 14
 
         Item {
+            visible: laps.titled
             width: parent.width
             height: 20
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: qsTr("Laps")
-                color: Theme.text2
+                color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: Theme.labelSize
+                font.pixelSize: Theme.titleSize
             }
             Text {
                 anchors.right: parent.right
@@ -318,51 +323,16 @@ Item {
             }
         }
 
-        // which view: a compact connected switch
-        Item {
+        // which view: a connected switch
+        SegmentedToggle {
             id: switcher
-            width: Math.min(parent.width, 360)
-            height: 48
-            readonly property var options: laps.hasPacing
-                                            ? [["bars", qsTr("Bars")], ["table", qsTr("Table")], ["pacing", qsTr("Pacing")]]
-                                            : [["bars", qsTr("Bars")], ["table", qsTr("Table")]]
-            Rectangle {
-                y: 4
-                width: parent.width
-                height: 40
-                radius: 20
-                color: Theme.control
-            }
-            Row {
-                x: 2
-                width: parent.width - 4
-                Repeater {
-                    model: switcher.options
-                    PulseButton {
-                        id: option
-                        readonly property bool on: laps.shownView === modelData[0]
-                        width: parent.width / switcher.options.length
-                        height: switcher.height
-                        topInset: 6
-                        bottomInset: 6
-                        radius: 18
-                        fill: on ? Theme.accent : "transparent"
-                        Accessible.name: qsTr("Show laps as %1").arg(modelData[1])
-                        Accessible.checkable: true
-                        Accessible.checked: option.on
-                        onClicked: laps.view = modelData[0]
-                        contentItem: Text {
-                            text: modelData[1]
-                            color: option.on ? Theme.accentInk : Theme.text2
-                            font.family: Theme.bodySemibold
-                            font.pixelSize: 13
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
-                        }
-                    }
-                }
-            }
+            readonly property var keys: laps.hasPacing ? ["bars", "table", "pacing"] : ["bars", "table"]
+            width: Math.min(parent.width, keys.length * 96)
+            height: 40
+            options: laps.hasPacing ? [qsTr("Bars"), qsTr("Table"), qsTr("Pacing")] : [qsTr("Bars"), qsTr("Table")]
+            currentIndex: Math.max(0, keys.indexOf(laps.shownView))
+            name: qsTr("Show laps as")
+            onPicked: laps.view = keys[index]
         }
 
         // bars: height by average power, width by duration, tinted by zone

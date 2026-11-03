@@ -1,16 +1,20 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 
 // This week, month or year so far against the same stretch of the one before: up to the same
-// weekday, date and time. A rise is green, a fall stays quiet; nothing here is red.
-Card {
+// weekday, date and time, as rows on hairlines. A rise is green, a fall stays quiet; nothing
+// here is red. Simple shows time, distance and rides; Pro every row.
+Column {
     id: card
+    objectName: "periodCompare"
 
     property var library: null
     property bool miles: false
 
     property string span: "month"    // "week", "month" or "year"
+    property bool pro: false
     property var now: ({})
     property var before: ({})
 
@@ -71,89 +75,43 @@ Card {
         [qsTr("Average power"), Math.round(avgPower(now)) + " W", Math.round(avgPower(before)) + " W", change(avgPower(now), avgPower(before))]
     ]
 
-    onLibraryChanged: refresh()
+    readonly property var shownRows: pro ? rows : [rows[0], rows[1], rows[3]]
+
     onSpanChanged: refresh()
-    onVisibleChanged: if (visible) refresh()
-    Component.onCompleted: refresh()
-    Connections {
-        target: card.library
-        ignoreUnknownSignals: true
-        function onChanged() { card.refresh() }
+
+    spacing: 12
+
+    SectionHead {
+        width: parent.width
+        title: qsTr("Compare")
+        note: card.span === "week" ? qsTr("Same days last week")
+              : (card.span === "month" ? qsTr("Same days last month") : qsTr("Same days last year"))
     }
 
-    Text {
-        width: parent.width
-        text: card.span === "week" ? qsTr("This week so far, against the same days of last week")
-              : (card.span === "month" ? qsTr("This month so far, against the same days of last month")
-                                       : qsTr("This year so far, against the same days of last year"))
-        color: Theme.text2
-        font.family: Theme.bodySemibold
-        font.pixelSize: Theme.labelSize
-        wrapMode: Text.WordWrap
-    }
-
-    Chips {
-        width: parent.width
-        what: qsTr("Compare")
-        current: card.span
-        options: [["week", qsTr("This week")], ["month", qsTr("This month")], ["year", qsTr("This year")]]
-        onPicked: card.span = key
+    SegmentedToggle {
+        width: Math.min(parent.width, 360)
+        height: 40
+        name: qsTr("Compare")
+        options: [qsTr("This week"), qsTr("This month"), qsTr("This year")]
+        currentIndex: ["week", "month", "year"].indexOf(card.span)
+        onPicked: card.span = ["week", "month", "year"][index]
     }
 
     Column {
         width: parent.width
         spacing: 0
         Repeater {
-            model: card.rows
-            Item {
+            model: card.shownRows
+            HairlineRow {
                 id: compareRow
                 width: parent.width
-                height: 54
-                Accessible.role: Accessible.StaticText
-                Accessible.name: qsTr("%1: %2, %3 %4, %5").arg(modelData[0]).arg(modelData[1]).arg(card.beforeName).arg(modelData[2]).arg(modelData[3])
-                Column {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - values.width - 12
-                    spacing: 2
-                    Text {
-                        width: parent.width
-                        text: modelData[0]
-                        color: Theme.text2
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: Theme.bodySize
-                        elide: Text.ElideRight
-                    }
-                    Text {
-                        width: parent.width
-                        text: card.beforeName + " " + modelData[2]
-                        color: Theme.text3
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: Theme.tertiarySize
-                        elide: Text.ElideRight
-                    }
-                }
-                Row {
-                    id: values
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 12
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: modelData[1]
-                        color: Theme.text
-                        font.family: Theme.display
-                        font.pixelSize: 19
-                    }
-                    Text {
-                        width: 48
-                        anchors.verticalCenter: parent.verticalCenter
-                        horizontalAlignment: Text.AlignRight
-                        text: modelData[3]
-                        color: modelData[3].charAt(0) === "+" || modelData[3] === qsTr("new") ? Theme.zoneColors[2] : Theme.text3
-                        font.family: Theme.bodySemibold
-                        font.pixelSize: Theme.labelSize
-                    }
-                }
+                label: modelData[0]
+                sub: card.beforeName + " " + modelData[2]
+                value: modelData[1]
+                valueSize: 22
+                delta: modelData[3]
+                deltaColor: modelData[3].charAt(0) === "+" || modelData[3] === qsTr("new") ? Theme.zoneColors[2] : Theme.text3
+                line: index < card.shownRows.length - 1
             }
         }
     }

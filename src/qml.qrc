@@ -236,6 +236,30 @@
         <file>ui2/today/Coach.js</file>
         <file>ui2/today/SuggestionCard.qml</file>
         <file>ui2/today/WorkoutShape.qml</file>
+        <file>ui2/progress/Hub.js</file>
+        <file>ui2/progress/DrawIn.qml</file>
+        <file>ui2/progress/SectionHead.qml</file>
+        <file>ui2/progress/FtpTrend.qml</file>
+        <file>ui2/progress/InsightBlock.qml</file>
+        <file>ui2/progress/ConsistencyCard.qml</file>
+        <file>ui2/you/PowerPage.qml</file>
+        <file>ui2/rides/Analysis.js</file>
+        <file>ui2/rides/KeyGrid.qml</file>
+        <file>ui2/rides/LineIcon.qml</file>
+        <file>ui2/rides/PowerCurve.qml</file>
+        <file>ui2/rides/RideRow.qml</file>
+        <file>ui2/rides/WorkBlocks.qml</file>
+        <file>ui2/rides/ZoneRows.qml</file>
+        <file>ui2/goals/WeekRow.qml</file>
+        <file>ui2/goals/GoalRing.qml</file>
+        <file>ui2/goals/HabitPage.qml</file>
+        <file>ui2/goals/GoalSetup.qml</file>
+        <file>ui2/goals/PauseSheet.qml</file>
+        <file>ui2/goals/WelcomeBack.qml</file>
+        <file>ui2/moments/PrMoment.qml</file>
+        <file>ui2/moments/WeekClosed.qml</file>
+        <file>ui2/moments/Fingerprint.qml</file>
+        <file>ui2/moments/ShareSheet.qml</file>
         <file>ui2/AppShell.qml</file>
         <file>ui2/AreaChart.qml</file>
         <file>ui2/BarChart.qml</file>

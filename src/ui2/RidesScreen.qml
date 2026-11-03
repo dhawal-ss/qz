@@ -1,24 +1,64 @@
 import QtQuick 2.15
 import "."
+import "sig"
 import "calendar"
+import "rides"
 import "Format.js" as Format
+import "rides/Analysis.js" as Analysis
 
-// Every ride, newest first, grouped by month. Tapping one opens its detail: over the list on
-// phones, beside it on wide windows.
+// Every ride as a journal: the year as a grid of days at the top, then the months, newest first,
+// each under its name in display type with what it added up to, and each ride a row on a
+// hairline with its own small Pulse in the zone it counts in, its day, a tiny power line and a
+// mark for every record. On phones a tapped row grows into the ride (the row is the container
+// the ride opens from) and going back slides the ride away as a predictive back does; on wide
+// windows the ride sits beside the list and changes with a fade through.
 Item {
     id: rides
+    objectName: "ridesScreen"
 
     property var library: null
     property bool miles: false
     property bool showYou: true
     property string initial: "B"
     property int selectedId: -1
+    // the power of the rides is estimated (a bike without a power meter)
+    property bool powerEstimated: false
+    // rootItem, for the folder a shared picture is saved in
+    property var core: null
+    // the end of the page the floating navigation covers: the list and the ride scroll under it
+    property real bottomClearance: 0
 
     signal openYou()
 
     readonly property bool twoPane: width >= 760
+    // a ride covers the list (phones): the shell can hide its navigation
+    readonly property bool detailOpen: !twoPane && shownId >= 0
+
+    // the ride the detail shows: it stays while the detail slides away
+    property int shownId: -1
+    // phones: how far the ride has grown out of its row (0 to 1), and how far it has gone back
+    property real openness: 0
+    property real leave: 0
+    // where the ride grows from: the row, or a row-sized strip in the middle
+    property rect origin: Qt.rect(0, 0, 0, 0)
+    // wide windows: the fade through between two rides
+    property real paneFade: 1
+    property var allRides: []
+    property var monthTotals: ({})
 
     function open(id) {
+        if (id === selectedId)
+            return
+        origin = rowRect(id)
+        selectedId = id
+    }
+
+    // a row was tapped: the ride grows out of it
+    function openFrom(id, item) {
+        if (item) {
+            var p = item.mapToItem(rides, 0, 0)
+            origin = Qt.rect(p.x, p.y, item.width, item.height)
+        }
         selectedId = id
     }
 
@@ -30,36 +70,113 @@ Item {
         return false
     }
 
+    // the rect of the row of a ride on screen, else a row-sized strip in the middle
+    function rowRect(id) {
+        var kids = list.contentItem.children
+        for (var i = 0; i < kids.length; i++) {
+            var k = kids[i]
+            if (k.rideId === id && k.visible) {
+                var p = k.mapToItem(rides, 0, 0)
+                if (p.y + k.height > 0 && p.y < rides.height)
+                    return Qt.rect(p.x, p.y, k.width, k.height)
+            }
+        }
+        var m = Theme.margin(width)
+        return Qt.rect(m, height * 0.4, width - m * 2, 76)
+    }
+
+    onSelectedIdChanged: {
+        if (twoPane) {
+            backAnimation.stop()
+            openAnimation.stop()
+            openness = 1
+            leave = 0
+            if (selectedId < 0 || shownId < 0 || Theme.reduceMotion) {
+                paneSwap.stop()
+                shownId = selectedId
+                paneFade = 1
+                return
+            }
+            paneSwap.restart()
+            return
+        }
+        if (selectedId >= 0) {
+            backAnimation.stop()
+            shownId = selectedId
+            leave = 0
+            if (Theme.reduceMotion) {
+                openness = 1
+                return
+            }
+            openness = 0
+            openAnimation.restart()
+            return
+        }
+        if (shownId < 0)
+            return
+        openAnimation.stop()
+        if (Theme.reduceMotion) {
+            shownId = -1
+            openness = 0
+            return
+        }
+        backAnimation.restart()
+    }
+
     // the first ride of a tapped day
     function openDay(dayMs) {
         var day = Format.startOfDay(dayMs)
         for (var i = rideModel.count - 1; i >= 0; i--)
             if (Format.startOfDay(rideModel.get(i).start) === day) {
-                selectedId = rideModel.get(i).rideId
+                open(rideModel.get(i).rideId)
                 return
             }
     }
 
     function refresh() {
         rideModel.clear()
-        if (!library)
+        if (!library) {
+            allRides = []
+            monthTotals = {}
             return
+        }
         var list = library.rides(0, 5000)
+        allRides = list
+        monthTotals = Analysis.monthTotals(list)
         for (var i = 0; i < list.length; i++) {
             var r = list[i]
             rideModel.append({
                 rideId: r.id, start: r.start, month: Format.month(r.start), title: Format.title(r),
-                duration: r.duration, distance: r.distance, avgPower: r.avgPower, kj: r.kj,
-                spark: JSON.stringify(r.spark || []), records: (r.records || []).length
+                day: Format.day(r.start) + ", " + Format.time(r.start), length: Analysis.shortDuration(r.duration),
+                zone: Analysis.rideZone(r.intensity), spark: JSON.stringify(r.spark || []),
+                records: (r.records || []).length
             })
         }
         if (twoPane && selectedId < 0 && list.length > 0)
             selectedId = list[0].id
     }
 
+    function monthLine(name) {
+        var t = monthTotals[name]
+        if (!t)
+            return ""
+        var parts = [t.rides === 1 ? qsTr("1 ride") : qsTr("%1 rides").arg(t.rides), Format.hours(t.seconds)]
+        if (t.kj > 0)
+            parts.push(qsTr("%1 kJ").arg(Format.big(t.kj)))
+        return parts.join(", ")
+    }
+
     onLibraryChanged: refresh()
     Component.onCompleted: refresh()
-    onTwoPaneChanged: if (twoPane && selectedId < 0 && rideModel.count > 0) selectedId = rideModel.get(0).rideId
+    onTwoPaneChanged: {
+        if (twoPane && selectedId < 0 && rideModel.count > 0)
+            selectedId = rideModel.get(0).rideId
+        else if (twoPane) {
+            openness = 1
+            leave = 0
+            shownId = selectedId
+        }
+    }
     Connections {
         target: rides.library
         ignoreUnknownSignals: true
@@ -68,17 +185,70 @@ Item {
 
     ListModel { id: rideModel }
 
+    // phones: the ride grows out of its row on the emphasized curve, which does not overshoot
+    // (an overshoot would push the edges off the screen)
+    NumberAnimation {
+        id: openAnimation
+        target: rides
+        property: "openness"
+        to: 1
+        duration: 480
+        easing.type: Easing.Bezier
+        easing.bezierCurve: [0.2, 0, 0, 1, 1, 1]
+    }
+    // phones, going back: the ride shrinks a little and slides off to the side as it fades
+    SequentialAnimation {
+        id: backAnimation
+        NumberAnimation {
+            target: rides
+            property: "leave"
+            from: 0
+            to: 1
+            duration: 340
+            easing.type: Easing.Bezier
+            easing.bezierCurve: [0.3, 0, 0.8, 0.15, 1, 1]
+        }
+        PropertyAction { target: rides; property: "shownId"; value: -1 }
+        PropertyAction { target: rides; property: "openness"; value: 0 }
+        PropertyAction { target: rides; property: "leave"; value: 0 }
+    }
+    // wide windows: the ride beside the list fades out, changes, and fades in
+    SequentialAnimation {
+        id: paneSwap
+        NumberAnimation {
+            target: rides
+            property: "paneFade"
+            to: 0
+            duration: 90
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.effectsCurve
+        }
+        ScriptAction { script: rides.shownId = rides.selectedId }
+        NumberAnimation {
+            target: rides
+            property: "paneFade"
+            to: 1
+            duration: 210
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.effectsCurve
+        }
+    }
+
     ListView {
         id: list
         readonly property real margin: Theme.margin(rides.width)
-        visible: rides.twoPane || rides.selectedId < 0
+        readonly property real cover: rides.twoPane ? 0 : Math.min(1, rides.openness) * (1 - 0.6 * rides.leave)
+        visible: rides.twoPane || rides.shownId < 0 || cover < 1
         x: 0
         width: rides.twoPane ? Math.min(420, rides.width * 0.42) : rides.width
         height: rides.height
+        // behind a ride growing out of it, the list sinks back a little and dims
+        scale: 1 - 0.04 * cover
+        opacity: 1 - 0.75 * cover
         clip: true
         model: rideModel
         boundsBehavior: Flickable.StopAtBounds
-        bottomMargin: 24
+        bottomMargin: 24 + rides.bottomClearance
 
         // the header grows once the calendar knows its size: stay at the top until the rider scrolls
         property bool scrolled: false
@@ -110,7 +280,6 @@ Item {
                 library: rides.library
                 onDayClicked: rides.openDay(dayMs)
             }
-            Item { width: 1; height: rideModel.count > 0 ? 8 : 0 }
             Text {
                 width: parent.width
                 visible: rideModel.count === 0
@@ -125,96 +294,56 @@ Item {
             }
         }
 
+        // a month: its name in display type and what it added up to
         section.property: "month"
         section.delegate: Item {
             width: list.width
-            height: 44
+            height: 104
+            Accessible.role: Accessible.Heading
+            Accessible.name: section + ", " + rides.monthLine(section)
+            Text {
+                id: monthName
+                x: list.margin
+                y: 36
+                width: parent.width - list.margin * 2
+                text: section
+                color: Theme.text
+                font.family: Theme.display
+                font.pixelSize: 30
+                font.letterSpacing: -0.6
+                elide: Text.ElideRight
+                Accessible.ignored: true
+            }
             Text {
                 x: list.margin
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 8
-                text: section
+                anchors.top: monthName.bottom
+                anchors.topMargin: 4
+                width: parent.width - list.margin * 2
+                text: rides.monthLine(section)
                 color: Theme.text2
-                font.family: Theme.bodySemibold
-                font.pixelSize: Theme.labelSize
+                font.family: Theme.bodyMedium
+                font.pixelSize: 13
+                elide: Text.ElideRight
+                Accessible.ignored: true
             }
         }
 
-        delegate: PulseButton {
+        delegate: RideRow {
             id: row
-            x: list.margin - 8
-            width: list.width - list.margin * 2 + 16
-            height: 86
-            radius: 20
-            pressedScale: 0.98
-            fill: rides.twoPane && rides.selectedId === model.rideId ? Theme.control : (pressed ? Theme.pressed : "transparent")
-            Accessible.name: model.title + ", " + Format.day(model.start) + ", " + Format.duration(model.duration)
-            onClicked: rides.selectedId = model.rideId
-
-            contentItem: Item {
-                Column {
-                    x: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - 16 - spark.width - 12
-                    spacing: 4
-                    Row {
-                        spacing: 8
-                        width: parent.width
-                        Text {
-                            width: Math.min(implicitWidth, parent.width - (badge.visible ? badge.width + 8 : 0))
-                            text: model.title
-                            color: Theme.text
-                            font.family: Theme.bodySemibold
-                            font.pixelSize: 16
-                            elide: Text.ElideRight
-                        }
-                        Rectangle {
-                            id: badge
-                            visible: model.records > 0
-                            width: badgeText.implicitWidth + 14
-                            height: 20
-                            radius: 10
-                            color: Qt.rgba(1, 203 / 255, 82 / 255, 0.16)
-                            anchors.verticalCenter: parent.verticalCenter
-                            Text {
-                                id: badgeText
-                                anchors.centerIn: parent
-                                text: qsTr("Record")
-                                color: Theme.zoneColors[3]
-                                font.family: Theme.bodySemibold
-                                font.pixelSize: 11
-                            }
-                        }
-                    }
-                    Text {
-                        width: parent.width
-                        text: Format.day(model.start) + "  ·  " + Format.time(model.start)
-                        color: Theme.text3
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: Theme.tertiarySize
-                        elide: Text.ElideRight
-                    }
-                    Text {
-                        width: parent.width
-                        text: Format.duration(model.duration) + "   " + Format.distance(model.distance, rides.miles)
-                              + "   " + Format.whole(model.avgPower) + " W"
-                        color: Theme.text2
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: Theme.labelSize
-                        elide: Text.ElideRight
-                    }
-                }
-                Sparkline {
-                    id: spark
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(96, row.width * 0.24)
-                    height: 34
-                    values: JSON.parse(model.spark)
-                    color: Qt.rgba(201 / 255, 184 / 255, 1, 0.8)
-                }
-            }
+            readonly property int rideId: model.rideId
+            objectName: "rideRow" + index
+            x: list.margin - 10
+            width: list.width - list.margin * 2 + 20
+            height: 76
+            title: model.title
+            day: model.day
+            length: model.length
+            zone: model.zone
+            spark: JSON.parse(model.spark)
+            records: model.records
+            picked: rides.twoPane && rides.selectedId === model.rideId
+            line: ListView.nextSection === ListView.section
+            onClicked: rides.openFrom(model.rideId, row)
         }
     }
 
@@ -226,15 +355,57 @@ Item {
         color: Theme.hairline
     }
 
-    RideDetail {
-        visible: rides.selectedId >= 0
-        x: rides.twoPane ? list.width + 1 : 0
-        width: rides.width - x
-        height: rides.height
-        library: rides.library
-        rideId: rides.selectedId
-        miles: rides.miles
-        showBack: !rides.twoPane
-        onBack: rides.selectedId = -1
+    // the ride: on phones a container that grows out of the row, beside the list on wide windows
+    Item {
+        id: sheet
+        readonly property real p: rides.twoPane ? 1 : rides.openness
+        readonly property real fullX: rides.twoPane ? list.width + 1 : 0
+        visible: rides.shownId >= 0
+        x: rides.origin.x + (fullX - rides.origin.x) * p
+        y: rides.origin.y * (1 - p)
+        width: rides.origin.width + (rides.width - fullX - rides.origin.width) * p
+        height: rides.origin.height + (rides.height - rides.origin.height) * p
+        clip: !rides.twoPane && p < 1
+        // going back: a little smaller, to the side, fading
+        transform: [
+            Scale {
+                origin.x: sheet.width / 2
+                origin.y: sheet.height / 2
+                xScale: 1 - 0.1 * rides.leave
+                yScale: 1 - 0.1 * rides.leave
+            },
+            Translate { x: rides.width * 0.16 * rides.leave }
+        ]
+        // it stays solid while it shrinks and moves, and fades only at the end
+        opacity: Math.min(1, (1 - rides.leave) / 0.4) * (rides.twoPane ? rides.paneFade : 1)
+        layer.enabled: rides.leave > 0
+
+        // the row's surface becoming the page
+        Rectangle {
+            anchors.fill: parent
+            radius: rides.twoPane ? 0 : Math.max(20 * (1 - sheet.p), 28 * rides.leave)
+            color: Qt.rgba(Theme.control.r + (Theme.bg.r - Theme.control.r) * sheet.p,
+                           Theme.control.g + (Theme.bg.g - Theme.control.g) * sheet.p,
+                           Theme.control.b + (Theme.bg.b - Theme.control.b) * sheet.p, 1)
+        }
+
+        RideDetail {
+            id: rideDetail
+            x: -sheet.x + sheet.fullX
+            y: -sheet.y
+            width: rides.width - sheet.fullX
+            height: rides.height
+            // the content shows once the container has grown a good part of the way
+            opacity: rides.twoPane ? 1 : Math.max(0, Math.min(1, (sheet.p - 0.3) / 0.5))
+            library: rides.library
+            rideId: rides.shownId
+            miles: rides.miles
+            showBack: !rides.twoPane
+            powerEstimated: rides.powerEstimated
+            core: rides.core
+            rideList: rides.allRides
+            bottomClearance: rides.bottomClearance
+            onBack: rides.goBack()
+        }
     }
 }

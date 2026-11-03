@@ -1,11 +1,13 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 import "Challenge.js" as Challenge
 
 // The monthly challenge (rules in Challenge.js): a target made from the rider's own months, how
 // far this month is, and the pace. Short of the pace it says what a week needs, never "behind".
-Card {
+// A quiet section: a cap label over the words, a thin bar, no box.
+Column {
     id: challengeCard
 
     property var history: []         // Challenge.history()
@@ -14,7 +16,9 @@ Card {
     readonly property var month: history.length > 0 ? history[history.length - 1] : { key: Challenge.monthKey(nowMs), target: Challenge.starter, minutes: 0, met: false }
     readonly property var pace: Challenge.pace(month.minutes, month.target, nowMs)
     readonly property int metCount: Challenge.metMonths(history).length
-    readonly property color tint: month.met ? Theme.zoneColors[2] : Theme.accent
+    readonly property color tint: Theme.accent
+
+    spacing: 12
 
     // 23 h, 4 h 30 min, 40 min
     function hoursText(minutes) {
@@ -27,12 +31,9 @@ Card {
     Item {
         width: parent.width
         height: 24
-        Text {
+        CapLabel {
             anchors.verticalCenter: parent.verticalCenter
             text: qsTr("Monthly challenge")
-            color: Theme.text2
-            font.family: Theme.bodySemibold
-            font.pixelSize: Theme.labelSize
         }
         Text {
             anchors.right: parent.right
@@ -49,8 +50,9 @@ Card {
         width: parent.width
         text: qsTr("Ride %1 in %2").arg(challengeCard.hoursText(challengeCard.month.target)).arg(Format.monthNames[new Date(challengeCard.nowMs).getMonth()])
         color: Theme.text
-        font.family: Theme.display
-        font.pixelSize: 24
+        font.family: Theme.bodySemibold
+        font.pixelSize: 21
+        font.letterSpacing: -0.2
         wrapMode: Text.WordWrap
     }
 
@@ -70,19 +72,19 @@ Card {
         Accessible.role: Accessible.ProgressBar
         Accessible.name: qsTr("%1 of %2 this month").arg(challengeCard.hoursText(challengeCard.month.minutes)).arg(challengeCard.hoursText(challengeCard.month.target))
         Rectangle {
-            y: 2
+            y: 4
             width: parent.width
-            height: 12
-            radius: 6
+            height: 8
+            radius: 4
             color: Theme.chip
             Rectangle {
-                width: Math.max(12, parent.width * Math.min(1, challengeCard.month.minutes / Math.max(1, challengeCard.month.target)))
+                width: Math.max(8, parent.width * Math.min(1, challengeCard.month.minutes / Math.max(1, challengeCard.month.target)))
                 height: parent.height
-                radius: 6
+                radius: 4
                 color: challengeCard.tint
                 Behavior on width {
                     enabled: !Theme.reduceMotion
-                    NumberAnimation { duration: Theme.medium; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
+                    Spring { token: "default" }
                 }
             }
         }
@@ -115,7 +117,7 @@ Card {
             width: 10
             height: 10
             radius: 5
-            color: challengeCard.month.met || challengeCard.pace.onTrack ? Theme.zoneColors[2] : Theme.accent
+            color: challengeCard.month.met || challengeCard.pace.onTrack ? Theme.accent : Theme.dashed
         }
         Text {
             width: parent.width - 18

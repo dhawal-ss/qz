@@ -16,8 +16,10 @@ YouPage {
             x: 12
             width: parent.width - 24
             height: brandColumn.height + 44
-            radius: 28
+            radius: Theme.heroRadius
             color: Theme.card
+            border.width: 1
+            border.color: Theme.raisedBorder
 
             Column {
                 id: brandColumn

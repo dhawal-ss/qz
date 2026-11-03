@@ -124,6 +124,10 @@ Item {
     }
 
     // Android back: step back inside the section, then to Today, then let the app close
+    function openGoalSetup() {
+        goalsScreen.openSetup()
+    }
+
     function goBack() {
         if (tab === "rides" && rides.goBack())
             return true
@@ -186,7 +190,9 @@ Item {
         RidesScreen {
             id: rides
             width: parent.width
-            height: pages.shortHeight
+            height: parent.height
+            bottomClearance: shell.navClearance + shell.insetBottom
+            core: shell.core
             visible: shell.pageShown("rides")
             opacity: shell.pageOpacity("rides")
             scale: shell.pageScale("rides")
@@ -201,7 +207,8 @@ Item {
         ProgressScreen {
             id: progressScreen
             width: parent.width
-            height: pages.shortHeight
+            height: parent.height
+            bottomClearance: shell.navClearance + shell.insetBottom
             visible: shell.pageShown("progress")
             opacity: shell.pageOpacity("progress")
             scale: shell.pageScale("progress")
@@ -217,7 +224,9 @@ Item {
         GoalsScreen {
             id: goalsScreen
             width: parent.width
-            height: pages.shortHeight
+            height: parent.height
+            bottomClearance: shell.navClearance + shell.insetBottom
+            onRideRequested: shell.rideRequested()
             visible: shell.pageShown("goals")
             opacity: shell.pageOpacity("goals")
             scale: shell.pageScale("goals")
@@ -232,7 +241,7 @@ Item {
         Loader {
             id: youLoader
             width: parent.width
-            height: pages.shortHeight
+            height: parent.height
             visible: shell.pageShown("you")
             opacity: shell.pageOpacity("you")
             scale: shell.pageScale("you")
@@ -243,6 +252,7 @@ Item {
             onLoaded: {
                 item.core = Qt.binding(function () { return shell.core })
                 item.metrics = Qt.binding(function () { return shell.metrics })
+                item.bottomClearance = Qt.binding(function () { return shell.navClearance + shell.insetBottom })
             }
         }
         Connections {
@@ -271,6 +281,12 @@ Item {
                       : shell.height - shell.insetBottom - shell.navLift - height
         width: implicitWidth
         height: implicitHeight
+        // the ride analysis takes the whole phone screen, as on the board; the nav steps aside
+        readonly property bool stepAside: (!shell.rail && shell.tab === "rides" && rides.detailOpen)
+                                          || (shell.tab === "goals" && goalsScreen.covering)
+        opacity: stepAside ? 0 : 1
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Theme.reduceMotion ? 0 : Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve } }
         onPicked: shell.tab = name
         onRideRequested: shell.rideRequested()
     }

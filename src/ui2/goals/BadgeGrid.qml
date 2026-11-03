@@ -1,11 +1,12 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 import "Badges.js" as Badges
 
 // Badges: the earned ones newest first, then the few closest to being earned, and every other
-// one behind See all. A tap opens the badge.
-Card {
+// one behind See all. A tap opens the badge. A quiet section: a cap label, no box.
+Column {
     id: badgeCard
 
     property var badges: []          // Badges.evaluate()
@@ -17,8 +18,10 @@ Card {
 
     readonly property var earnedList: Badges.earned(badges)
     readonly property var lockedList: Badges.next(badges, showAll ? badges.length : 3)
-    readonly property int columns: Math.max(3, Math.floor((width - padding * 2 + 8) / 100))
-    readonly property real cellWidth: (width - padding * 2 - 8 * (columns - 1)) / columns
+    readonly property int columns: Math.max(3, Math.floor((width + 8) / 100))
+    readonly property real cellWidth: (width - 8 * (columns - 1)) / columns
+
+    spacing: 12
 
     function subtitle(b) {
         if (b.earned)
@@ -29,12 +32,9 @@ Card {
     Item {
         width: parent.width
         height: 24
-        Text {
+        CapLabel {
             anchors.verticalCenter: parent.verticalCenter
             text: qsTr("Badges")
-            color: Theme.text2
-            font.family: Theme.bodySemibold
-            font.pixelSize: Theme.labelSize
         }
         Text {
             anchors.right: parent.right
@@ -64,13 +64,10 @@ Card {
             visible: sectionList.length > 0
             width: parent.width
             spacing: 8
-            Text {
+            CapLabel {
                 visible: modelData.title !== ""
-                topPadding: 4
+                topPadding: 8
                 text: modelData.title
-                color: Theme.text3
-                font.family: Theme.bodyMedium
-                font.pixelSize: Theme.tertiarySize
             }
             Grid {
                 columns: badgeCard.columns
@@ -132,12 +129,10 @@ Card {
 
     PulseButton {
         visible: badgeCard.badges.length > badgeCard.earnedList.length + 3
-        width: allLabel.implicitWidth + 32
-        height: 48
-        topInset: 4
-        bottomInset: 4
-        radius: 20
-        fill: pressed ? Theme.pressed : Theme.chip
+        x: -12
+        width: allLabel.implicitWidth + 24
+        height: 44
+        fill: pressed ? Theme.pressed : "transparent"
         Accessible.name: allLabel.text
         onClicked: badgeCard.showAll = !badgeCard.showAll
         contentItem: Text {
@@ -145,7 +140,7 @@ Card {
             text: badgeCard.showAll ? qsTr("Show fewer") : qsTr("See all %1 badges").arg(badgeCard.badges.length)
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: Theme.labelSize
+            font.pixelSize: 14
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

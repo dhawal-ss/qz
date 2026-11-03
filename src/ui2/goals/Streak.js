@@ -11,8 +11,9 @@
 //   - A missed week spends a banked freeze when there is a streak to save: the streak goes on
 //     without the week adding to it. With no freeze the streak ends and the count to the next
 //     freeze starts again; freezes already earned stay banked.
-//   - A week the rider marked as rest, sick or injured pauses everything: no freeze is spent,
-//     the streak neither grows nor ends. A marked week that still meets the goal counts as met.
+//   - A week the rider marked as rest, sick, injured, travel or other (the Pause goals sheet)
+//     pauses everything: no freeze is spent, the streak neither grows nor ends. A marked week
+//     that still meets the goal counts as met.
 //   - The week in progress never spends a freeze or ends the streak; it counts once it is met.
 //   - Weeks before the first ride are not missed, they had not started yet.
 
@@ -31,7 +32,7 @@ var choices = {
 }
 // distance goals for riders who see miles, stored in km
 var mileChoices = [15, 30, 50, 75, 100, 125]
-var reasons = ["rest", "sick", "injured"]
+var reasons = ["rest", "sick", "injured", "travel", "other"]
 
 function noon(ms) {
     var d = new Date(ms)
@@ -74,13 +75,14 @@ function perWeek(days) {
         var key = weekKey(days[i].day)
         var w = weeks[key]
         if (!w) {
-            w = { seconds: 0, kj: 0, km: 0, rides: 0, lastDay: 0 }
+            w = { seconds: 0, kj: 0, km: 0, rides: 0, tss: 0, lastDay: 0 }
             weeks[key] = w
         }
         w.seconds += days[i].seconds || 0
         w.kj += days[i].kj || 0
         w.km += days[i].distance || 0
         w.rides += days[i].rides || 0
+        w.tss += days[i].tss || 0
         w.lastDay = Math.max(w.lastDay, days[i].day)
     }
     return weeks
@@ -221,4 +223,73 @@ function mark(rest, reasonsMap, key, reason) {
     }
     list.sort(function (a, b) { return a - b })
     return { rest: list, reasons: map }
+}
+
+// ---- the pause of the Pause goals sheet, stored as the ui2 setting goalsPause:
+// { from: week key it started, until: week key of the Monday the rider expects to be back, or 0
+// while open, reason }. Every week from `from` up to the week before `until` (while open: up to
+// the week holding now) is a rest week, written into restWeeks so every screen sees it.
+
+function parsePause(text) {
+    var v = parseMap(text)
+    return v.from ? v : null
+}
+
+// paused right now: started, and the week of return not reached yet
+function pausedNow(pause, now) {
+    return pause !== null && pause !== undefined && Number(pause.from) > 0
+           && (!(Number(pause.until) > 0) || weekKey(now) < Number(pause.until))
+}
+
+// the week keys a pause covers so far, oldest first (at most a year)
+function pauseKeys(pause, now) {
+    var out = []
+    if (!pause || !(Number(pause.from) > 0))
+        return out
+    var last = Number(pause.until) > 0 ? addWeeks(keyDay(pause.until), -1) : mondayOf(now)
+    var monday = mondayOf(keyDay(pause.from))
+    for (var n = 0; n < 53 && monday <= last; n++) {
+        out.push(dayKey(monday))
+        monday = addWeeks(monday, 1)
+    }
+    return out
+}
+
+// the stored rest weeks with every week of the pause marked; a week already marked keeps its reason
+function withPause(rest, reasonsMap, pause, now) {
+    var out = { rest: rest.slice(), reasons: {} }
+    for (var k in reasonsMap)
+        out.reasons[k] = reasonsMap[k]
+    var keys = pauseKeys(pause, now)
+    for (var i = 0; i < keys.length; i++) {
+        var have = false
+        for (var j = 0; j < out.rest.length; j++)
+            if (Number(out.rest[j]) === keys[i])
+                have = true
+        if (have)
+            continue
+        out.rest.push(keys[i])
+        out.reasons[String(keys[i])] = reasons.indexOf(pause.reason) >= 0 ? pause.reason : "rest"
+    }
+    out.rest.sort(function (a, b) { return a - b })
+    return out
+}
+
+// back early: the weeks after this one that the pause marked ahead are free again; this week
+// stays a rest week (it still counts as met if the goal is met)
+function endPause(rest, reasonsMap, pause, now) {
+    var thisWeek = weekKey(now)
+    var ahead = {}
+    var marked = pauseKeys(pause, addWeeks(now, 60))
+    for (var i = 0; i < marked.length; i++)
+        if (marked[i] > thisWeek)
+            ahead[marked[i]] = true
+    var out = { rest: [], reasons: {} }
+    for (var j = 0; j < rest.length; j++)
+        if (!ahead[Number(rest[j])])
+            out.rest.push(Number(rest[j]))
+    for (var k in reasonsMap)
+        if (!ahead[Number(k)])
+            out.reasons[k] = reasonsMap[k]
+    return out
 }

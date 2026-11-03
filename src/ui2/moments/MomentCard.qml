@@ -1,9 +1,11 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 
-// One more moment of the ride under the hero: its Pulse, the number and what it means.
-// A card that arrives slides in after `delay` ms, so late records land one by one.
-Rectangle {
+// One more moment of the ride under the hero, as a quiet row on a hairline: its small Pulse, what
+// it is and what it means on the left, the number on the right. A row that arrives rises in
+// after `delay` ms on the default spring, so late records land one by one.
+Item {
     id: card
 
     property string title: ""
@@ -13,80 +15,55 @@ Rectangle {
     property int tone: 1
     property bool arrive: false
     property int delay: 0
+    property bool line: true
 
     readonly property color tint: Theme.zoneColors[tone - 1]
 
-    implicitHeight: Math.max(80, words.height + 36)
-    radius: 24
-    color: Theme.card
-    border.width: 1
-    border.color: Qt.rgba(tint.r, tint.g, tint.b, 0.18)
-    transform: Translate { id: slide }
+    implicitHeight: Math.max(64, Math.max(words.height, number.height) + 28)
+    Accessible.role: Accessible.StaticText
+    Accessible.name: title + ", " + value + (unit !== "" ? " " + unit : "") + (detail !== "" ? ". " + detail : "")
+
+    property real progress: 1
+    opacity: Math.max(0, Math.min(1, progress))
+    transform: Translate { y: (1 - card.progress) * Theme.riseDistance * 2 }
 
     Component.onCompleted: {
-        if (arrive && !Theme.reduceMotion) {
-            opacity = 0
+        if (arrive && !Theme.reduceMotion)
             enter.start()
-        }
     }
 
     SequentialAnimation {
         id: enter
+        PropertyAction { target: card; property: "progress"; value: 0 }
         PauseAnimation { duration: card.delay }
-        ParallelAnimation {
-            NumberAnimation { target: card; property: "opacity"; from: 0; to: 1; duration: Theme.medium }
-            NumberAnimation {
-                target: slide; property: "y"; from: 28; to: 0; duration: Theme.slow
-                easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve
-            }
-            NumberAnimation {
-                target: card; property: "scale"; from: 0.94; to: 1; duration: Theme.slow
-                easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve
-            }
+        NumberAnimation {
+            target: card; property: "progress"; to: 1; duration: Theme.riseTime
+            easing.type: Easing.Bezier; easing.bezierCurve: Theme.defaultSpatialCurve
         }
     }
 
-    PulseShape {
+    Pulse {
         id: mark
-        x: 16
-        y: 20
-        width: 40
-        height: 40
+        anchors.verticalCenter: parent.verticalCenter
+        width: 28
+        height: 28
         zone: card.tone
         color: card.tint
     }
 
-    // the number first, then what it means
     Column {
         id: words
-        x: 72
-        width: card.width - x - 20
+        x: 44
+        width: card.width - x - number.width - 16
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 4
-        Row {
-            spacing: 5
-            Numeral {
-                id: number
-                text: card.value
-                color: Theme.zoneLight[card.tone - 1]
-                font.pixelSize: 28
-            }
-            Text {
-                text: card.unit
-                color: Theme.text3
-                font.family: Theme.bodyMedium
-                font.pixelSize: Theme.tertiarySize
-                anchors.baseline: number.baseline
-                visible: text !== ""
-            }
-        }
-        Item { width: 1; height: 2 }
+        spacing: 3
+        Accessible.ignored: true
         Text {
             width: parent.width
             text: card.title
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: Theme.bodySize
+            font.pixelSize: 15
             wrapMode: Text.WordWrap
         }
         Text {
@@ -94,9 +71,39 @@ Rectangle {
             text: card.detail
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: Theme.labelSize
+            font.pixelSize: 13
+            lineHeightMode: Text.FixedHeight
+            lineHeight: 18
             wrapMode: Text.WordWrap
             visible: text !== ""
         }
+    }
+
+    Row {
+        id: number
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 4
+        Accessible.ignored: true
+        Numeral {
+            id: big
+            text: card.value
+            color: Theme.text
+            font.pixelSize: 24
+        }
+        Text {
+            text: card.unit
+            color: Theme.text2
+            font.family: Theme.bodyMedium
+            font.pixelSize: 13
+            anchors.baseline: big.baseline
+            visible: text !== ""
+        }
+    }
+
+    Hairline {
+        visible: card.line
+        anchors.bottom: parent.bottom
+        width: parent.width
     }
 }

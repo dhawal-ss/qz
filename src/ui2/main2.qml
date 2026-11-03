@@ -155,7 +155,6 @@ ApplicationWindow {
         metrics: window.metricsObject
         core: window.core
         home: home
-        onConnectedChanged: if (connected && window.mode === "launcher") window.mode = "ride"
     }
 
     RideSim {
@@ -173,6 +172,8 @@ ApplicationWindow {
 
     function openDemo() {
         demoRide.restart()
+        // stopped, so the ride screen shows Start ride and its 3, 2, 1 countdown
+        demoRide.stop()
         mode = "demo"
     }
 
@@ -308,6 +309,11 @@ ApplicationWindow {
                 onOpenRide: {
                     window.mode = "home"
                     shell.openRide(id)
+                }
+                onPlanWeek: {
+                    window.mode = "home"
+                    shell.tab = "goals"
+                    shell.openGoalSetup()
                 }
             }
         }

@@ -1,10 +1,12 @@
 import QtQuick 2.15
 import ".."
+import "../sig"
 import "../Format.js" as Format
 
 // Lifetime ladders for distance and work: the total, the next rung and a bar of every rung.
 // The rungs are the ones of Moments.js, so a rung crossed on a ride is a moment there.
-Card {
+// A quiet section: a cap label, then each ladder over a hairline.
+Column {
     id: laddersCard
 
     property var lifetime: ({})      // library.totals(0, 0)
@@ -22,11 +24,8 @@ Card {
 
     spacing: 20
 
-    Text {
+    CapLabel {
         text: qsTr("Ladders")
-        color: Theme.text2
-        font.family: Theme.bodySemibold
-        font.pixelSize: Theme.labelSize
     }
 
     Repeater {
@@ -49,18 +48,23 @@ Card {
             function amount(v) {
                 return modelData.kind === "km" ? Format.distance(v, laddersCard.miles) : Format.big(v) + " kJ"
             }
-            Text {
-                text: modelData.name
-                color: Theme.text3
-                font.family: Theme.bodyMedium
-                font.pixelSize: Theme.tertiarySize
-            }
-            Text {
+            Item {
                 width: parent.width
-                text: ladder.amount(ladder.value)
-                color: Theme.text
-                font.family: Theme.display
-                font.pixelSize: 32
+                height: ladderAmount.height
+                Text {
+                    anchors.baseline: ladderAmount.baseline
+                    text: modelData.name
+                    color: Theme.text
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: 15
+                }
+                Numeral {
+                    id: ladderAmount
+                    anchors.right: parent.right
+                    text: ladder.amount(ladder.value)
+                    color: Theme.text
+                    font.pixelSize: 26
+                }
             }
             Text {
                 width: parent.width
@@ -80,8 +84,8 @@ Card {
                     model: ladder.rungs
                     Rectangle {
                         width: (ladder.width - 4 * (ladder.rungs.length - 1)) / ladder.rungs.length
-                        height: 10
-                        radius: 5
+                        height: 6
+                        radius: 3
                         color: modelData <= ladder.value ? Theme.accent : Theme.chip
                     }
                 }

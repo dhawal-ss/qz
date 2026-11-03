@@ -1,9 +1,12 @@
 import QtQuick 2.15
 import Qt.labs.settings 1.0
 import ".."
+import "../sig"
 
-// You: the profile and the settings Bikemodo needs, the bike, heart rate, body, zones, units,
-// connections, the rides on disk and the credits. The list of sections and the open page side
+// You: the profile and the settings Bikemodo needs, the bike, heart rate, power, body, zones,
+// units, connections, the rides on disk and the credits. The profile leads as a hero (the initial
+// in the Pulse, the name, FTP and max heart rate), the sections follow as hairline rows under cap
+// labels. The list of sections and the open page side
 // by side on wide windows, one after the other on phones.
 // The values are QZ's own settings (the same keys as settings.qml), read and written here.
 Item {
@@ -20,6 +23,9 @@ Item {
     // the shell forwards it to refresh_bluetooth_devices_clicked() of the window
     signal refreshDevicesRequested()
 
+    // the end of the page the floating navigation covers: the content scrolls under it
+    property real bottomClearance: 0
+
     // the open page, "" for the list on a phone
     property string section: ""
     property bool restartNeeded: false
@@ -35,6 +41,8 @@ Item {
     readonly property bool connected: metrics !== null && metrics.connected === true
     readonly property string deviceName: metrics !== null && metrics.deviceName ? metrics.deviceName : ""
     readonly property real heartRate: metrics !== null && metrics.heartRate ? metrics.heartRate : 0
+    // watts are an estimate unless a connected bike says it measures them
+    readonly property bool powerEstimated: !(connected && metrics.powerEstimated === false)
     readonly property bool lbs: qzStore.miles_unit && !qzStore.weight_kg_unit
     readonly property int maxHeartRate: Math.round(qzStore.heart_max_override_enable ? qzStore.heart_max_override_value : 220 - qzStore.age)
     readonly property string nickname: qzStore.user_nickname.trim()
@@ -53,15 +61,21 @@ Item {
         return names
     }
 
+    readonly property var groups: [
+        { id: "ride", title: qsTr("What you ride with") },
+        { id: "you", title: qsTr("Your numbers") },
+        { id: "app", title: qsTr("The app") }
+    ]
     readonly property var sections: [
-        { id: "bike", title: qsTr("Bike and sensors"), icon: "bike" },
-        { id: "heart", title: qsTr("Heart rate"), icon: "heart" },
-        { id: "body", title: qsTr("Body and FTP"), icon: "body" },
-        { id: "zones", title: qsTr("Zones"), icon: "zones" },
-        { id: "units", title: qsTr("Units and display"), icon: "units" },
-        { id: "connections", title: qsTr("Connections"), icon: "link" },
-        { id: "data", title: qsTr("Your data"), icon: "data" },
-        { id: "about", title: qsTr("About"), icon: "info" }
+        { id: "bike", title: qsTr("Bike and sensors"), icon: "bike", group: "ride" },
+        { id: "heart", title: qsTr("Heart rate"), icon: "heart", group: "ride" },
+        { id: "power", title: qsTr("Power"), icon: "bolt", group: "ride" },
+        { id: "body", title: qsTr("Body and FTP"), icon: "body", group: "you" },
+        { id: "zones", title: qsTr("Zones"), icon: "zones", group: "you" },
+        { id: "units", title: qsTr("Units and display"), icon: "units", group: "app" },
+        { id: "connections", title: qsTr("Connections"), icon: "link", group: "app" },
+        { id: "data", title: qsTr("Your data"), icon: "data", group: "app" },
+        { id: "about", title: qsTr("About"), icon: "info", group: "app" }
     ]
 
     // the settings of QZ, same names, types and defaults as in settings.qml
@@ -110,8 +124,11 @@ Item {
         section = id
     }
 
-    // Android back: from a page to the list on a phone; true when it went back
+    // Android back: a page in steps goes a step back, else from a page to the list on a phone;
+    // true when it went back
     function goBack() {
+        if (pageLoader.item !== null && typeof pageLoader.item.goBack === "function" && pageLoader.item.goBack())
+            return true
         if (!wide && section !== "") {
             screen.forceActiveFocus()
             section = ""
@@ -154,6 +171,8 @@ Item {
         }
         if (id === "heart")
             return qzStore.heart_rate_belt_name === "Disabled" ? qsTr("From the bike") : qzStore.heart_rate_belt_name
+        if (id === "power")
+            return powerEstimated ? qsTr("Estimated from level and cadence") : qsTr("Measured by the bike")
         if (id === "body")
             return qsTr("FTP %1 W, %2").arg(Math.round(qzStore.ftp)).arg(weightText(qzStore.weight))
         if (id === "zones")
@@ -186,7 +205,8 @@ Item {
         color: Theme.bg
     }
 
-    // the list of sections, under the profile
+    // the profile hero and the sections, grouped under cap labels on hairlines; nothing here is a
+    // raised surface, so the open page beside it on a tablet may have its one
     Item {
         id: listPane
         width: screen.wide ? 340 : screen.width
@@ -194,127 +214,144 @@ Item {
         visible: screen.wide || screen.section === ""
         clip: true
 
-        onVisibleChanged: if (visible && !screen.wide && !Theme.reduceMotion) listEnter.start()
-        NumberAnimation {
-            id: listEnter
-            target: listFlick
-            property: "opacity"
-            from: 0
-            to: 1
-            duration: Theme.fast
-            easing.type: Easing.Bezier
-            easing.bezierCurve: Theme.effectsCurve
-        }
-
-        Glow {
-            x: -180
-            y: -220
-            width: 520
-            height: 520
-            tint: Theme.accent
-            opacity: 0.16
-        }
+        signal entered()
+        onVisibleChanged: if (visible && !screen.wide) entered()
 
         Flickable {
             id: listFlick
             anchors.fill: parent
-            contentHeight: listColumn.y + listColumn.height + 32 + (screen.restartNeeded ? 140 : 0)
+            contentHeight: listColumn.y + listColumn.height + 32 + screen.bottomClearance + (screen.restartNeeded ? 140 : 0)
             boundsBehavior: Flickable.StopAtBounds
 
             Column {
                 id: listColumn
                 x: (listPane.width - width) / 2
-                y: 28
+                y: 24
                 width: Math.min(720, listPane.width - 2 * (screen.margin - 12))
 
-                Text {
+                // the profile: the initial in the Pulse, the name, and the two numbers zones
+                // come from; a tap opens Body and FTP
+                Rise {
+                    cue: listPane
+                    order: 0
                     width: parent.width
-                    leftPadding: 12
-                    rightPadding: 12
-                    text: qsTr("You")
-                    color: Theme.text
-                    font.family: Theme.display
-                    font.pixelSize: 34
-                    wrapMode: Text.WordWrap
-                    Accessible.role: Accessible.Heading
-                    Accessible.name: text
-                }
+                    PulseButton {
+                        id: profile
+                        width: parent.width
+                        height: 112
+                        radius: 28
+                        pressedScale: 0.98
+                        fill: pressed ? Theme.control : Qt.rgba(0, 0, 0, 0)
+                        Accessible.name: (screen.nickname !== "" ? screen.nickname : qsTr("Add your name")) + ", " + qsTr("edit your profile")
+                        onClicked: screen.open("body")
 
-                Item {
-                    width: 1
-                    height: 16
-                }
-
-                // the profile: a tap opens Body and FTP
-                PulseButton {
-                    x: 12
-                    width: parent.width - 24
-                    height: Math.max(96, profileText.implicitHeight + 40)
-                    radius: 28
-                    pressedRadius: 20
-                    fill: Theme.card
-                    Accessible.name: (screen.nickname !== "" ? screen.nickname : qsTr("Add your name")) + ", " + qsTr("edit your profile")
-                    onClicked: screen.open("body")
-
-                    contentItem: Item {
-                        PulseShape {
+                        HeroGlow {
+                            width: 300
+                            height: 300
+                            x: avatar.x + avatar.width / 2 - width / 2
+                            y: avatar.y + avatar.height / 2 - height / 2
+                            tint: Theme.accent
+                            low: 0.16
+                            high: 0.26
+                        }
+                        Item {
                             id: avatar
-                            x: 18
-                            width: 60
-                            height: 60
+                            x: 12
+                            width: 88
+                            height: 88
                             anchors.verticalCenter: parent.verticalCenter
-                            zone: 2
-                            color: Theme.accent
+                            Pulse {
+                                anchors.fill: parent
+                                zone: 3
+                                color: Theme.accent
+                                turning: true
+                            }
                             Text {
                                 anchors.centerIn: parent
                                 text: screen.initial
                                 color: Theme.accentInk
                                 font.family: Theme.display
-                                font.pixelSize: 26
+                                font.pixelSize: 34
                             }
                         }
                         Column {
-                            id: profileText
-                            x: avatar.x + avatar.width + 16
-                            width: parent.width - x - 18
+                            x: avatar.x + avatar.width + 18
+                            width: parent.width - x - 40
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 4
+                            spacing: 6
                             Text {
                                 width: parent.width
                                 text: screen.nickname !== "" ? screen.nickname : qsTr("Add your name")
                                 color: screen.nickname !== "" ? Theme.text : Theme.text2
                                 font.family: Theme.display
-                                font.pixelSize: 24
+                                font.pixelSize: 28
                                 elide: Text.ElideRight
                             }
                             Text {
                                 width: parent.width
-                                text: qsTr("FTP %1 W, max heart rate %2 bpm").arg(Math.round(qzStore.ftp)).arg(screen.maxHeartRate)
-                                color: Theme.text3
+                                text: qsTr("Edit your profile")
+                                color: Theme.text2
                                 font.family: Theme.bodyMedium
                                 font.pixelSize: Theme.labelSize
-                                wrapMode: Text.WordWrap
+                                elide: Text.ElideRight
                             }
+                        }
+                        YouIcon {
+                            x: parent.width - width - 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            name: "next"
+                            size: 20
+                            weight: 1.8
+                            color: Theme.text3
                         }
                     }
                 }
 
-                Item {
-                    width: 1
-                    height: 12
+                Rise {
+                    cue: listPane
+                    order: 1
+                    width: parent.width
+                    KeyNumbers {
+                        x: 12
+                        width: parent.width - 24
+                        columns: 2
+                        valueSize: 30
+                        items: [
+                            { value: String(Math.round(screen.qz.ftp)), unit: qsTr("W"), label: qsTr("FTP"), estimated: screen.powerEstimated },
+                            { value: String(screen.maxHeartRate), unit: qsTr("bpm"), label: qsTr("Max heart rate") }
+                        ]
+                    }
                 }
 
                 Repeater {
-                    model: screen.sections
-                    delegate: YouRow {
-                        title: modelData.title
-                        detail: screen.summary(modelData.id)
-                        glyph: modelData.icon
-                        iconColor: modelData.id === "heart" ? Theme.zoneColors[5] : Theme.accent
-                        highlighted: screen.wide && screen.shown === modelData.id
-                        trailing: screen.wide ? "" : "next"
-                        hairline: index < screen.sections.length - 1
-                        onClicked: screen.open(modelData.id)
+                    model: screen.groups
+                    delegate: Rise {
+                        id: group
+                        readonly property string groupId: modelData.id
+                        readonly property var members: screen.sections.filter(function (s) { return s.group === group.groupId })
+                        cue: listPane
+                        order: index + 2
+                        width: listColumn.width
+                        Column {
+                            width: parent.width
+                            YouText {
+                                kind: "heading"
+                                text: modelData.title
+                            }
+                            Repeater {
+                                model: group.members
+                                delegate: YouRow {
+                                    title: modelData.title
+                                    detail: screen.summary(modelData.id)
+                                    glyph: modelData.icon
+                                    iconColor: modelData.id === "heart" ? Theme.zoneColors[5] : Theme.accent
+                                    highlighted: screen.wide && screen.shown === modelData.id
+                                    trailing: screen.wide ? "" : "next"
+                                    hairline: index < group.members.length - 1
+                                    onClicked: screen.open(modelData.id)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -337,6 +374,7 @@ Item {
         visible: screen.shown !== ""
         sourceComponent: screen.shown === "bike" ? bikePage
                          : screen.shown === "heart" ? heartPage
+                         : screen.shown === "power" ? powerPage
                          : screen.shown === "body" ? bodyPage
                          : screen.shown === "zones" ? zonesPage
                          : screen.shown === "units" ? unitsPage
@@ -347,6 +385,7 @@ Item {
 
     Component { id: bikePage; BikePage { you: screen } }
     Component { id: heartPage; HeartPage { you: screen } }
+    Component { id: powerPage; PowerPage { you: screen } }
     Component { id: bodyPage; BodyPage { you: screen } }
     Component { id: zonesPage; ZonesPage { you: screen } }
     Component { id: unitsPage; UnitsPage { you: screen } }
@@ -360,7 +399,7 @@ Item {
         height: restartRow.height + 24
         // under the page, the list stays clear on a wide window
         x: pageLoader.x + (pageLoader.width - width) / 2
-        y: screen.restartNeeded ? screen.height - height - 16 : screen.height + 8
+        y: screen.restartNeeded ? screen.height - height - 16 - screen.bottomClearance : screen.height + 8
         visible: screen.restartNeeded
         radius: 28
         color: Theme.floating

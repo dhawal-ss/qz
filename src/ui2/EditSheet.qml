@@ -1,9 +1,12 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import "."
+import "sig"
 import "Metrics.js" as Metrics
 
 // The side sheet that swaps, restyles or removes one metric while the ride keeps recording.
+// It slides in on the default spatial spring; a picked metric lights up for a moment before the
+// sheet slides away and the metric rolls into its row.
 Item {
     id: sheet
 
@@ -11,7 +14,10 @@ Item {
     property var slots: []
     property int slot: -1
     readonly property bool open: slot >= 0
-    readonly property var current: open ? slots[slot] : null
+    // the slot the sheet shows: it keeps the last one while sliding away
+    property int shownSlot: -1
+    onSlotChanged: if (slot >= 0) shownSlot = slot
+    readonly property var current: shownSlot >= 0 && shownSlot < slots.length ? slots[shownSlot] : null
     readonly property bool currentEmpty: current !== null && current.m === "empty"
 
     signal pickStyle(string style)
@@ -19,12 +25,38 @@ Item {
     signal removeSlot()
     signal close()
 
+    // the metric just picked, lit while the sheet hands it over
+    property string picking: ""
+    onOpenChanged: picking = ""
+
+    function pick(id) {
+        if (!open || picking !== "")
+            return
+        if (Theme.reduceMotion) {
+            pickMetric(id)
+            return
+        }
+        picking = id
+        pickTimer.restart()
+    }
+
+    Timer {
+        id: pickTimer
+        interval: 160
+        onTriggered: {
+            var id = sheet.picking
+            sheet.picking = ""
+            if (id !== "")
+                sheet.pickMetric(id)
+        }
+    }
+
     visible: open || panel.x < width
     Accessible.ignored: !open
 
     function slotOf(id) {
         for (var k = 0; k < slots.length; k++) {
-            if (k !== slot && slots[k].m === id)
+            if (k !== shownSlot && slots[k].m === id)
                 return k
         }
         return -1
@@ -40,6 +72,16 @@ Item {
         onClicked: sheet.close()
     }
 
+    // the sheet floats over the ride
+    Shadow {
+        x: panel.x
+        width: panel.width
+        height: panel.height
+        radius: 32
+        offset: 0
+        visible: panel.x < sheet.width
+    }
+
     Rectangle {
         id: panel
         width: Math.min(384, sheet.width)
@@ -50,7 +92,7 @@ Item {
 
         Behavior on x {
             enabled: !Theme.reduceMotion
-            NumberAnimation { duration: 450; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
+            Spring { token: "default" }
         }
 
         // square the right edge, the sheet runs off the screen there
@@ -80,7 +122,7 @@ Item {
                     Text {
                         width: parent.width
                         elide: Text.ElideRight
-                        text: !sheet.open ? "" : (sheet.slot === 0 ? qsTr("Main number")
+                        text: sheet.current === null ? "" : (sheet.shownSlot === 0 ? qsTr("Main number")
                               : (sheet.currentEmpty ? qsTr("Add a metric") : Metrics.info(sheet.current.m, sheet.source).label))
                         color: Theme.text
                         font.family: Theme.display
@@ -115,7 +157,7 @@ Item {
 
             // connected button group: number, trend, bar
             Row {
-                visible: sheet.open && sheet.slot > 0 && !sheet.currentEmpty
+                visible: sheet.current !== null && sheet.shownSlot > 0 && !sheet.currentEmpty
                 width: parent.width
                 spacing: 3
                 Repeater {
@@ -128,7 +170,7 @@ Item {
                         fill: on ? Theme.accent : Theme.pressed
                         Accessible.name: qsTr("Show as %1").arg(modelData[1])
                         Accessible.checked: on
-                        onClicked: sheet.pickStyle(modelData[0])
+                        onClicked: if (sheet.open) sheet.pickStyle(modelData[0])
                         contentItem: Text {
                             text: modelData[1]
                             color: parent.on ? Theme.accentInk : Theme.text
@@ -142,7 +184,7 @@ Item {
             }
 
             Text {
-                text: sheet.slot === 0 ? qsTr("Show instead") : (sheet.currentEmpty ? qsTr("Choose a metric") : qsTr("Swap for"))
+                text: sheet.shownSlot === 0 ? qsTr("Show instead") : (sheet.currentEmpty ? qsTr("Choose a metric") : qsTr("Swap for"))
                 color: Theme.text2
                 font.family: Theme.bodyMedium
                 font.pixelSize: Theme.labelSize
@@ -156,17 +198,18 @@ Item {
             anchors { top: head.bottom; topMargin: 4; bottom: removeButton.visible ? removeButton.top : parent.bottom; bottomMargin: 12 }
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            model: sheet.open ? Metrics.order.filter(function (id) { return id !== sheet.current.m }) : []
+            model: sheet.current !== null ? Metrics.order.filter(function (id) { return id !== sheet.current.m }) : []
             Accessible.name: qsTr("Metrics")
             delegate: PulseButton {
                 readonly property var info: Metrics.info(modelData, sheet.source)
                 readonly property int where: sheet.slotOf(modelData)
                 width: options.width
                 height: 54
-                radius: 12
+                radius: 18
                 pressedScale: 0.98
+                fill: sheet.picking === modelData ? Qt.rgba(42 / 255, 36 / 255, 64 / 255, 1) : (pressed ? Theme.pressed : "transparent")
                 Accessible.name: (sheet.currentEmpty ? qsTr("Add %1") : qsTr("Show %1")).arg(info.label)
-                onClicked: sheet.pickMetric(modelData)
+                onClicked: sheet.pick(modelData)
                 Rectangle {
                     anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 6; rightMargin: 6 }
                     height: 1
@@ -201,14 +244,14 @@ Item {
 
         PulseButton {
             id: removeButton
-            visible: sheet.open && sheet.slot > 0 && !sheet.currentEmpty
+            visible: sheet.current !== null && sheet.shownSlot > 0 && !sheet.currentEmpty
             x: 20
             width: panel.width - 40
             height: 46
             anchors { bottom: parent.bottom; bottomMargin: 16 }
             fill: Theme.pressed
             Accessible.name: qsTr("Remove, keep the space")
-            onClicked: sheet.removeSlot()
+            onClicked: if (sheet.open) sheet.removeSlot()
             contentItem: Text {
                 text: qsTr("Remove, keep the space")
                 color: Theme.danger

@@ -81,7 +81,7 @@ Item {
                 radius: width / 2
                 color: index === chart.steps.length - 1 ? Theme.accent : Theme.text2
                 border.width: 2
-                border.color: Theme.card
+                border.color: Theme.bg
             }
         }
     }
