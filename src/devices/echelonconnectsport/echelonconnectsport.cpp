@@ -879,15 +879,19 @@ bool echelonconnectsport::connected() {
 }
 
 uint16_t echelonconnectsport::watts() {
+    QSettings settings;
+    // without a power sensor the watts come from the resistance table, also before the first pedal stroke
+    const bool fromTable = settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
+                               .toString()
+                               .startsWith(QStringLiteral("Disabled"));
+    m_powerEstimated = fromTable;
+
     if (currentCadence().value() == 0) {
         return 0;
     }
 
-    QSettings settings;
     // If power sensor/pedal is enabled, use the actual power value from the external sensor
-    if (!settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
-            .toString()
-            .startsWith(QStringLiteral("Disabled"))) {
+    if (!fromTable) {
         return m_watt.value();
     }
 

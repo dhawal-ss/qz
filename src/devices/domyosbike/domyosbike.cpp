@@ -925,6 +925,7 @@ uint16_t domyosbike::watts() {
     // ref
     // https://translate.google.com/translate?hl=it&sl=en&u=https://support.wattbike.com/hc/en-us/articles/115001881825-Power-Resistance-and-Cadence-Tables&prev=search&pto=aue
 
+    m_powerEstimated = true;
     if (currentCadence().value() <= 0) {
         return 0;
     }

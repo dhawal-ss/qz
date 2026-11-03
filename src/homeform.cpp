@@ -941,8 +941,10 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
     connect(this->innerTemplateManager, &TemplateInfoSenderBuilder::activityDescriptionChanged, this,
             &homeform::setActivityDescription);
     engine->rootContext()->setContextProperty(QStringLiteral("rootItem"), (QObject *)this);
-    engine->rootContext()->setContextProperty(QStringLiteral("rideMetrics"), new RideMetrics(bl, this));
+    RideMetrics *metrics = new RideMetrics(bl, this);
+    engine->rootContext()->setContextProperty(QStringLiteral("rideMetrics"), metrics);
     rideLibrary = new RideLibrary(getWritableAppDir(), this);
+    rideLibrary->setMetrics(metrics);
     engine->rootContext()->setContextProperty(QStringLiteral("rideLibrary"), rideLibrary);
     connect(this, &homeform::restoreDefaultWheelDiameter, this, &homeform::handleRestoreDefaultWheelDiameter);
 

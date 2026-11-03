@@ -10,6 +10,7 @@
 #include <QVariantMap>
 
 class RideLibraryWorker;
+class RideMetrics;
 
 // The finished rides of the Pulse interface (src/ui2), with their numbers, laps and samples worked
 // out once and kept in bikemodo-library.sqlite. A ride is made of one or more parts, one per .fit
@@ -27,6 +28,9 @@ class RideLibrary : public QObject {
     // a ride the app did not save because it was closed or killed during it, found in QZ's minute
     // backups: {path, start, seconds}, or empty
     Q_PROPERTY(QVariantMap unfinished READ unfinished NOTIFY unfinishedChanged)
+    // whose power curve and records the screens show: 1 the rides whose watts were worked out (a
+    // bike with no power meter), 0 the others, -1 all of them. main2.qml sets it from the bike.
+    Q_PROPERTY(int powerGroup READ powerGroup WRITE setPowerGroup NOTIFY changed)
 
   public:
     // appDir is homeform::getWritableAppDir(): the .fit files are in its fit folder
@@ -38,6 +42,12 @@ class RideLibrary : public QObject {
     int indexed() const { return m_indexed; }
     int toIndex() const { return m_toIndex; }
     QVariantMap unfinished() const { return m_unfinished; }
+    int powerGroup() const { return m_powerGroup; }
+    void setPowerGroup(int group);
+
+    // the live numbers of the bike, which say whether its watts are measured: a .fit file saved
+    // while it is connected keeps that
+    void setMetrics(RideMetrics *metrics) { m_metrics = metrics; }
 
     // adds a .fit file that was just saved
     void importFile(const QString &path);
@@ -46,15 +56,21 @@ class RideLibrary : public QObject {
     Q_INVOKABLE QVariantList rides(int offset, int limit);
     Q_INVOKABLE QVariantMap ride(int id);
     Q_INVOKABLE QVariantMap samples(int id, int maxPoints);
-    Q_INVOKABLE QVariantList powerCurve(qint64 fromMs, qint64 toMs);
+    // group as powerGroup, -2 for powerGroup itself
+    Q_INVOKABLE QVariantList powerCurve(qint64 fromMs, qint64 toMs, int group = -2);
     Q_INVOKABLE QVariantMap totals(qint64 fromMs, qint64 toMs);
     Q_INVOKABLE QVariantList days(qint64 fromMs, qint64 toMs);
     // every time the best of a power curve duration was beaten: [{start, watts, rideId}] in start order
-    Q_INVOKABLE QVariantList recordHistory(int seconds);
+    Q_INVOKABLE QVariantList recordHistory(int seconds, int group = -2);
     // longest ride, most kJ, longest distance and biggest week by time:
     // [{key, value, start, rideId, history: [{start, value, rideId}]}]
     Q_INVOKABLE QVariantList rideRecords();
     Q_INVOKABLE void rescan();
+    // works every ride out again from its samples, with the FTP and zones of the rider now
+    Q_INVOKABLE void rebuild();
+    // gives every part whose power source is not known (read before the library kept it) the
+    // source of this bike, then works the rides out again
+    Q_INVOKABLE void assignUnknownPower(bool estimated);
     // joins a ride to the one before it (when that one ended at most 3 h before): the ride then
     // carries the id of the one before it. False when there is nothing to join.
     Q_INVOKABLE bool mergeWithPrevious(int id);
@@ -81,7 +97,13 @@ class RideLibrary : public QObject {
     void onUnfinishedFound(const QVariantMap &ride);
     void setLinks(const QStringList &paths, int mode);
     void forgetUnfinished();
+    void import(const QString &path, int powerSource);
+    // stops the worker between two files; at quit and in the destructor
+    void shutdown();
 
+    RideMetrics *m_metrics = nullptr;
+    int m_powerGroup = 0;
+    bool m_stopped = false;
     QString m_appDir;
     QString m_fitDir;
     QString m_dbPath;
@@ -102,7 +124,10 @@ class RideLibraryWorker : public QObject {
     explicit RideLibraryWorker(const QString &dbPath) : m_dbPath(dbPath) {}
 
     void scan(const QString &fitDir);
-    void importFile(const QString &path);
+    // powerSource > 0 first gives it to every part with none
+    void rebuild(int powerSource = 0);
+    // powerSource as parts.power_source, 0 when not known
+    void importFile(const QString &path, int powerSource);
     // mode 1 joins each of these parts to the part before it, 0 keeps them apart
     void setLinks(const QStringList &paths, int mode);
     // the newest backup in appDir written before the app started (before) and after the last one the

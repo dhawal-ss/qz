@@ -97,7 +97,8 @@ Column {
     SectionHead {
         width: parent.width
         title: qsTr("FTP")
-        note: qsTr("From your best 20 min")
+        note: ftp.library !== null && ftp.library.powerGroup === 1 ? qsTr("Est., from your best 20 min")
+                                                                   : qsTr("From your best 20 min")
     }
 
     Text {

@@ -419,8 +419,17 @@ Item {
             goalStreak: goalStreak,
             miles: miles
         }, now)
-        ready = Coach.readiness(allDays, latest ? latest.start : 0, now)
+        ready = Coach.readiness(allDays, latest ? latest.start : 0, now, Theme.ftpSet)
         coachWords = Coach.words(ready)
+        // an FTP to offer while it is still the guess: 95% of the best 20 min of the last 90 days
+        var best20 = 0
+        if (!Theme.ftpSet) {
+            var lately = library.powerCurve(now - 90 * 86400000, 0)
+            for (var b = 0; b < lately.length; b++)
+                if (lately[b].seconds === 1200)
+                    best20 = lately[b].watts
+        }
+        ftpOffer = best20 > 0 ? Math.round(best20 * 0.95) : 0
         suggestion = Coach.suggest(ready, found.reach, found.reach ? Format.effort(found.reach.seconds) : "")
         weekDays = Coach.weekDays(recent, now)
         usual = Patterns.usual(recent, now)
@@ -431,6 +440,10 @@ Item {
 
     onLibraryChanged: refresh()
     onMilesChanged: refreshLater.restart()
+    Connections {
+        target: Theme
+        function onFtpSetChanged() { refreshLater.restart() }
+    }
     onVisibleChanged: {
         if (!visible) {
             learnOpen = false
@@ -479,6 +492,10 @@ Item {
             return qsTr("%1 min ago").arg(pausedMinutes)
         return qsTr("%1 ago").arg(Format.hours(pausedMinutes * 60))
     }
+    // FTP worked out from the rides while the rider has not set one (Theme.ftpSet), 0 for none
+    property int ftpOffer: 0
+    readonly property bool askFtp: !Theme.ftpSet && rideCount > 0
+
     // a ride the app was closed or killed during, from QZ's backups: the banner offers to keep it
     readonly property var unfinished: library && library.unfinished && library.unfinished.seconds > 0 ? library.unfinished : null
     readonly property bool showRecover: unfinished !== null && !ridePaused
@@ -579,6 +596,7 @@ Item {
         id: bestsComponent
         BestsCard {
             bests: todayPage.bests
+            estimated: todayPage.library !== null && todayPage.library.powerGroup === 1
             onOpenRide: todayPage.openRide(id)
             onLearn: todayPage.openLearn("bests")
         }
@@ -924,6 +942,90 @@ Item {
                     }
                 }
                 Item { width: 1; height: 14 }
+                // FTP still QZ's guess: offer one from the rides, or the place to set it
+                Rectangle {
+                    objectName: "ftpAsk"
+                    visible: todayPage.askFtp
+                    width: parent.width
+                    height: visible ? ftpColumn.height + 32 : 0
+                    radius: 24
+                    color: Theme.accentWash(0.10)
+                    Column {
+                        id: ftpColumn
+                        x: 16
+                        y: 16
+                        width: parent.width - 32
+                        spacing: 12
+                        Column {
+                            width: parent.width
+                            spacing: 3
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: ftpTitle.text + ". " + ftpWords.text
+                            Text {
+                                id: ftpTitle
+                                width: parent.width
+                                text: qsTr("Set your FTP")
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 15
+                                Accessible.ignored: true
+                            }
+                            Text {
+                                id: ftpWords
+                                width: parent.width
+                                text: todayPage.ftpOffer > 0
+                                      ? qsTr("Your best 20 minutes of the last 90 days puts it near %1 W. Your load, form and power zones start from it.").arg(todayPage.ftpOffer)
+                                      : qsTr("Your load, form and power zones start from it. Set it in You, or ride 20 minutes hard and Bikemodo offers one.")
+                                color: Theme.text2
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 13
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: 18
+                                wrapMode: Text.WordWrap
+                                Accessible.ignored: true
+                            }
+                        }
+                        Row {
+                            spacing: 8
+                            PulseButton {
+                                visible: todayPage.ftpOffer > 0
+                                width: useText.implicitWidth + 32
+                                height: 48
+                                pressedRadius: 14
+                                fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
+                                Accessible.name: qsTr("Use %1 watts as your FTP").arg(todayPage.ftpOffer)
+                                onClicked: Theme.setFtp(todayPage.ftpOffer)
+                                contentItem: Text {
+                                    id: useText
+                                    text: qsTr("Use %1 W").arg(todayPage.ftpOffer)
+                                    color: Theme.accentInk
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 14
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                            PulseButton {
+                                width: ownText.implicitWidth + 32
+                                height: 48
+                                pressedRadius: 14
+                                fill: pressed ? Theme.chip : Theme.control
+                                Accessible.name: qsTr("Set your FTP in You")
+                                onClicked: todayPage.openYou()
+                                contentItem: Text {
+                                    id: ownText
+                                    text: qsTr("Set my own")
+                                    color: Theme.text
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 14
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                        }
+                    }
+                }
+                Item { width: 1; height: todayPage.askFtp ? 14 : 0 }
                 Rise {
                     cue: todayPage
                     order: 2
@@ -931,6 +1033,7 @@ Item {
                     SuggestionCard {
                         width: parent.width
                         plan: todayPage.plan
+                        showLoad: Theme.ftpSet
                         swapLabel: todayPage.swapped ? qsTr("Back to %1").arg(todayPage.suggestion.main.name) : todayPage.suggestion.otherLabel
                         firstRide: todayPage.rideCount === 0
                         onRideRequested: todayPage.rideRequested()

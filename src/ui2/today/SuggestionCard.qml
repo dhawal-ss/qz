@@ -12,6 +12,8 @@ Rectangle {
     property var plan: null              // Coach.plan()
     property string swapLabel: ""
     property bool firstRide: false
+    // the training load of the idea, which needs the rider's own FTP (Theme.ftpSet)
+    property bool showLoad: true
 
     signal rideRequested()
     signal swap()
@@ -89,6 +91,7 @@ Rectangle {
             }
             Text {
                 id: load
+                visible: suggestion.showLoad
                 text: suggestion.plan ? qsTr("TSS %1 <font color=\"%2\">est.</font>").arg(suggestion.plan.tss).arg(Theme.text3) : ""
                 textFormat: Text.StyledText
                 color: Theme.text2

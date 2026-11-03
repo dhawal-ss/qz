@@ -79,11 +79,13 @@ function recentDays(series) {
     return easy === 1 ? qsTr("an easy day") : qsTr("%1 easy days").arg(count(easy))
 }
 
-// days: library.days(0, 0); latestStart: start of the newest ride (0 for none); now in ms.
+// days: library.days(0, 0); latestStart: start of the newest ride (0 for none); now in ms;
+// ftpSet: false while FTP is still QZ's 200 W guess (Theme.ftpSet), the load of every ride is
+// then a guess too and there is no form to show.
 // Returns { state, hasForm, ready, word, tsb, ctl, rodeToday, todaySeconds, away, recent };
-// state is new, start, away, veryFresh, fresh, steady, building or overreaching, and hasForm
+// state is new, start, noFtp, away, veryFresh, fresh, steady, building or overreaching, and hasForm
 // says if there is fitness enough to show the form at all.
-function readiness(days, latestStart, now) {
+function readiness(days, latestStart, now, ftpSet) {
     var out = { state: "new", hasForm: false, ready: 0, word: "", tsb: 0, ctl: 0, rodeToday: false, todaySeconds: 0, away: 0, recent: "" }
     if (!days || days.length === 0 || !latestStart)
         return out
@@ -105,7 +107,9 @@ function readiness(days, latestStart, now) {
     // a long break first: after months off the fitness is under 5 again, but the rider is back,
     // not new. The form shows only once there is fitness to read it from.
     var label = Fitness.formLabel(out.ctl, today.tsb)
-    out.hasForm = label !== "start"
+    if (ftpSet === false)
+        label = "noFtp"
+    out.hasForm = label !== "start" && label !== "noFtp"
     if (out.away >= 7)
         out.state = "away"
     else
@@ -123,6 +127,9 @@ function words(r) {
     if (r.state === "start")
         return { headline: qsTr("Every ride builds the base."),
                  line: qsTr("Your form shows after a few weeks of riding. Until then, here is your week.") }
+    if (r.state === "noFtp")
+        return { headline: qsTr("Set your FTP to see your form."),
+                 line: qsTr("Training load and form are worked out from your FTP. Until it is yours, here is your week.") }
     if (r.state === "away")
         return { headline: qsTr("Welcome back."),
                  line: r.away === 1 ? qsTr("A day since your last ride.")
@@ -177,7 +184,8 @@ function easySpin() {
 // Insights.reach() (a record the latest ride came close to) or null; effortName names its length.
 function suggest(r, reach, effortName) {
     var main
-    if (r.state === "new" || r.state === "start")
+    // with no FTP of their own, no hard ride is set from a guess
+    if (r.state === "new" || r.state === "start" || r.state === "noFtp")
         main = plan("first", qsTr("Easy 20"), qsTr("Find your rhythm, nothing hard"), [[5, 1], [10, 2], [5, 1]])
     else if (r.state === "away" || r.state === "overreaching" || r.rodeToday)
         main = plan("recovery", qsTr("Recovery spin"), qsTr("Easy pedaling, legs only"), [[5, 1], [15, 1], [5, 1]])

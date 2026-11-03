@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import "."
 
 // The ride as the engine sees it: the numbers of rideMetrics (src/ridemetrics.h) and the
 // controls of the home object. Same properties as RideSim.
@@ -45,6 +46,8 @@ QtObject {
     readonly property int plannedSeconds: 0
     readonly property bool miles: ready ? metrics.miles : false
     readonly property bool powerEstimated: ready ? metrics.powerEstimated : false
+    // training load needs the rider's own FTP (Metrics.js shows a dash without it)
+    readonly property bool ftpSet: Theme.ftpSet
     readonly property string heartSource: ""
     readonly property bool connected: ready ? metrics.connected : false
     readonly property string deviceName: ready ? metrics.deviceName : ""

@@ -62,7 +62,12 @@ YouPage {
         maximum: 2000
         value: String(Math.round(page.qz.ftp))
         hairline: false
-        onCommitted: page.qz.ftp = Number(text)
+        // also in Theme: a number the rider types is their FTP, even 200, and the rides are worked
+        // out again with it (main2.qml)
+        onCommitted: {
+            page.qz.ftp = Number(text)
+            Theme.setFtp(Number(text))
+        }
     }
 
     YouText {

@@ -141,7 +141,9 @@ Column {
     SectionHead {
         width: parent.width
         title: qsTr("Power curve")
-        note: curve.comparing ? qsTr("vs last period") : ""
+        // worked out watts (library.powerGroup 1) are compared only with this kind of bike
+        note: curve.comparing ? qsTr("vs last period")
+                              : (curve.library !== null && curve.library.powerGroup === 1 ? qsTr("Est., this bike") : "")
     }
 
     // the best of a duration: the one under the crosshair, or 5 min

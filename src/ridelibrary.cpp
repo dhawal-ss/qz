@@ -1,9 +1,12 @@
 #include "ridelibrary.h"
 #include "qfit.h"
 #include "qzsettings.h"
+#include "ridemetrics.h"
 #include "ridestats.h"
 
+#include <QCoreApplication>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -32,10 +35,23 @@ const QString databaseName = QStringLiteral("bikemodo-library.sqlite");
 // the columns rides() and ride() share, in the order rideMap() reads them
 const QString rideColumns = QStringLiteral("id, start_ms, duration_s, distance_km, avg_power, max_power, np, intensity, "
                                            "tss, kj, kcal, avg_hr, max_hr, avg_cadence, title, sport, spark, records, "
-                                           "parts, part_ids, gap_s, end_ms, prev_gap_s");
+                                           "parts, part_ids, gap_s, end_ms, prev_gap_s, power_estimated");
 
-// PRAGMA user_version of the tables below. 0 is the first library, with one ride per .fit file.
-const int schemaVersion = 2;
+// PRAGMA user_version of the tables below. 0 is the first library, with one ride per .fit file;
+// 3 adds the power source of every part and ride and keeps other sports out.
+const int schemaVersion = 3;
+
+// the sports of a .fit file the library keeps: bike rides and files with no sport. Runs, rows,
+// ellipticals and the like (QZ records those too) are skipped.
+bool bikeSport(int sport) {
+    return sport == FIT_SPORT_GENERIC || sport == FIT_SPORT_CYCLING || sport == FIT_SPORT_E_BIKING ||
+           sport == FIT_SPORT_INVALID;
+}
+const QString bikeSports = QStringLiteral("(0, 2, 21, 255)");
+
+// parts.power_source: what made the watts of a part, NULL when not known (a file read from disk)
+const int powerMeasured = 1;
+const int powerEstimated = 2;
 
 // the setting with the longest pause, in minutes, after which a ride saved again is a ride of its own
 const QString mergeGapKey = QStringLiteral("ui2/mergeGapMinutes");
@@ -59,6 +75,9 @@ const int recoveryMinSeconds = 60;
 //   parts, part_ids: how many parts the ride has and their ids (json array) in start order
 //   gap_s: seconds of pause between the parts, left out of duration_s
 //   end_ms: end of the last part. prev_gap_s: seconds from the end of the ride before, NULL for the first
+//   power_estimated: 1 when a part worked its watts out (no power meter), 0 when every part measured
+//   them, NULL when not known
+// parts.power_source: see powerMeasured and powerEstimated, NULL when not known
 // parts: one per .fit file. ride_id is the ride it belongs to, end_ms the end of its last second,
 //   lap_starts a json array of the sample where each lap after the first starts.
 // laps: one row per lap of a ride; every part after the first starts a lap.
@@ -73,12 +92,12 @@ const QStringList tableStatements = {
                    "max_power REAL, np REAL, intensity REAL, tss REAL, kj REAL, kcal REAL, avg_hr REAL, "
                    "max_hr REAL, avg_cadence REAL, title TEXT, sport INTEGER, ftp_used REAL, max_hr_used REAL, "
                    "power_zone_s TEXT, hr_zone_s TEXT, spark TEXT, best TEXT, records TEXT, parts INTEGER DEFAULT 1, "
-                   "part_ids TEXT, gap_s INTEGER DEFAULT 0, end_ms INTEGER, prev_gap_s INTEGER)"),
+                   "part_ids TEXT, gap_s INTEGER DEFAULT 0, end_ms INTEGER, prev_gap_s INTEGER, power_estimated INTEGER)"),
     QStringLiteral("CREATE INDEX IF NOT EXISTS rides_start ON rides(start_ms)"),
     QStringLiteral("CREATE TABLE IF NOT EXISTS parts (id INTEGER PRIMARY KEY AUTOINCREMENT, ride_id INTEGER, "
                    "file_path TEXT UNIQUE NOT NULL, file_size INTEGER, file_mtime INTEGER, start_ms INTEGER, "
                    "end_ms INTEGER, duration_s INTEGER, distance_km REAL, kcal REAL, title TEXT, sport INTEGER, "
-                   "lap_starts TEXT)"),
+                   "lap_starts TEXT, power_source INTEGER)"),
     QStringLiteral("CREATE INDEX IF NOT EXISTS parts_ride ON parts(ride_id)"),
     QStringLiteral("CREATE TABLE IF NOT EXISTS laps (ride_id INTEGER, idx INTEGER, start_s INTEGER, "
                    "duration_s INTEGER, distance_km REAL, avg_power REAL, max_power REAL, avg_hr REAL, "
@@ -136,6 +155,22 @@ bool migrateFromFirstVersion(QSqlDatabase &db) {
     return true;
 }
 
+// To schema 3: the power source columns (parts has it already when it was made just now, from the
+// first library), the parts of other sports go (a scan finds their files again and skips them), and
+// every ride is worked out again: power curves that no longer span the break between parts, and the
+// zones and FTP of the rider now.
+bool migrateToThree(QSqlDatabase &db, bool partsHadNoSource) {
+    QSqlQuery query(db);
+    QStringList statements = {QStringLiteral("ALTER TABLE rides ADD COLUMN power_estimated INTEGER")};
+    if (partsHadNoSource)
+        statements << QStringLiteral("ALTER TABLE parts ADD COLUMN power_source INTEGER");
+    statements << QStringLiteral("DELETE FROM samples WHERE ride_id IN (SELECT id FROM parts WHERE sport NOT IN ") +
+                      bikeSports + QStringLiteral(")")
+               << QStringLiteral("DELETE FROM parts WHERE sport NOT IN ") + bikeSports
+               << QStringLiteral("UPDATE rides SET part_ids = NULL");
+    return execAll(query, statements);
+}
+
 bool createTables(QSqlDatabase &db) {
     QSqlQuery query(db);
     if (query.exec(QStringLiteral("PRAGMA journal_mode=WAL")) && query.next())
@@ -145,12 +180,16 @@ bool createTables(QSqlDatabase &db) {
     int version = 0;
     if (query.exec(QStringLiteral("PRAGMA user_version")) && query.next())
         version = query.value(0).toInt();
-    if (version >= schemaVersion)
+    // a newer library (from a later Bikemodo) is not read: RideLibrary starts a new one
+    if (version > schemaVersion)
+        return false;
+    if (version == schemaVersion)
         return execAll(query, tableStatements);
 
     // a rides table before any version is the first library
     bool firstVersion = false;
-    if (query.exec(QStringLiteral("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'rides'")) &&
+    if (version == 0 &&
+        query.exec(QStringLiteral("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'rides'")) &&
         query.next())
         firstVersion = query.value(0).toInt() > 0;
     query.finish();
@@ -159,10 +198,12 @@ bool createTables(QSqlDatabase &db) {
     bool ok = execAll(query, tableStatements);
     if (ok && firstVersion)
         ok = migrateFromFirstVersion(db);
+    if (ok && (firstVersion || version == 2))
+        ok = migrateToThree(db, version == 2);
     if (ok)
         ok = query.exec(QStringLiteral("PRAGMA user_version = ") + QString::number(schemaVersion));
     if (ok && db.commit()) {
-        if (firstVersion)
+        if (firstVersion || version > 0)
             qDebug() << "ride library: moved to schema" << schemaVersion;
         return true;
     }
@@ -227,6 +268,9 @@ QVariantMap rideMap(const QSqlQuery &query) {
     // a ride that overlaps the one before it is another recording, not a part of it
     ride[QStringLiteral("canMergePrevious")] = !previousGap.isNull() && previousGap.toLongLong() >= -1 &&
                                                previousGap.toLongLong() <= manualMergeGapSeconds;
+    // true when the watts were worked out, false when measured or not known
+    ride[QStringLiteral("powerEstimated")] = query.value(23).toInt() == 1;
+    ride[QStringLiteral("powerKnown")] = !query.value(23).isNull();
     return ride;
 }
 
@@ -243,6 +287,7 @@ struct Part {
     QString title;
     int sport = 0;
     QVariantList lapStarts;
+    QVariant powerSource;
 };
 
 // the zones of the rider now
@@ -309,7 +354,7 @@ bool storeRide(QSqlDatabase &db, const QList<Part> &parts, const RiderZones &zon
         kcal += part.kcal;
         partIds.append(part.id);
     }
-    RideStats stats = RideStatsCalc::compute(samples, lapStarts, zones.ftp, zones.maxHr, zones.hrZonePercent);
+    RideStats stats = RideStatsCalc::compute(samples, lapStarts, zones.ftp, zones.maxHr, zones.hrZonePercent, partStarts);
     stats.distance = distance;
     stats.kcal = kcal;
 
@@ -324,6 +369,17 @@ bool storeRide(QSqlDatabase &db, const QList<Part> &parts, const RiderZones &zon
     for (int i = 0; i < stats.bestSeconds.size(); i++)
         best.insert(QString::number(stats.bestSeconds.at(i)), oneDecimal(stats.bestWatts.at(i)));
 
+    // estimated when any part worked its watts out, measured when every part says so
+    bool anyEstimated = false;
+    bool allKnown = true;
+    for (const Part &part : parts) {
+        if (part.powerSource.isNull())
+            allKnown = false;
+        else if (part.powerSource.toInt() == powerEstimated)
+            anyEstimated = true;
+    }
+    const QVariant rideEstimated = anyEstimated ? QVariant(1) : (allKnown ? QVariant(0) : QVariant());
+
     const Part &first = parts.first();
     for (const QString &statement :
          {QStringLiteral("DELETE FROM rides WHERE id = :id"), QStringLiteral("DELETE FROM laps WHERE ride_id = :id")}) {
@@ -337,10 +393,10 @@ bool storeRide(QSqlDatabase &db, const QList<Part> &parts, const RiderZones &zon
     query.prepare(QStringLiteral(
         "INSERT INTO rides (id, file_path, file_size, file_mtime, start_ms, duration_s, distance_km, avg_power, "
         "max_power, np, intensity, tss, kj, kcal, avg_hr, max_hr, avg_cadence, title, sport, ftp_used, max_hr_used, "
-        "power_zone_s, hr_zone_s, spark, best, records, parts, part_ids, gap_s, end_ms) VALUES (:id, :path, :size, "
-        ":mtime, :start, :duration, :distance, :avgPower, :maxPower, :np, :intensity, :tss, :kj, :kcal, :avgHr, "
-        ":maxHr, :avgCadence, :title, :sport, :ftp, :maxHrUsed, :powerZones, :hrZones, :spark, :best, '[]', :parts, "
-        ":partIds, :gap, :end)"));
+        "power_zone_s, hr_zone_s, spark, best, records, parts, part_ids, gap_s, end_ms, power_estimated) VALUES (:id, "
+        ":path, :size, :mtime, :start, :duration, :distance, :avgPower, :maxPower, :np, :intensity, :tss, :kj, :kcal, "
+        ":avgHr, :maxHr, :avgCadence, :title, :sport, :ftp, :maxHrUsed, :powerZones, :hrZones, :spark, :best, '[]', "
+        ":parts, :partIds, :gap, :end, :powerEstimated)"));
     query.bindValue(QStringLiteral(":id"), first.id);
     query.bindValue(QStringLiteral(":path"), first.path);
     query.bindValue(QStringLiteral(":size"), first.size);
@@ -370,6 +426,7 @@ bool storeRide(QSqlDatabase &db, const QList<Part> &parts, const RiderZones &zon
     query.bindValue(QStringLiteral(":partIds"), toJson(partIds));
     query.bindValue(QStringLiteral(":gap"), gapMs / 1000);
     query.bindValue(QStringLiteral(":end"), parts.last().end);
+    query.bindValue(QStringLiteral(":powerEstimated"), rideEstimated);
     if (!query.exec()) {
         qDebug() << "ride library: cannot store the ride of" << first.path << query.lastError().text();
         return false;
@@ -404,6 +461,16 @@ bool storeRide(QSqlDatabase &db, const QList<Part> &parts, const RiderZones &zon
     return true;
 }
 
+// the rides of a power group (see RideLibrary::powerGroup) as more of a WHERE clause; rides whose
+// power source is not known go with the measured ones
+QString powerGroupClause(int group) {
+    if (group == 1)
+        return QStringLiteral(" AND power_estimated = 1");
+    if (group == 0)
+        return QStringLiteral(" AND COALESCE(power_estimated, 0) = 0");
+    return QString();
+}
+
 // "start_ms >= from AND start_ms < to", with 0 meaning no bound
 void bindRange(QSqlQuery &query, qint64 fromMs, qint64 toMs) {
     query.bindValue(QStringLiteral(":from"), fromMs > 0 ? fromMs : std::numeric_limits<qint64>::min());
@@ -436,10 +503,22 @@ RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(paren
     // the tables exist before the first read from QML
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), uiConnection);
     db.setDatabaseName(m_dbPath);
-    if (!db.open())
-        qDebug() << "ride library: cannot open" << m_dbPath << db.lastError().text();
-    else if (createTables(db))
+    bool ready = db.open() && createTables(db);
+    if (!ready) {
+        // damaged, or made by a newer Bikemodo: it is put aside as .bad and the rides are read again
+        // from the .fit files (merges and splits made by hand are lost with it)
+        qDebug() << "ride library: starting again, cannot use" << m_dbPath << db.lastError().text();
+        db.close();
+        for (const QString &suffix : {QString(), QStringLiteral("-wal"), QStringLiteral("-shm")}) {
+            QFile::remove(m_dbPath + suffix + QStringLiteral(".bad"));
+            QFile::rename(m_dbPath + suffix, m_dbPath + suffix + QStringLiteral(".bad"));
+        }
+        ready = db.open() && createTables(db);
+    }
+    if (ready)
         onInserted();
+    else
+        qDebug() << "ride library: cannot open" << m_dbPath << db.lastError().text();
 
     m_worker = new RideLibraryWorker(m_dbPath);
     m_worker->moveToThread(&m_thread);
@@ -448,6 +527,9 @@ RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(paren
     connect(m_worker, &RideLibraryWorker::jobDone, this, &RideLibrary::jobDone);
     connect(m_worker, &RideLibraryWorker::unfinishedFound, this, &RideLibrary::onUnfinishedFound);
     m_thread.start(QThread::LowPriority);
+    // homeform, which owns the library, is not deleted at quit: the worker stops here instead
+    if (QCoreApplication::instance())
+        connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &RideLibrary::shutdown);
 
     // after homeform has moved the old .fit files into the fit folder; the backups are looked at
     // once the rides are read, so a backup of a ride that was saved is not offered
@@ -463,13 +545,28 @@ RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(paren
 }
 
 RideLibrary::~RideLibrary() {
-    m_worker->stopRequested.storeRelease(1);
-    m_thread.quit();
-    m_thread.wait();
+    shutdown();
     delete m_worker;
     QSqlDatabase::removeDatabase(workerConnection);
     QSqlDatabase::database(uiConnection, false).close();
     QSqlDatabase::removeDatabase(uiConnection);
+}
+
+// the job running finishes its file (a scan stops before the next one), the others are dropped
+void RideLibrary::shutdown() {
+    if (m_stopped)
+        return;
+    m_stopped = true;
+    m_worker->stopRequested.storeRelease(1);
+    m_thread.quit();
+    m_thread.wait();
+}
+
+void RideLibrary::setPowerGroup(int group) {
+    if (group == m_powerGroup)
+        return;
+    m_powerGroup = group;
+    emit changed();
 }
 
 // Next to ddb.sqlite. On Android 14+ a file left in Documents/QZ by a previous install can be
@@ -542,8 +639,9 @@ void RideLibrary::recoverUnfinished() {
     QString target = m_fitDir + QStringLiteral("/") + name + QStringLiteral(".fit");
     for (int i = 2; QFile::exists(target); i++)
         target = m_fitDir + QStringLiteral("/") + name + QStringLiteral(" (") + QString::number(i) + QStringLiteral(").fit");
+    // which bike recorded it is not known any more
     if (QFile::copy(source, target))
-        importFile(target);
+        import(target, 0);
     else
         qDebug() << "ride library: cannot recover" << source << "to" << target;
     forgetUnfinished();
@@ -554,6 +652,23 @@ void RideLibrary::dismissUnfinished() {
         forgetUnfinished();
 }
 
+void RideLibrary::rebuild() {
+    if (m_stopped)
+        return;
+    jobStarted();
+    RideLibraryWorker *worker = m_worker;
+    QMetaObject::invokeMethod(m_worker, [worker]() { worker->rebuild(); }, Qt::QueuedConnection);
+}
+
+void RideLibrary::assignUnknownPower(bool estimated) {
+    if (m_stopped)
+        return;
+    jobStarted();
+    RideLibraryWorker *worker = m_worker;
+    const int source = estimated ? powerEstimated : powerMeasured;
+    QMetaObject::invokeMethod(m_worker, [worker, source]() { worker->rebuild(source); }, Qt::QueuedConnection);
+}
+
 void RideLibrary::rescan() {
     jobStarted();
     RideLibraryWorker *worker = m_worker;
@@ -561,10 +676,21 @@ void RideLibrary::rescan() {
     QMetaObject::invokeMethod(m_worker, [worker, fitDir]() { worker->scan(fitDir); }, Qt::QueuedConnection);
 }
 
+// homeform saves a ride while its bike is still connected: rideMetrics knows its power then
 void RideLibrary::importFile(const QString &path) {
+    int source = 0;
+    if (m_metrics && m_metrics->connected())
+        source = m_metrics->powerEstimated() ? powerEstimated : powerMeasured;
+    import(path, source);
+}
+
+void RideLibrary::import(const QString &path, int powerSource) {
+    if (m_stopped)
+        return;
     jobStarted();
     RideLibraryWorker *worker = m_worker;
-    QMetaObject::invokeMethod(m_worker, [worker, path]() { worker->importFile(path); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(m_worker, [worker, path, powerSource]() { worker->importFile(path, powerSource); },
+                              Qt::QueuedConnection);
 }
 
 bool RideLibrary::mergeWithPrevious(int id) {
@@ -643,7 +769,7 @@ QVariantMap RideLibrary::ride(int id) {
     QVariantMap ride = rideMap(query);
 
     // json object keys come back sorted as text ("10" before "2"): sort them as numbers
-    const QJsonObject bestObject = jsonObject(query.value(23).toString());
+    const QJsonObject bestObject = jsonObject(query.value(24).toString());
     QList<int> durations;
     for (const QString &key : bestObject.keys())
         durations.append(key.toInt());
@@ -656,12 +782,12 @@ QVariantMap RideLibrary::ride(int id) {
         best.append(point);
     }
     ride[QStringLiteral("best")] = best;
-    ride[QStringLiteral("powerZones")] = jsonList(query.value(24).toString());
-    ride[QStringLiteral("hrZones")] = jsonList(query.value(25).toString());
-    ride[QStringLiteral("ftp")] = query.value(26).toDouble();
+    ride[QStringLiteral("powerZones")] = jsonList(query.value(25).toString());
+    ride[QStringLiteral("hrZones")] = jsonList(query.value(26).toString());
+    ride[QStringLiteral("ftp")] = query.value(27).toDouble();
     // maxHr stays the highest heart rate of the ride, this is the one the zones were cut with
-    ride[QStringLiteral("zoneMaxHr")] = query.value(27).toDouble();
-    ride[QStringLiteral("filePath")] = query.value(28).toString();
+    ride[QStringLiteral("zoneMaxHr")] = query.value(28).toDouble();
+    ride[QStringLiteral("filePath")] = query.value(29).toString();
 
     // the ride this one would join with mergeWithPrevious(), 0 when there is none
     int previousId = 0;
@@ -753,14 +879,15 @@ QVariantMap RideLibrary::samples(int id, int maxPoints) {
     return out;
 }
 
-QVariantList RideLibrary::powerCurve(qint64 fromMs, qint64 toMs) {
+QVariantList RideLibrary::powerCurve(qint64 fromMs, qint64 toMs, int group) {
     const QVector<int> &durations = RideStatsCalc::curveDurations();
     QVector<double> bestWatts(durations.size(), 0);
     QVector<int> bestRide(durations.size(), 0);
     QVector<qint64> bestStart(durations.size(), 0);
 
     QSqlQuery query(QSqlDatabase::database(uiConnection));
-    query.prepare(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE start_ms >= :from AND start_ms < :to"));
+    query.prepare(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE start_ms >= :from AND start_ms < :to") +
+                  powerGroupClause(group == -2 ? m_powerGroup : group));
     bindRange(query, fromMs, toMs);
     if (query.exec()) {
         while (query.next()) {
@@ -842,10 +969,12 @@ QVariantList RideLibrary::days(qint64 fromMs, qint64 toMs) {
     return out;
 }
 
-QVariantList RideLibrary::recordHistory(int seconds) {
+QVariantList RideLibrary::recordHistory(int seconds, int group) {
     QVariantList out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
-    if (!query.exec(QStringLiteral("SELECT id, start_ms, best FROM rides ORDER BY start_ms, id")))
+    const QString where = powerGroupClause(group == -2 ? m_powerGroup : group);
+    if (!query.exec(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE 1") + where +
+                    QStringLiteral(" ORDER BY start_ms, id")))
         return out;
     const QString key = QString::number(seconds);
     QVector<double> watts;
@@ -990,12 +1119,24 @@ void RideLibraryWorker::scan(const QString &fitDir) {
         }
     }
 
+    // a long first scan (years of QZ rides) groups the parts every 50 files, not after each one,
+    // and tells the screens at most every 2 s, so they do not read the whole library again and again
     emit progress(0, toRead.size());
+    QElapsedTimer sinceShown;
+    sinceShown.start();
+    int sinceGrouped = 0;
     for (int i = 0; i < toRead.size() && !stopRequested.loadAcquire(); i++) {
         if (indexFile(toRead.at(i))) {
             changed = true;
+            sinceGrouped++;
+        }
+        if (sinceGrouped >= 50 || (sinceGrouped > 0 && i + 1 == toRead.size())) {
             regroup();
-            emit inserted();
+            sinceGrouped = 0;
+            if (sinceShown.elapsed() >= 2000) {
+                emit inserted();
+                sinceShown.restart();
+            }
         }
         emit progress(i + 1, toRead.size());
     }
@@ -1009,10 +1150,34 @@ void RideLibraryWorker::scan(const QString &fitDir) {
     emit jobDone();
 }
 
-void RideLibraryWorker::importFile(const QString &path) {
+void RideLibraryWorker::importFile(const QString &path, int powerSource) {
     // also when the file has no samples (any more): its part is gone and so may be its ride
     if (openDatabase()) {
-        indexFile(QFileInfo(path).absoluteFilePath());
+        const QString absolute = QFileInfo(path).absoluteFilePath();
+        if (indexFile(absolute) && powerSource > 0) {
+            QSqlQuery query(QSqlDatabase::database(workerConnection));
+            query.prepare(QStringLiteral("UPDATE parts SET power_source = :source WHERE file_path = :path"));
+            query.bindValue(QStringLiteral(":source"), powerSource);
+            query.bindValue(QStringLiteral(":path"), absolute);
+            query.exec();
+        }
+        regroup();
+        updateRecords();
+        emit inserted();
+    }
+    emit jobDone();
+}
+
+// regroup() works out again every ride whose stored parts differ: forgetting them all does it for all
+void RideLibraryWorker::rebuild(int powerSource) {
+    if (openDatabase()) {
+        QSqlQuery query(QSqlDatabase::database(workerConnection));
+        if (powerSource > 0) {
+            query.prepare(QStringLiteral("UPDATE parts SET power_source = :source WHERE power_source IS NULL"));
+            query.bindValue(QStringLiteral(":source"), powerSource);
+            query.exec();
+        }
+        query.exec(QStringLiteral("UPDATE rides SET part_ids = NULL"));
         regroup();
         updateRecords();
         emit inserted();
@@ -1120,20 +1285,32 @@ bool RideLibraryWorker::indexFile(const QString &path) {
     FIT_SPORT sport = FIT_SPORT_INVALID;
     QString title;
     QList<int> lapStarts;
-    // the FIT decoder throws on a damaged file (a ride cut short by a crash): it is then skipped
+    // the FIT decoder throws on a damaged file (a ride cut short by a crash) after it has handed
+    // over the records it could read: those are kept, a file with none is skipped
     try {
         qfit::open(path, &lines, &sport, &title, nullptr, nullptr, nullptr, nullptr, &lapStarts);
     } catch (...) {
-        qDebug() << "ride library: unreadable" << path;
-        lines.clear();
+        qDebug() << "ride library: damaged" << path << "kept" << lines.size() << "records";
         lapStarts.clear();
     }
+    // a run, a row or another sport QZ recorded is not a bike ride
+    if (!bikeSport(int(sport)))
+        lines.clear();
 
     const QFileInfo info(path);
     const qint64 size = info.size();
     const qint64 mtime = info.lastModified().toMSecsSinceEpoch();
     QSqlDatabase db = QSqlDatabase::database(workerConnection);
     db.transaction();
+    // a file read again keeps the power source it was saved with
+    QVariant powerSource;
+    {
+        QSqlQuery before(db);
+        before.prepare(QStringLiteral("SELECT power_source FROM parts WHERE file_path = :path"));
+        before.bindValue(QStringLiteral(":path"), path);
+        if (before.exec() && before.next())
+            powerSource = before.value(0);
+    }
     removeFile(path);
 
     if (lines.isEmpty()) {
@@ -1167,8 +1344,8 @@ bool RideLibraryWorker::indexFile(const QString &path) {
     QSqlQuery query(db);
     query.prepare(QStringLiteral(
         "INSERT INTO parts (ride_id, file_path, file_size, file_mtime, start_ms, end_ms, duration_s, distance_km, kcal, "
-        "title, sport, lap_starts) VALUES (0, :path, :size, :mtime, :start, :end, :duration, :distance, :kcal, :title, "
-        ":sport, :lapStarts)"));
+        "title, sport, lap_starts, power_source) VALUES (0, :path, :size, :mtime, :start, :end, :duration, :distance, "
+        ":kcal, :title, :sport, :lapStarts, :powerSource)"));
     query.bindValue(QStringLiteral(":path"), path);
     query.bindValue(QStringLiteral(":size"), size);
     query.bindValue(QStringLiteral(":mtime"), mtime);
@@ -1181,6 +1358,7 @@ bool RideLibraryWorker::indexFile(const QString &path) {
     query.bindValue(QStringLiteral(":title"), title);
     query.bindValue(QStringLiteral(":sport"), int(sport));
     query.bindValue(QStringLiteral(":lapStarts"), toJson(lapIndices));
+    query.bindValue(QStringLiteral(":powerSource"), powerSource);
     if (!query.exec()) {
         qDebug() << "ride library: cannot store" << path << query.lastError().text();
         db.rollback();
@@ -1214,7 +1392,7 @@ bool RideLibraryWorker::regroup() {
     QList<Part> parts;
     QSqlQuery query(db);
     if (!query.exec(QStringLiteral("SELECT id, file_path, file_size, file_mtime, start_ms, end_ms, distance_km, kcal, "
-                                   "title, sport, lap_starts FROM parts ORDER BY start_ms, id")))
+                                   "title, sport, lap_starts, power_source FROM parts ORDER BY start_ms, id")))
         return false;
     while (query.next()) {
         Part part;
@@ -1229,6 +1407,7 @@ bool RideLibraryWorker::regroup() {
         part.title = query.value(8).toString();
         part.sport = query.value(9).toInt();
         part.lapStarts = jsonList(query.value(10).toString());
+        part.powerSource = query.value(11);
         parts.append(part);
     }
     query.finish();
@@ -1342,24 +1521,27 @@ bool RideLibraryWorker::regroup() {
     return changed;
 }
 
-// Marks, for every ride, the durations where it beat all the rides before it. Done over the
+// Marks, for every ride, the durations where it beat all the rides before it with the same kind of
+// watts: estimated watts race only estimated ones, measured (or not known) only those. Done over the
 // whole library in start order, so a ride added later with an older date is placed right.
 void RideLibraryWorker::updateRecords() {
     QSqlDatabase db = QSqlDatabase::database(workerConnection);
     QSqlQuery query(db);
-    if (!query.exec(QStringLiteral("SELECT id, best, records FROM rides ORDER BY start_ms, id")))
+    if (!query.exec(QStringLiteral("SELECT id, best, records, COALESCE(power_estimated, 0) FROM rides "
+                                   "ORDER BY start_ms, id")))
         return;
-    QHash<int, double> bestSoFar;
+    QHash<int, double> bestSoFar[2];
     QList<QPair<int, QString>> updates;
     while (query.next()) {
         const QJsonObject best = jsonObject(query.value(1).toString());
+        QHash<int, double> &groupBest = bestSoFar[query.value(3).toInt() == 1 ? 1 : 0];
         QList<int> records;
         for (const QString &key : best.keys()) {
             const int seconds = key.toInt();
             const double watts = best.value(key).toDouble();
-            if (watts > 0 && watts > bestSoFar.value(seconds, 0)) {
+            if (watts > 0 && watts > groupBest.value(seconds, 0)) {
                 records.append(seconds);
-                bestSoFar[seconds] = watts;
+                groupBest[seconds] = watts;
             }
         }
         std::sort(records.begin(), records.end());

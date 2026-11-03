@@ -255,8 +255,9 @@ Item {
     function componentFor(cardId) {
         if (cardId === "insight")
             return insightSection
+        // fitness, fatigue and form are worked out from FTP: a note in their place until it is set
         if (cardId === "fitness")
-            return fitnessSection
+            return Theme.ftpSet ? fitnessSection : fitnessNeedsFtp
         if (cardId === "ftp")
             return ftpSection
         if (cardId === "curve")
@@ -342,6 +343,26 @@ Item {
                 headline: progressPage.insightWords.headline
                 line: progressPage.insightWords.line
                 Accessible.ignored: true
+            }
+        }
+    }
+    Component {
+        id: fitnessNeedsFtp
+        Column {
+            spacing: 8
+            SectionHead {
+                width: parent.width
+                title: qsTr("Fitness and form")
+            }
+            Text {
+                width: parent.width
+                text: qsTr("Your fitness, fatigue and form are worked out from your FTP. Set it in You, Body and FTP, or take the one Today offers from your rides.")
+                color: Theme.text2
+                font.family: Theme.bodyMedium
+                font.pixelSize: 14
+                lineHeightMode: Text.FixedHeight
+                lineHeight: 20
+                wrapMode: Text.WordWrap
             }
         }
     }

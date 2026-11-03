@@ -239,6 +239,14 @@ class bluetoothdevice : public QObject {
     metric wattsMetric();
 
     /**
+     * @brief powerIsEstimated True while the watts of this device are worked out from its level,
+     * cadence or heart rate (a table or a formula) instead of measured by the device. A power meter
+     * paired as power sensor is not looked at here. Devices that work watts out set
+     * m_powerEstimated where they do, or override this.
+     */
+    virtual bool powerIsEstimated() { return m_powerEstimated; }
+
+    /**
      * @brief wattsMetricforUi Show the wattage applying averaging in case the user requested this.  Units: watts
      */
     double wattsMetricforUI() {
@@ -885,6 +893,8 @@ class bluetoothdevice : public QObject {
   protected:
     // useful to understand if a power sensor device for treadmill, it's a real one like the stryd or it's a dumb one like the runpod from Zwift
     bool powerReceivedFromPowerSensor = false;
+    // see powerIsEstimated()
+    bool m_powerEstimated = false;
 };
 
 #endif // BLUETOOTHDEVICE_H

@@ -1063,16 +1063,20 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
             // power table from an user
             if (isManualResistanceBike() && manualResistancePowerAdjustmentActive &&
                 (SMARTBIKE_3DIGIT || cscbike::useCustomResistancePowerTable())) {
+                m_powerEstimated = true;
                 m_watt = cscbike::customResistanceAdjustedWatts(currentCadence().value(), manualResistanceTarget);
                 emit debug(QStringLiteral("Current Watt (custom resistance table): ") + QString::number(m_watt.value()));
             } else if (MOK_FITNESS && cscbike::useCustomResistancePowerTable()) {
+                m_powerEstimated = true;
                 m_watt = cscbike::customResistanceAdjustedWatts(currentCadence().value(), Resistance.value());
                 emit debug(QStringLiteral("Current Watt (custom resistance table): ") + QString::number(m_watt.value()));
             } else if(DU30_bike) {
+                m_powerEstimated = true;
                 m_watt = wattsFromResistance(Resistance.value());
                 emit debug(QStringLiteral("Current Watt: ") + QString::number(m_watt.value()));
             } else if (SPORT01 && settings.value(QZSettings::toputure_teb1, QZSettings::default_toputure_teb1).toBool()) {
                 // Custom power calculation for SPORT01
+                m_powerEstimated = true;
                 // Resistance multipliers for levels 1-10
                 const double k[10] = {0.60, 0.75, 0.85, 0.95, 1.00, 1.18, 1.40, 1.70, 2.00, 2.40};
 
@@ -1097,8 +1101,10 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
                 emit debug(QStringLiteral("Current Watt (SPORT01 formula - R%1 x%2): %3")
                     .arg(resistance_level).arg(k[resistance_level - 1]).arg(m_watt.value()));
             } else if (TOPUTURE_TEB5 && settings.value(QZSettings::toputure_teb1, QZSettings::default_toputure_teb1).toBool()) {
+                m_powerEstimated = true;
                 applyToputureTEB5Watt();
             } else if (MRK_S26C) {
+                m_powerEstimated = true;
                 m_watt = Cadence.value() * (Resistance.value() * 1.16);
                 emit debug(QStringLiteral("Current Watt (MRK-S26C formula): ") + QString::number(m_watt.value()));
             } else if ((LYDSTO || DMASUN) && watt_ignore_builtin) {
@@ -1112,6 +1118,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
                 double ftms_watt = ((double)(((uint16_t)((uint8_t)newValue.at(index + 1)) << 8) |
                                    (uint16_t)((uint8_t)newValue.at(index))));
                 m_rawWatt = ftms_watt;  // Always update rawWatt from FTMS bike data
+                m_powerEstimated = false;
                 if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                         .toString()
                         .startsWith(QStringLiteral("Disabled"))) {

@@ -138,7 +138,8 @@ Column {
     SectionHead {
         width: parent.width
         title: qsTr("Records")
-        note: qsTr("All time")
+        // power records of worked out watts (library.powerGroup 1) are this kind of bike's only
+        note: board.library !== null && board.library.powerGroup === 1 ? qsTr("Power est., this bike") : qsTr("All time")
         learnable: true
         onLearn: board.learn("records", board.learnFacts())
     }

@@ -119,15 +119,16 @@ Item {
     readonly property int barHeight: 92
 
     readonly property bool estimated: ride.powerEstimated === true
+    // training load needs the rider's own FTP (Theme.ftpSet): without it, it is left out
     readonly property var rows: [
         [qsTr("Ride time"), Metrics.clock(ride.elapsed || 0), "", false],
         [qsTr("Average power"), Metrics.whole(ride.avgPower), "W", estimated],
         [qsTr("Normalized power"), Metrics.whole(ride.normalizedPower), "W", estimated],
-        [qsTr("Training load"), Metrics.whole(ride.tss), "TSS", estimated],
+        Theme.ftpSet ? [qsTr("Training load"), Metrics.whole(ride.tss), "TSS", estimated] : null,
         [qsTr("Work"), Metrics.whole(ride.kilojoules), "kJ", estimated],
         [qsTr("Calories"), Metrics.whole(ride.calories), "kcal", estimated],
         [qsTr("Distance"), ride.distance !== undefined ? ride.distance.toFixed(1) : "0", ride.miles ? "mi" : "km", false]
-    ]
+    ].filter(function (r) { return r !== null })
     readonly property var keyItems: rows.map(function (r) { return { value: r[1], unit: r[2], label: r[0], estimated: r[3] } })
 
     // read with value(): a property here would keep the goal of when the app started
@@ -229,7 +230,8 @@ Item {
             return
         recordsAdded = true
         var best = library.ride(saved.id).best || []
-        var extra = Moments.recordMoments(records, best, library.powerCurve(0, saved.start))
+        // records race rides with the same kind of watts (estimated or measured) as this one
+        var extra = Moments.recordMoments(records, best, library.powerCurve(0, saved.start, saved.powerEstimated === true ? 1 : 0))
         if (extra.length > 0)
             show(Moments.merge(moments, extra), false)
         startOverlays()

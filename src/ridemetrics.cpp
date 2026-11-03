@@ -65,11 +65,11 @@ void RideMetrics::refresh() {
     }
 
     m_deviceName = dev->bluetoothDevice.name();
-    // a bike without its own power meter computes watts from level and cadence
+    // a bike without its own power meter may work its watts out from level, cadence or heart rate:
+    // it says so (bluetoothdevice::powerIsEstimated)
     QString powerSensor = settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name).toString();
     bool hasPowerSensor = !powerSensor.isEmpty() && !powerSensor.startsWith(QStringLiteral("Disabled"));
-    QString className = QString::fromLatin1(dev->metaObject()->className());
-    m_powerEstimated = !hasPowerSensor && className.startsWith(QStringLiteral("echelon"));
+    m_powerEstimated = !hasPowerSensor && dev->powerIsEstimated();
 
     double unit = m_miles ? 0.621371 : 1.0;
     m_power = dev->wattsMetricforUI();

@@ -145,10 +145,16 @@ Item {
     onLibraryChanged: refresh()
     onWeeksChanged: refresh()
     Component.onCompleted: refresh()
+    // a burst of changes reads the year once
+    Timer {
+        id: refreshLater
+        interval: 300
+        onTriggered: heat.refresh()
+    }
     Connections {
         target: heat.library
         ignoreUnknownSignals: true
-        function onChanged() { heat.refresh() }
+        function onChanged() { refreshLater.restart() }
     }
 
     // month names over the week where a month begins

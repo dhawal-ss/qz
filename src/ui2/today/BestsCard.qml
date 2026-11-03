@@ -11,6 +11,8 @@ Column {
     id: bestsCard
 
     property var bests: []           // [{seconds, watts, rideId}] from library.powerCurve()
+    // the bests are of worked out watts (library.powerGroup 1): only for this kind of bike
+    property bool estimated: false
 
     signal openRide(int id)
     signal learn()
@@ -19,7 +21,7 @@ Column {
 
     LearnLabel {
         x: -8
-        caption: qsTr("Best power")
+        caption: bestsCard.estimated ? qsTr("Best power on this bike") : qsTr("Best power")
         onClicked: bestsCard.learn()
     }
     KeyNumbers {
@@ -28,7 +30,8 @@ Column {
         valueSize: 26
         items: bestsCard.bests.map(function (b) {
             return { value: String(Math.round(b.watts)), unit: "W", label: Format.effort(b.seconds),
-                     color: Theme.zoneColors[Moments.recordTone(b.seconds) - 1], action: b.rideId }
+                     color: Theme.zoneColors[Moments.recordTone(b.seconds) - 1], action: b.rideId,
+                     estimated: bestsCard.estimated }
         })
         onPicked: bestsCard.openRide(bestsCard.bests[index].rideId)
     }

@@ -39,7 +39,8 @@ function info(id, m) {
         return { label: qsTr("Live NP"), value: whole(m.normalizedPower), unit: "W", tag: powerTag(m),
                  frac: m.normalizedPower / (m.ftp * 1.5), trail: "powerTrail" }
     case "tss":
-        return { label: qsTr("TSS so far"), value: whole(m.tss), unit: "", tag: powerTag(m),
+        // a dash while FTP is still a guess (LiveSource.ftpSet)
+        return { label: qsTr("TSS so far"), value: m.ftpSet === false ? "–" : whole(m.tss), unit: "", tag: powerTag(m),
                  frac: m.tss / 100, trail: "powerTrail" }
     case "kcal":
         return { label: qsTr("Calories"), value: whole(m.calories), unit: "kcal", tag: powerTag(m),

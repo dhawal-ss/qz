@@ -60,15 +60,18 @@ namespace RideStatsCalc {
 const QVector<int> &curveDurations();
 
 // Everything at once. lapStarts are seconds since the first sample (as RideSample::second);
-// hrZonePercent are the starts of zones 2..5 as percent of maxHr.
+// hrZonePercent are the starts of zones 2..5 as percent of maxHr. partStarts, the first sample of
+// every part of a merged ride (joinParts), keep the power curve and NP from spanning a break.
 RideStats compute(const QVector<RideSample> &samples, const QList<int> &lapStarts, double ftp, double maxHr,
-                  const double hrZonePercent[4]);
+                  const double hrZonePercent[4], const QList<int> &partStarts = QList<int>());
 
-// 30 s rolling average, raised to the fourth power, averaged, fourth root. 0 under 30 samples.
-double normalizedPower(const QVector<double> &watts);
+// 30 s rolling average, raised to the fourth power, averaged, fourth root, with the rolling average
+// started again at every segment start. 0 when no segment has 30 samples.
+double normalizedPower(const QVector<double> &watts, const QList<int> &segmentStarts = QList<int>());
 
-// Best average over every window of the given length, -1 when the ride is shorter.
-double meanMax(const QVector<double> &prefixSums, int seconds);
+// Best average over every window of the given length that stays inside one segment, -1 when no
+// segment is that long.
+double meanMax(const QVector<double> &prefixSums, int seconds, const QList<int> &segmentStarts = QList<int>());
 
 // Averages consecutive values into at most points buckets.
 QVector<double> bucketAverage(const QVector<double> &values, int points);

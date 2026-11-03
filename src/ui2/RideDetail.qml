@@ -134,8 +134,10 @@ Item {
         var similar = Analysis.similarRide(r, list)
         var spread = Analysis.cadenceSpread(all)
         var similarSpread = similar ? Analysis.cadenceSpread(library.samples(similar.id, 0)) : 0
-        curve90 = r.start ? library.powerCurve(r.start - 90 * day, r.start) : []
-        curveBefore = r.start ? library.powerCurve(0, r.start) : []
+        // against rides with the same kind of watts (estimated or measured) as this one
+        var group = r.powerEstimated === true ? 1 : 0
+        curve90 = r.start ? library.powerCurve(r.start - 90 * day, r.start, group) : []
+        curveBefore = r.start ? library.powerCurve(0, r.start, group) : []
         history = list
         learnOpen = false
         story = Analysis.headline({
@@ -426,8 +428,11 @@ Item {
             out.push({ label: qsTr("Avg power"), value: Format.whole(r.avgPower), unit: "W", estimated: estimated, learn: "avgpower" })
         if (pro && r.np > 0) {
             out.push({ label: qsTr("Normalized power"), value: Format.whole(r.np), unit: "W", estimated: estimated, learn: "np" })
-            out.push({ label: qsTr("Intensity factor"), value: (r.intensity || 0).toFixed(2), unit: "", estimated: estimated, learn: "if" })
-            out.push({ label: qsTr("Training load"), value: Format.whole(r.tss), unit: "TSS", estimated: estimated, learn: "tss" })
+            // both come from FTP: shown once it is the rider's own (Theme.ftpSet)
+            if (Theme.ftpSet) {
+                out.push({ label: qsTr("Intensity factor"), value: (r.intensity || 0).toFixed(2), unit: "", estimated: estimated, learn: "if" })
+                out.push({ label: qsTr("Training load"), value: Format.whole(r.tss), unit: "TSS", estimated: estimated, learn: "tss" })
+            }
         }
         if (r.avgHr > 0)
             out.push({ label: qsTr("Avg heart rate"), value: Format.whole(r.avgHr), unit: "bpm", learn: "avghr" })

@@ -1,5 +1,6 @@
 #include "ridestats.h"
 
+#include <QPair>
 #include <QtMath>
 #include <algorithm>
 
@@ -59,34 +60,53 @@ const QVector<int> &curveDurations() {
     return durations;
 }
 
-double normalizedPower(const QVector<double> &watts) {
+// [start, end) of every segment: the whole range when segmentStarts is empty, else from each start
+// to the next one (starts out of range or out of order are skipped)
+QList<QPair<int, int>> segments(int size, const QList<int> &segmentStarts) {
+    QList<QPair<int, int>> out;
+    int from = 0;
+    for (int start : segmentStarts) {
+        if (start <= from || start >= size)
+            continue;
+        out.append(qMakePair(from, start));
+        from = start;
+    }
+    out.append(qMakePair(from, size));
+    return out;
+}
+
+double normalizedPower(const QVector<double> &watts, const QList<int> &segmentStarts) {
     const int window = 30;
-    if (watts.size() < window)
-        return 0;
-    double rolling = 0;
     double fourthSum = 0;
     int count = 0;
-    for (int i = 0; i < watts.size(); i++) {
-        rolling += watts.at(i);
-        if (i >= window)
-            rolling -= watts.at(i - window);
-        if (i >= window - 1) {
-            fourthSum += qPow(rolling / window, 4);
-            count++;
+    for (const QPair<int, int> &segment : segments(watts.size(), segmentStarts)) {
+        double rolling = 0;
+        for (int i = segment.first; i < segment.second; i++) {
+            rolling += watts.at(i);
+            if (i - segment.first >= window)
+                rolling -= watts.at(i - window);
+            if (i - segment.first >= window - 1) {
+                fourthSum += qPow(rolling / window, 4);
+                count++;
+            }
         }
     }
+    if (count == 0)
+        return 0;
     return qPow(fourthSum / count, 0.25);
 }
 
-double meanMax(const QVector<double> &prefixSums, int seconds) {
+double meanMax(const QVector<double> &prefixSums, int seconds, const QList<int> &segmentStarts) {
     // prefixSums[i] is the sum of the first i values, so it has one more entry than the ride
-    int samples = prefixSums.size() - 1;
-    if (seconds <= 0 || seconds > samples)
+    const int samples = prefixSums.size() - 1;
+    if (seconds <= 0)
         return -1;
-    double best = 0;
-    for (int end = seconds; end <= samples; end++)
-        best = qMax(best, prefixSums.at(end) - prefixSums.at(end - seconds));
-    return best / seconds;
+    double best = -1;
+    for (const QPair<int, int> &segment : segments(samples, segmentStarts)) {
+        for (int end = segment.first + seconds; end <= segment.second; end++)
+            best = qMax(best, prefixSums.at(end) - prefixSums.at(end - seconds));
+    }
+    return best < 0 ? -1 : best / seconds;
 }
 
 QVector<double> bucketAverage(const QVector<double> &values, int points) {
@@ -106,7 +126,7 @@ QVector<double> bucketAverage(const QVector<double> &values, int points) {
 }
 
 RideStats compute(const QVector<RideSample> &samples, const QList<int> &lapStarts, double ftp, double maxHr,
-                  const double hrZonePercent[4]) {
+                  const double hrZonePercent[4], const QList<int> &partStarts) {
     RideStats stats;
     stats.powerZones = QVector<int>(7, 0);
     stats.hrZones = QVector<int>(5, 0);
@@ -151,13 +171,14 @@ RideStats compute(const QVector<RideSample> &samples, const QList<int> &lapStart
     stats.avgPower = prefixSums.last() / n;
     stats.avgHr = hrCount ? hrSum / hrCount : 0;
     stats.avgCadence = cadenceCount ? cadenceSum / cadenceCount : 0;
-    stats.np = normalizedPower(watts);
+    // the break between the parts of a merged ride is not ridden: no window spans it
+    stats.np = normalizedPower(watts, partStarts);
     stats.intensity = stats.np / ftp;
     stats.tss = stats.duration * stats.np * stats.intensity / (ftp * 3600.0) * 100.0;
     stats.spark = bucketAverage(watts, 48);
 
     for (int seconds : curveDurations()) {
-        double best = meanMax(prefixSums, seconds);
+        double best = meanMax(prefixSums, seconds, partStarts);
         if (best < 0)
             break;
         stats.bestSeconds.append(seconds);

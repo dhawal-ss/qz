@@ -196,10 +196,16 @@ Item {
             shownId = selectedId
         }
     }
+    // a burst of changes (a first scan, a merge) reads the list once
+    Timer {
+        id: refreshLater
+        interval: 300
+        onTriggered: rides.refresh()
+    }
     Connections {
         target: rides.library
         ignoreUnknownSignals: true
-        function onChanged() { rides.refresh() }
+        function onChanged() { refreshLater.restart() }
     }
 
     ListModel { id: rideModel }

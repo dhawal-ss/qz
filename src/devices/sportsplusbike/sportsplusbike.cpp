@@ -276,6 +276,7 @@ void sportsplusbike::characteristicChanged(const QLowEnergyCharacteristic &chara
         if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                 .toString()
                 .startsWith(QStringLiteral("Disabled"))) {
+            m_powerEstimated = packetWatts < 0;
             m_watt = packetWatts >= 0 ? packetWatts : wattsFromResistance(currentResistance().value());
         }
         emit debug(QStringLiteral("Current watt: ") + QString::number(m_watt.value()));
@@ -315,6 +316,7 @@ void sportsplusbike::characteristicChanged(const QLowEnergyCharacteristic &chara
         if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                 .toString()
                 .startsWith(QStringLiteral("Disabled"))) {
+            m_powerEstimated = true;
             m_watt = wattsFromResistance(currentResistance().value());
         }
         emit debug(QStringLiteral("Current watt: ") + QString::number(m_watt.value()));

@@ -41,6 +41,21 @@ QtObject {
         property string accentChoice: "lavender"
         property int weekStart: 1
         property bool heartZonesSet: false
+        property bool ftpConfirmed: false
+    }
+    // QZ's FTP. Its default, 200 W, is not the rider's own until they set or confirm it (ui2/
+    // ftpConfirmed): until then training load, form and power zones say "set your FTP" instead
+    // of numbers worked out from a guess. Body and FTP and Today set it here with setFtp().
+    readonly property Settings savedFtp: Settings {
+        property real ftp: 200.0
+    }
+    readonly property real ftp: savedFtp.ftp > 0 ? savedFtp.ftp : 200
+    readonly property bool ftpSet: Math.round(savedFtp.ftp) !== 200 || savedLook.ftpConfirmed
+    function setFtp(watts) {
+        savedFtp.ftp = watts
+        savedLook.ftpConfirmed = true
+        savedFtp.sync()
+        savedLook.sync()
     }
     // QZ's four heart zone steps (heart_rate_zone1..4): the share of max heart rate, in percent,
     // where zones 2 to 5 start. Saved rides are worked out from the same keys (ridestats.cpp), and

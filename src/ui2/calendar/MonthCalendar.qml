@@ -74,10 +74,16 @@ Item {
     onMonthMsChanged: refresh()
     onLibraryChanged: refresh()
     Component.onCompleted: refresh()
+    // a burst of changes reads the month once
+    Timer {
+        id: refreshLater
+        interval: 300
+        onTriggered: month.refresh()
+    }
     Connections {
         target: month.library
         ignoreUnknownSignals: true
-        function onChanged() { month.refresh() }
+        function onChanged() { refreshLater.restart() }
     }
 
     Column {

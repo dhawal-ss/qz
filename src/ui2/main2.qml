@@ -213,11 +213,50 @@ ApplicationWindow {
         id: powerMemory
         category: "ui2"
         property bool lastPowerEstimated: false
+        property bool unknownPowerAssigned: false
     }
     Connections {
         target: live
-        function onConnectedChanged() { if (live.connected) powerMemory.lastPowerEstimated = live.powerEstimated }
+        function onConnectedChanged() {
+            if (live.connected) {
+                powerMemory.lastPowerEstimated = live.powerEstimated
+                if (!powerMemory.unknownPowerAssigned)
+                    assignPower.restart()
+            }
+        }
         function onPowerEstimatedChanged() { if (live.connected) powerMemory.lastPowerEstimated = live.powerEstimated }
+    }
+    // once: the rides read before the library kept their power source are taken as this bike's, so
+    // they stay in its power curve and records. 10 s after it connects, when it has said how it
+    // gets its watts.
+    Timer {
+        id: assignPower
+        interval: 10000
+        onTriggered: {
+            if (!live.connected || window.libraryObject === null || powerMemory.unknownPowerAssigned)
+                return
+            window.libraryObject.assignUnknownPower(live.powerEstimated)
+            powerMemory.unknownPowerAssigned = true
+        }
+    }
+    // a new FTP: the training load, zones and form of every ride are worked out again with it
+    Connections {
+        target: Theme
+        // after Theme.setFtp has saved it, so the library reads the new one
+        function onFtpChanged() {
+            Qt.callLater(function () {
+                if (window.libraryObject !== null)
+                    window.libraryObject.rebuild()
+            })
+        }
+    }
+
+    // power curves and records are this bike's kind: estimated watts with estimated ones only
+    Binding {
+        target: window.libraryObject
+        when: window.libraryObject !== null
+        property: "powerGroup"
+        value: powerMemory.lastPowerEstimated ? 1 : 0
     }
 
     RideSim {

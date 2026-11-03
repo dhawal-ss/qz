@@ -539,6 +539,7 @@ bool bike::inclinationAvailableBySoftware() { return false; }
 uint16_t bike::wattFromHR(bool useSpeedAndCadence) {
     QSettings settings;
     double watt = 0;
+    m_powerEstimated = true;
     if (currentCadence().value() == 0 && useSpeedAndCadence == true) {
         return 0;
     }
