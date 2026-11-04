@@ -621,6 +621,15 @@ Item {
         ignoreUnknownSignals: true
         function onChanged() { refreshLater.restart() }
     }
+    // Today is on screen at launch, before the app's core is there: read the body, and refresh
+    // for the home screen widget, once it is
+    onCoreChanged: {
+        if (core === null)
+            return
+        if (healthAsked)
+            readBody()
+        refreshLater.restart()
+    }
 
     Settings {
         id: uiStore
