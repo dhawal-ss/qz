@@ -47,7 +47,7 @@ YouPage {
                             text: "Bikemodo"
                             color: Theme.text
                             font.family: Theme.display
-                            font.pixelSize: 26
+                            font.pixelSize: Theme.fs(26)
                         }
                         Text {
                             visible: you.version !== ""

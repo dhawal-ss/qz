@@ -33,14 +33,14 @@ PulseButton {
                 text: qsTr("This week")
                 color: Theme.text
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
             }
             Text {
                 anchors.right: parent.right
                 text: weekCard.summary
                 color: weekCard.met ? Theme.zoneColors[2] : Theme.text2
                 font.family: weekCard.met ? Theme.bodySemibold : Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
         WeekPulses {

@@ -52,7 +52,7 @@ PulseButton {
                     text: rideRow.title
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 16
+                    font.pixelSize: Theme.fs(16)
                     elide: Text.ElideRight
                 }
                 // a record: the Pulse at its spikiest, as the badge a record settles into
@@ -74,7 +74,7 @@ PulseButton {
                         text: rideRow.records
                         color: rideRow.tint
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
             }
@@ -83,7 +83,7 @@ PulseButton {
                 text: rideRow.day
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
             }
         }
@@ -137,7 +137,7 @@ PulseButton {
             text: rideRow.length
             color: Theme.text
             font.family: Theme.display
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
         }
     }
 

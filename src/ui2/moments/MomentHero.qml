@@ -142,7 +142,7 @@ Item {
                     text: hero.status
                     color: Theme.text
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     elide: Text.ElideRight
                 }
             }
@@ -265,7 +265,7 @@ Item {
                         text: qsTr("est.")
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
             }
@@ -275,7 +275,7 @@ Item {
                 text: hero.moment.detail || ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: 21
                 wrapMode: Text.WordWrap
@@ -316,7 +316,7 @@ Item {
                             text: qsTr("Share")
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fs(15)
                         }
                     }
                 }

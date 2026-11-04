@@ -24,7 +24,7 @@ Column {
         text: qsTr("%1 of %2 rides read. They show up here as they come in.").arg(firstCard.indexed).arg(firstCard.toIndex)
         color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: 13
+        font.pixelSize: Theme.fs(13)
         wrapMode: Text.WordWrap
     }
     Repeater {
@@ -56,7 +56,7 @@ Column {
                     text: modelData.title
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     wrapMode: Text.WordWrap
                 }
                 Text {
@@ -64,7 +64,7 @@ Column {
                     text: modelData.detail
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     wrapMode: Text.WordWrap
                 }
             }

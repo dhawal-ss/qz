@@ -127,7 +127,7 @@ YouPage {
                         text: modelData.name
                         color: modelData.state === "coming" ? Theme.text2 : Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 17
+                        font.pixelSize: Theme.fs(17)
                     }
                     Rectangle {
                         visible: modelData.state !== ""
@@ -142,7 +142,7 @@ YouPage {
                             text: modelData.state === "now" ? qsTr("Now") : qsTr("Coming")
                             color: modelData.state === "now" ? Theme.accentInk : Theme.text2
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fs(12)
                         }
                     }
                 }
@@ -151,7 +151,7 @@ YouPage {
                     text: modelData.detail
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Math.round(font.pixelSize * 1.45)
                     wrapMode: Text.WordWrap
@@ -207,7 +207,7 @@ YouPage {
                             text: qsTr("W")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fs(15)
                         }
                         Text {
                             visible: you.powerEstimated
@@ -215,7 +215,7 @@ YouPage {
                             text: qsTr("est.")
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fs(12)
                         }
                     }
                     YouButton {
@@ -232,7 +232,7 @@ YouPage {
                                              : qsTr("Your zones start from it.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Math.round(font.pixelSize * 1.45)
                     wrapMode: Text.WordWrap
@@ -287,7 +287,7 @@ YouPage {
                 text: qsTr("Coming")
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }

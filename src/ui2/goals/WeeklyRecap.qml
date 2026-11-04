@@ -358,7 +358,7 @@ Item {
                     text: qsTr("Back")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -382,7 +382,7 @@ Item {
                     text: nextButton.last ? qsTr("Done") : qsTr("Next")
                     color: Theme.accentInk
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }

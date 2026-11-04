@@ -44,7 +44,7 @@ Column {
                 text: reachCard.reach ? qsTr("A new %1 record is %2 W away").arg(reachCard.effortName).arg(reachCard.reach.gap) : ""
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 17
+                font.pixelSize: Theme.fs(17)
                 wrapMode: Text.WordWrap
             }
             Text {
@@ -53,7 +53,7 @@ Column {
                                           .arg(reachCard.reach.watts).arg(reachCard.effortName).arg(reachCard.reach.best) : ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 wrapMode: Text.WordWrap
             }
         }
@@ -82,7 +82,7 @@ Column {
                     text: "W"
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                 }
             }
         }
@@ -100,7 +100,7 @@ Column {
                 text: qsTr("Try it")
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }

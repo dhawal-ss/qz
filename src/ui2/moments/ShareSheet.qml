@@ -69,7 +69,7 @@ Item {
             text: qsTr("Share ride")
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             Accessible.role: Accessible.Heading
             Accessible.name: text
         }
@@ -117,7 +117,7 @@ Item {
                   : (sheet.savedImage !== "" ? qsTr("Saved to %1").arg(sheet.savedImage) : "")
             color: sheet.failed ? Theme.danger : Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             wrapMode: Text.WrapAnywhere
             maximumLineCount: 3
             elide: Text.ElideRight
@@ -157,7 +157,7 @@ Item {
                         text: sheet.canShare ? qsTr("Share") : qsTr("Save image")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 18
+                        font.pixelSize: Theme.fs(18)
                     }
                 }
             }
@@ -201,7 +201,7 @@ Item {
                             text: qsTr("Save")
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fs(15)
                         }
                     }
                 }
@@ -240,14 +240,14 @@ Item {
                             text: qsTr("Post to Strava")
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fs(15)
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: qsTr("Soon")
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fs(12)
                         }
                     }
                 }

@@ -124,7 +124,10 @@ HabitPage {
                             id: kindButton
                             readonly property bool current: modelData[0] === setup.pickedKind
                             width: kindLabel.implicitWidth + (current ? 46 : 32)
-                            height: 36
+                            height: 48
+                            // 36 to see, 48 to touch
+                            topInset: 6
+                            bottomInset: 6
                             fill: current ? Theme.accent : (pressed ? Theme.pressed : "transparent")
                             pressedScale: 0.96
                             Accessible.name: modelData[1] + (current ? ", " + qsTr("selected") : "")
@@ -151,7 +154,7 @@ HabitPage {
                                         text: modelData[1]
                                         color: kindButton.current ? Theme.accentInk : Theme.text2
                                         font.family: Theme.bodySemibold
-                                        font.pixelSize: 14
+                                        font.pixelSize: Theme.fs(14)
                                     }
                                 }
                             }
@@ -300,7 +303,7 @@ HabitPage {
                         text: qsTr("Freezes")
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 17
+                        font.pixelSize: Theme.fs(17)
                     }
                     Text {
                         width: parent.width
@@ -308,7 +311,7 @@ HabitPage {
                               .arg(Streak.freezeEvery).arg(Streak.freezeMax)
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         lineHeight: 1.1
                         wrapMode: Text.WordWrap
                     }
@@ -320,7 +323,7 @@ HabitPage {
                 text: qsTr("You can change this any time. Smaller goals stick better.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 lineHeight: 1.1
                 wrapMode: Text.WordWrap
             }

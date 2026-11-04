@@ -60,7 +60,7 @@ Column {
                     text: modelData[0]
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                 }
                 Row {
                     spacing: 3
@@ -76,7 +76,7 @@ Column {
                         text: modelData[2]
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 18
+                        font.pixelSize: Theme.fs(18)
                     }
                 }
             }
@@ -88,7 +88,7 @@ Column {
                            : qsTr("Critical power needs hard efforts of 3 to 20 minutes in the last 90 days. A ramp test or a few hard blocks bring it.")
         color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: 13
+        font.pixelSize: Theme.fs(13)
         wrapMode: Text.WordWrap
     }
 
@@ -102,7 +102,7 @@ Column {
             text: qsTr("VO2 max")
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
         Row {
             visible: physio.vo2 !== null
@@ -119,7 +119,7 @@ Column {
                 text: physio.vo2 ? qsTr("ml/kg/min, likely %1 to %2").arg(physio.vo2.low).arg(physio.vo2.high) : ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
             }
         }
         Text {
@@ -128,7 +128,7 @@ Column {
                   : (physio.weight > 0 ? qsTr("Needs a hard 5 minutes in the last 90 days: an all-out effort, not an easy ride.") : qsTr("Needs your weight, set in You."))
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
             wrapMode: Text.WordWrap
         }
     }
@@ -144,7 +144,7 @@ Column {
             text: qsTr("Fitness ramp")
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
         Text {
             width: parent.width
@@ -154,7 +154,7 @@ Column {
                   : qsTr("Down %1 this week.").arg(Math.abs(physio.ramp.perWeek))
             color: physio.ramp && physio.ramp.steep ? Theme.zoneColors[5] : Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 15
+            font.pixelSize: Theme.fs(15)
             wrapMode: Text.WordWrap
         }
     }

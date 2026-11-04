@@ -295,7 +295,7 @@ Item {
                                 text: index + 1
                                 color: Theme.bg
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fs(12)
                             }
                         }
                     }
@@ -323,7 +323,7 @@ Item {
                 text: Format.duration(laps.lapSeconds)
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
             }
         }
 
@@ -398,7 +398,7 @@ Item {
                                 text: Math.round(barSlot.lap.avgPower)
                                 color: Theme.bg
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fs(12)
                             }
                         }
 
@@ -410,7 +410,7 @@ Item {
                             text: index + 1
                             color: index === laps.selectedLap ? Theme.text : Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                 }
@@ -435,7 +435,7 @@ Item {
                         text: qsTr("Best")
                         color: Theme.accent
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.fs(11)
                     }
                 }
             }
@@ -454,7 +454,7 @@ Item {
                     text: qsTr("FTP %1 W").arg(Math.round(laps.ftp))
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
         }
@@ -628,7 +628,7 @@ Item {
                                         text: parent.parts[0]
                                         color: Theme.text
                                         font.family: Theme.bodySemibold
-                                        font.pixelSize: 14
+                                        font.pixelSize: Theme.fs(14)
                                     }
                                     Text {
                                         anchors.baseline: parent.children[0].baseline
@@ -636,7 +636,7 @@ Item {
                                         text: parent.parts[1] || ""
                                         color: Theme.text3
                                         font.family: Theme.bodyMedium
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme.fs(11)
                                     }
                                 }
                                 Row {
@@ -649,14 +649,14 @@ Item {
                                         color: tableCell.mine > 0 && tableCell.average > 0 ? laps.deltaColor(tableCell.mine - tableCell.average)
                                                                                            : Theme.text3
                                         font.family: Theme.bodyMedium
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme.fs(11)
                                     }
                                     Text {
                                         visible: table.wide && tableCell.mine > 0 && tableCell.before > 0
                                         text: laps.signed(tableCell.mine - tableCell.before)
                                         color: Theme.text3
                                         font.family: Theme.bodyMedium
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme.fs(11)
                                     }
                                 }
                             }
@@ -672,7 +672,7 @@ Item {
                                  : qsTr("Small figures: the change from the ride average")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
                 wrapMode: Text.WordWrap
             }
         }
@@ -750,7 +750,7 @@ Item {
                         text: laps.pacingTop + " W"
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.fs(11)
                     }
                 }
             }
@@ -762,21 +762,21 @@ Item {
                     text: "0:00"
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Format.duration(laps.pacingSeconds / 2)
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
                 Text {
                     anchors.right: parent.right
                     text: Format.duration(laps.pacingSeconds)
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
 

@@ -67,7 +67,10 @@ Item {
                 PulseButton {
                     visible: page.showBack
                     width: 44
-                    height: 44
+                    height: 48
+                    // 44 to see, 48 to touch
+                    topInset: 2
+                    bottomInset: 2
                     fill: Theme.control
                     Accessible.name: qsTr("Back")
                     onClicked: page.canStepBack ? page.stepBack() : page.you.goBack()
@@ -139,7 +142,7 @@ Item {
                         text: page.lead
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         lineHeightMode: Text.FixedHeight
                         lineHeight: 20
                         wrapMode: Text.WordWrap

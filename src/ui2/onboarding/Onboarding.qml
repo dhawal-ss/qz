@@ -54,7 +54,7 @@ Item {
             text: qsTr("Skip")
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 15
+            font.pixelSize: Theme.fs(15)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }
@@ -97,7 +97,7 @@ Item {
                     text: qsTr("Four quick steps, then your first ride. Skip any of them, everything can change later in You.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Math.round(font.pixelSize * 1.45)
                     wrapMode: Text.WordWrap
@@ -165,7 +165,7 @@ Item {
                     text: qsTr("Both are optional. Leave a box empty if you are not sure.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Math.round(font.pixelSize * 1.45)
                     wrapMode: Text.WordWrap

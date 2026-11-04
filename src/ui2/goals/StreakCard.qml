@@ -198,7 +198,7 @@ Column {
                 text: streakCard.line
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: 20
                 wrapMode: Text.WordWrap
@@ -277,7 +277,7 @@ Column {
                                   : (streakCard.weekMet ? qsTr("Closed. Everything from here is extra.") : streakCard.toGo)
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 16
+                            font.pixelSize: Theme.fs(16)
                             lineHeightMode: Text.FixedHeight
                             lineHeight: 21
                             wrapMode: Text.WordWrap
@@ -312,7 +312,7 @@ Column {
                                 }
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                                 wrapMode: Text.WordWrap
                                 Accessible.ignored: true
                             }
@@ -344,7 +344,7 @@ Column {
                                 text: qsTr("Weekly goal")
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 elide: Text.ElideRight
                             }
                             Text {
@@ -355,7 +355,7 @@ Column {
                                       : qsTr("minutes a week")
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                                 elide: Text.ElideRight
                             }
                         }
@@ -407,7 +407,7 @@ Column {
                                 text: modelData[0]
                                 color: actionButton.lead ? Theme.accentInk : Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }

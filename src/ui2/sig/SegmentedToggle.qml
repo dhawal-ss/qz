@@ -76,7 +76,7 @@ Item {
                     text: modelData
                     color: segment.current ? segmentGroup.ink : Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     elide: Text.ElideRight

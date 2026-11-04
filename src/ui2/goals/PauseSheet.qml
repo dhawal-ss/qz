@@ -117,7 +117,7 @@ HabitPage {
                             text: modelData[1]
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fs(17)
                             elide: Text.ElideRight
                         }
                         // the radio: a ring, filled with a check once picked
@@ -188,7 +188,7 @@ HabitPage {
                 text: qsTr("Goals pause, your streak waits, reminders stop until you're back.")
                 color: Theme.text
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 lineHeight: 1.1
                 wrapMode: Text.WordWrap
             }
@@ -231,14 +231,14 @@ HabitPage {
                             text: qsTr("Back around")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                         }
                         Text {
                             width: parent.width
                             text: pauseSheet.mondayWords(pauseSheet.until)
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fs(17)
                             elide: Text.ElideRight
                         }
                     }
@@ -250,7 +250,7 @@ HabitPage {
                         text: qsTr("Optional")
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                     GoalGlyph {
                         id: chevron
@@ -283,7 +283,10 @@ HabitPage {
                         id: dateChip
                         readonly property bool current: pauseSheet.until === modelData
                         width: chipText.implicitWidth + 28
-                        height: 40
+                        height: 48
+                        // 40 to see, 48 to touch
+                        topInset: 4
+                        bottomInset: 4
                         radius: 18
                         pressedRadius: 12
                         fill: current ? Theme.accent : (pressed ? Theme.chip : Theme.control)
@@ -297,7 +300,7 @@ HabitPage {
                             text: modelData > 0 ? Format.day(Streak.weekStartOf(Streak.keyDay(modelData))) : qsTr("Not sure yet")
                             color: dateChip.current ? Theme.accentInk : Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }

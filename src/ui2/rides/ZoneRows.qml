@@ -94,7 +94,7 @@ Item {
                     text: Theme.powerZoneNames[index]
                     color: zoneRow.lead ? Theme.zoneColors[index] : (zoneRow.none ? Theme.text3 : Theme.text)
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     elide: Text.ElideRight
                 }
                 Text {
@@ -105,7 +105,7 @@ Item {
                     text: zones.range(index + 1)
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     elide: Text.ElideRight
                 }
                 // a short bar of its share, before the minutes

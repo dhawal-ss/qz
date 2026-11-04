@@ -169,7 +169,7 @@ Column {
                 text: curve.shownPoint ? qsTr("W at %1").arg(Progress.effort(curve.shownPoint.seconds)) : ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
             Text {
                 anchors.bottom: wattsNumber.bottom
@@ -178,7 +178,7 @@ Column {
                 text: curve.shownPoint && curve.weight > 0 ? (curve.shownPoint.watts / curve.weight).toFixed(1) + " W/kg" : ""
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
         Text {
@@ -196,7 +196,7 @@ Column {
             }
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
             elide: Text.ElideRight
         }
         PulseButton {
@@ -205,7 +205,10 @@ Column {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: openText.implicitWidth + 28
-            height: 44
+            height: 48
+            // 44 to see, 48 to touch
+            topInset: 2
+            bottomInset: 2
             fill: pressed ? Theme.pressed : Theme.chip
             Accessible.name: qsTr("Open the ride of this best")
             onClicked: curve.openRide(curve.shownPoint.rideId)
@@ -214,7 +217,7 @@ Column {
                 text: qsTr("Open ride")
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
@@ -274,7 +277,7 @@ Column {
                     text: curve.scaleTop + " W"
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
 
                 Item {
@@ -316,7 +319,7 @@ Column {
                     text: qsTr("No rides in this period yet.")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                 }
 
                 // the shown point: 5 min, or the one under the crosshair
@@ -381,7 +384,7 @@ Column {
                     text: Progress.effort(modelData)
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
         }
@@ -404,7 +407,7 @@ Column {
                 text: qsTr("This period")
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
         Row {
@@ -425,7 +428,7 @@ Column {
                 text: qsTr("Previous")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }

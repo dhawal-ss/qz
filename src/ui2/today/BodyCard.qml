@@ -40,7 +40,7 @@ Rectangle {
             text: qsTr("Use heart rate variability, resting heart rate and sleep from Health Connect, against what is usual for you. Read on this phone only, never sent anywhere.")
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             lineHeightMode: Text.FixedHeight
             lineHeight: 18
             wrapMode: Text.WordWrap
@@ -60,7 +60,7 @@ Rectangle {
                     text: qsTr("Use Health Connect")
                     color: Theme.accentInk
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -77,7 +77,7 @@ Rectangle {
                     text: qsTr("Not now")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -93,7 +93,7 @@ Rectangle {
                   : bodyCard.body.words
             color: bodyCard.tone
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             wrapMode: Text.WordWrap
         }
         Flow {
@@ -118,20 +118,20 @@ Rectangle {
                             text: modelData.name
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                         Text {
                             text: modelData.value
                             color: modelData.tone > 0 ? Theme.zoneColors[1] : (modelData.tone < 0 ? Theme.zoneColors[4] : Theme.text)
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 15
+                            font.pixelSize: Theme.fs(15)
                         }
                         Text {
                             visible: text !== ""
                             text: modelData.usual
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                 }

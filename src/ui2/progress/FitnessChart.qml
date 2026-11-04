@@ -159,7 +159,7 @@ Column {
         text: qsTr("Ride a few times a week and your fitness shows here.")
         color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: 14
+        font.pixelSize: Theme.fs(14)
         wrapMode: Text.WordWrap
     }
 
@@ -202,7 +202,7 @@ Column {
                     text: modelData[0]
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     elide: Text.ElideRight
                 }
             }
@@ -259,7 +259,7 @@ Column {
                             text: Math.round(fitness.scaleTop * (1 - index / 2))
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                 }
@@ -343,7 +343,7 @@ Column {
                     text: modelData.text
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
 
@@ -407,7 +407,7 @@ Column {
                     style: Text.Outline
                     styleColor: Theme.bg
                     font.family: index === 1 ? Theme.bodySemibold : Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
 

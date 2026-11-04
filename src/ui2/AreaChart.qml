@@ -117,7 +117,7 @@ Item {
             text: chart.scaleTop + (chart.unit !== "" ? " " + chart.unit : "")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
         Text {
             anchors.right: parent.right
@@ -127,7 +127,7 @@ Item {
             text: chart.scaleBottom
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
     }
 }

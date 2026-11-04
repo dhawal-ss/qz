@@ -2274,6 +2274,24 @@ void homeform::updateWidget(const QString &value, const QString &detail, const Q
 #endif
 }
 
+double homeform::systemFontScale() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jfloat>("org/cagnulen/qdomyoszwift/BikemodoSystem", "fontScale",
+                                                       "(Landroid/content/Context;)F", QtAndroid::androidContext().object());
+#else
+    return 1.0;
+#endif
+}
+
+bool homeform::systemAnimationsOff() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoSystem", "animationsOff",
+                                                         "(Landroid/content/Context;)Z", QtAndroid::androidContext().object());
+#else
+    return false;
+#endif
+}
+
 bool homeform::healthAvailable() {
 #ifdef Q_OS_ANDROID
     return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoHealth", "available",

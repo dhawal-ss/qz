@@ -52,7 +52,7 @@ Rectangle {
                     text: suggestion.plan ? suggestion.plan.name : ""
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 21
+                    font.pixelSize: Theme.fs(21)
                     font.letterSpacing: -0.2
                     wrapMode: Text.WordWrap
                     maximumLineCount: 2
@@ -69,7 +69,7 @@ Rectangle {
                 text: suggestion.plan ? qsTr("%1 min").arg(suggestion.plan.minutes) : ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 Accessible.ignored: true
             }
         }
@@ -88,7 +88,7 @@ Rectangle {
                 text: suggestion.plan ? suggestion.plan.detail : ""
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 width: Math.min(implicitWidth, parent.width - load.width - 18)
                 elide: Text.ElideRight
             }
@@ -99,7 +99,7 @@ Rectangle {
                 textFormat: Text.StyledText
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 Accessible.name: suggestion.plan ? qsTr("Training load %1, estimated").arg(suggestion.plan.tss) : ""
             }
         }
@@ -129,7 +129,7 @@ Rectangle {
                         text: suggestion.plan ? qsTr("Start workout") : qsTr("Start ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 18
+                        font.pixelSize: Theme.fs(18)
                     }
                 }
             }
@@ -138,7 +138,10 @@ Rectangle {
         PulseButton {
             anchors.horizontalCenter: parent.horizontalCenter
             width: Math.min(parent.width, swapText.implicitWidth + 32)
-            height: 40
+            height: 48
+            // 40 to see, 48 to touch
+            topInset: 4
+            bottomInset: 4
             fill: pressed ? Theme.pressed : "transparent"
             Accessible.name: swapText.text
             onClicked: suggestion.firstRide ? suggestion.demoRequested() : suggestion.swap()
@@ -147,7 +150,7 @@ Rectangle {
                 text: suggestion.firstRide ? qsTr("Try a demo ride, no bike needed") : suggestion.swapLabel
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 elide: Text.ElideRight

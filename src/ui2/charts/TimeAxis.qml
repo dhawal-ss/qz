@@ -45,7 +45,7 @@ Item {
             text: axis.view.clock(seconds)
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
     }
 }

@@ -624,7 +624,7 @@ Item {
                         text: detail.ride.start ? Format.title(detail.ride) : ""
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 21
+                        font.pixelSize: Theme.fs(21)
                         font.letterSpacing: -0.2
                         elide: Text.ElideRight
                         Accessible.role: Accessible.Heading
@@ -636,7 +636,7 @@ Item {
                         text: detail.dayLine()
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         elide: Text.ElideRight
                     }
                     // a ride of parts, and Split
@@ -651,7 +651,7 @@ Item {
                             text: detail.working === "split" ? qsTr("Splitting the ride") : detail.partsWords()
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             elide: Text.ElideRight
                         }
                         PulseButton {
@@ -659,7 +659,10 @@ Item {
                             x: parent.width - width + 12
                             anchors.verticalCenter: parent.verticalCenter
                             width: splitText.implicitWidth + 28
-                            height: 44
+                            height: 48
+                            // 44 to see, 48 to touch
+                            topInset: 2
+                            bottomInset: 2
                             enabled: detail.working === ""
                             fill: pressed ? Theme.pressed : "transparent"
                             Accessible.name: qsTr("Split this ride into its %1 parts").arg(detail.ride.parts || 1)
@@ -669,7 +672,7 @@ Item {
                                 text: qsTr("Split")
                                 color: splitButton.enabled ? Theme.accent : Theme.text3
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -688,13 +691,16 @@ Item {
                                   : detail.mergeWords() + " " + qsTr("Merging makes them one ride, the pause left out.")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             wrapMode: Text.WordWrap
                         }
                         PulseButton {
                             id: mergeButton
                             width: mergeText.implicitWidth + 36
-                            height: 44
+                            height: 48
+                            // 44 to see, 48 to touch
+                            topInset: 2
+                            bottomInset: 2
                             enabled: detail.working === ""
                             pressedRadius: 14
                             fill: pressed ? Theme.chip : Theme.control
@@ -705,7 +711,7 @@ Item {
                                 text: qsTr("Merge with the ride before")
                                 color: mergeButton.enabled ? Theme.text : Theme.text3
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -754,7 +760,7 @@ Item {
                             text: detail.story.unit
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 18
+                            font.pixelSize: Theme.fs(18)
                             Accessible.ignored: true
                         }
                         Column {
@@ -771,7 +777,7 @@ Item {
                                 textFormat: Text.StyledText
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 wrapMode: Text.WordWrap
                                 maximumLineCount: 2
                                 elide: Text.ElideRight
@@ -783,7 +789,7 @@ Item {
                                 text: detail.story.sub
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                                 elide: Text.ElideRight
                                 Accessible.ignored: true
                             }
@@ -988,7 +994,7 @@ Item {
                             text: detail.estimated ? qsTr("Power, est.") : qsTr("Power")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                         }
                     }
                     ZoneRows {
@@ -1033,7 +1039,7 @@ Item {
                             text: detail.estimated ? qsTr("Best at each length, est.") : qsTr("Best at each length")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             elide: Text.ElideRight
                         }
                     }
@@ -1097,7 +1103,7 @@ Item {
                                 text: modelData.text
                                 color: Theme.text
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 lineHeight: 1.2
                                 wrapMode: Text.WordWrap
                             }
@@ -1148,7 +1154,7 @@ Item {
                                     text: modelData[0]
                                     color: Theme.text2
                                     font.family: Theme.bodyMedium
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.fs(13)
                                     Accessible.ignored: true
                                 }
                                 Row {
@@ -1166,7 +1172,7 @@ Item {
                                         text: modelData[2]
                                         color: Theme.text2
                                         font.family: Theme.bodyMedium
-                                        font.pixelSize: 18
+                                        font.pixelSize: Theme.fs(18)
                                         Accessible.ignored: true
                                     }
                                 }
@@ -1179,7 +1185,7 @@ Item {
                         text: detail.durable ? Analysis.durabilityWords(detail.durable.decoupling) : ""
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         lineHeight: 1.2
                         wrapMode: Text.WordWrap
                     }
@@ -1226,7 +1232,7 @@ Item {
                                 + (detail.estimated ? " " + qsTr("Estimated, like the watts of this bike.") : "")
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         lineHeight: 1.2
                         wrapMode: Text.WordWrap
                     }
@@ -1264,7 +1270,7 @@ Item {
                                 text: modelData.label
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                             }
                             Rectangle {
                                 x: bandLabel.width + 8
@@ -1286,7 +1292,7 @@ Item {
                                 text: Math.round(modelData.share * 100) + "%"
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                             }
                         }
                     }
@@ -1295,7 +1301,7 @@ Item {
                         text: qsTr("rpm, of the time you pedaled")
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
             }
@@ -1329,7 +1335,7 @@ Item {
                             text: detail.blocks.work ? qsTr("Work blocks") : qsTr("%1 laps").arg(detail.blocks.blocks.length)
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                         }
                     }
                     WorkBlocks {
@@ -1391,7 +1397,7 @@ Item {
                                     text: qsTr("Share")
                                     color: Theme.accentInk
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 16
+                                    font.pixelSize: Theme.fs(16)
                                 }
                             }
                         }
@@ -1410,7 +1416,7 @@ Item {
                             text: qsTr("Saved on this phone as a FIT file")
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                         }
                     }
                 }

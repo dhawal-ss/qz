@@ -34,7 +34,7 @@ LearnTap {
             text: Patterns.usualWords(usualCard.usual)
             color: usualCard.sample ? Theme.text2 : Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             wrapMode: Text.WordWrap
         }
         CompareBars {

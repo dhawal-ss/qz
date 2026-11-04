@@ -705,13 +705,13 @@ Item {
                                 text: modelData.name
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                             }
                             Text {
                                 text: modelData.when
                                 color: Theme.text3
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fs(12)
                             }
                         }
                     }
@@ -886,7 +886,7 @@ Item {
                     text: new Date().toLocaleDateString(Qt.locale(), "dddd, d MMMM")
                     color: Theme.text
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     elide: Text.ElideRight
                 }
                 Row {
@@ -911,7 +911,7 @@ Item {
                         text: todayPage.deviceName !== "" ? todayPage.deviceName : qsTr("Bike ready")
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                         elide: Text.ElideRight
                     }
                 }
@@ -934,7 +934,7 @@ Item {
                         text: todayPage.initial
                         color: Theme.accent
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 17
+                        font.pixelSize: Theme.fs(17)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -986,7 +986,7 @@ Item {
                                     text: todayPage.ridePaused ? qsTr("Ride paused") : qsTr("Unfinished ride")
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 15
+                                    font.pixelSize: Theme.fs(15)
                                     elide: Text.ElideRight
                                     Accessible.ignored: true
                                 }
@@ -995,7 +995,7 @@ Item {
                                     text: todayPage.ridePaused ? todayPage.pausedAgo : todayPage.unfinishedWords
                                     color: Theme.text2
                                     font.family: Theme.bodyMedium
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.fs(13)
                                     // the paused line is short; the unfinished one says what happened
                                     elide: todayPage.ridePaused ? Text.ElideRight : Text.ElideNone
                                     wrapMode: todayPage.ridePaused ? Text.NoWrap : Text.WordWrap
@@ -1028,7 +1028,7 @@ Item {
                                         text: todayPage.ridePaused ? qsTr("Resume") : qsTr("Keep")
                                         color: Theme.accentInk
                                         font.family: Theme.bodySemibold
-                                        font.pixelSize: 14
+                                        font.pixelSize: Theme.fs(14)
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignVCenter
                                     }
@@ -1054,7 +1054,7 @@ Item {
                                         text: todayPage.ridePaused ? qsTr("End") : qsTr("Dismiss")
                                         color: Theme.text
                                         font.family: Theme.bodySemibold
-                                        font.pixelSize: 14
+                                        font.pixelSize: Theme.fs(14)
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignVCenter
                                     }
@@ -1068,7 +1068,7 @@ Item {
                             text: qsTr("A long pause, but Resume still carries on this same ride.")
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             wrapMode: Text.WordWrap
                             bottomPadding: 6
                         }
@@ -1138,7 +1138,7 @@ Item {
                             text: todayPage.coachWords.line
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fs(14)
                             lineHeightMode: Text.FixedHeight
                             lineHeight: 20
                             wrapMode: Text.WordWrap
@@ -1186,7 +1186,7 @@ Item {
                                                           .arg(todayPage.ftpTest.watts) : ""
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 Accessible.ignored: true
                             }
                             Text {
@@ -1199,7 +1199,7 @@ Item {
                                         + " " + qsTr("Your power zones, load and workouts start from FTP.")
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                                 lineHeightMode: Text.FixedHeight
                                 lineHeight: 18
                                 wrapMode: Text.WordWrap
@@ -1220,7 +1220,7 @@ Item {
                                     text: todayPage.ftpTest ? qsTr("Use %1 W").arg(todayPage.ftpTest.watts) : ""
                                     color: Theme.accentInk
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fs(14)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -1237,7 +1237,7 @@ Item {
                                     text: Theme.ftpSet ? qsTr("Keep %1 W").arg(Math.round(Theme.ftp)) : qsTr("Not now")
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fs(14)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -1270,7 +1270,7 @@ Item {
                                 text: qsTr("Set your FTP")
                                 color: Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 Accessible.ignored: true
                             }
                             Text {
@@ -1281,7 +1281,7 @@ Item {
                                       : qsTr("Your load, form and power zones start from it. Set it in You, or ride 20 minutes hard and Bikemodo offers one.")
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.fs(13)
                                 lineHeightMode: Text.FixedHeight
                                 lineHeight: 18
                                 wrapMode: Text.WordWrap
@@ -1303,7 +1303,7 @@ Item {
                                     text: qsTr("Use %1 W").arg(todayPage.ftpOffer)
                                     color: Theme.accentInk
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fs(14)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -1320,7 +1320,7 @@ Item {
                                     text: qsTr("Ramp test")
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fs(14)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -1337,7 +1337,7 @@ Item {
                                     text: qsTr("Set my own")
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 14
+                                    font.pixelSize: Theme.fs(14)
                                     horizontalAlignment: Text.AlignHCenter
                                     verticalAlignment: Text.AlignVCenter
                                 }
@@ -1397,7 +1397,10 @@ Item {
                         PulseButton {
                             visible: todayPage.rideCount > 0
                             width: customizeText.implicitWidth + 24
-                            height: 44
+                            height: 48
+                            // 44 to see, 48 to touch
+                            topInset: 2
+                            bottomInset: 2
                             fill: pressed ? Theme.pressed : "transparent"
                             Accessible.name: qsTr("Customize Today")
                             onClicked: todayPage.customizing = true
@@ -1406,7 +1409,7 @@ Item {
                                 text: qsTr("Customize Today")
                                 color: Theme.accent
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -1414,7 +1417,10 @@ Item {
                         PulseButton {
                             visible: todayPage.rideCount > 0
                             width: demoText.implicitWidth + 24
-                            height: 44
+                            height: 48
+                            // 44 to see, 48 to touch
+                            topInset: 2
+                            bottomInset: 2
                             fill: pressed ? Theme.pressed : "transparent"
                             Accessible.name: qsTr("Try a demo ride, no bike needed")
                             onClicked: todayPage.demoRequested()
@@ -1423,7 +1429,7 @@ Item {
                                 text: qsTr("Try a demo ride")
                                 color: Theme.text2
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }

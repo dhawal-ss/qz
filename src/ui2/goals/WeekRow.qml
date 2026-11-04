@@ -111,7 +111,7 @@ Item {
         text: weekRow.weeks.length === 1 ? qsTr("This week") : qsTr("%1 weeks ago").arg(weekRow.weeks.length - 1)
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
     Text {
         visible: weekRow.labels && weekRow.weeks.length > 1
@@ -120,6 +120,6 @@ Item {
         text: qsTr("This week")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
 }

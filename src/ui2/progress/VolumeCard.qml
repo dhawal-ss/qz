@@ -179,7 +179,7 @@ Column {
                 }
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
     }
@@ -204,7 +204,7 @@ Column {
                 text: volume.averages.length > 0 ? qsTr("4-week avg %1").arg(volume.shortText(volume.averages[volume.averages.length - 1])) : ""
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
 
             Item {
@@ -230,7 +230,7 @@ Column {
                             text: volume.axisText(gridLine.at)
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                 }
@@ -286,7 +286,7 @@ Column {
                 text: volume.weeks.length > volume.lead ? Progress.shortDate(volume.weeks[volume.lead].start) : ""
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
             }
             Text {
                 y: plot.y + plot.height + 6
@@ -294,7 +294,7 @@ Column {
                 text: qsTr("Last week")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
             }
         }
     }

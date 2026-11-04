@@ -52,7 +52,7 @@ Column {
                     text: modelData.id === "event" ? qsTr("Event in %1 weeks").arg(card.eventWeeks) : modelData.name
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 16
+                    font.pixelSize: Theme.fs(16)
                     wrapMode: Text.WordWrap
                 }
                 Text {
@@ -60,7 +60,7 @@ Column {
                     text: modelData.detail
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     wrapMode: Text.WordWrap
                 }
                 // the weeks to the event
@@ -72,7 +72,10 @@ Column {
                         model: [4, 6, 8, 12, 16]
                         PulseButton {
                             width: 48
-                            height: 40
+                            height: 48
+                            // 40 to see, 48 to touch
+                            topInset: 4
+                            bottomInset: 4
                             pressedRadius: 12
                             fill: card.eventWeeks === modelData ? Theme.accent : Theme.control
                             Accessible.name: qsTr("%1 weeks").arg(modelData)
@@ -81,7 +84,7 @@ Column {
                                 text: modelData
                                 color: card.eventWeeks === modelData ? Theme.accentInk : Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -94,7 +97,10 @@ Column {
                 anchors.right: parent.right
                 y: 10
                 width: startText.implicitWidth + 28
-                height: 44
+                height: 48
+                // 44 to see, 48 to touch
+                topInset: 2
+                bottomInset: 2
                 pressedRadius: 14
                 fill: pressed ? Theme.chip : Theme.control
                 Accessible.name: qsTr("Start the plan %1").arg(modelData.name)
@@ -104,7 +110,7 @@ Column {
                     text: qsTr("Start")
                     color: Theme.accent
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -128,7 +134,7 @@ Column {
             text: card.plan ? (card.plan.id === "event" ? qsTr("Event in %1 weeks").arg(card.plan.weeks) : Plans.info(card.plan.id).name) : ""
             color: Theme.text
             font.family: Theme.display
-            font.pixelSize: 24
+            font.pixelSize: Theme.fs(24)
             wrapMode: Text.WordWrap
         }
         Text {
@@ -139,7 +145,7 @@ Column {
                     + (card.planState.easy ? ". " + qsTr("An easier week, to let the work sink in.") : "")
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             wrapMode: Text.WordWrap
         }
 
@@ -178,7 +184,7 @@ Column {
                         text: modelData.name
                         color: parent.parent.ridden ? Theme.text3 : Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                         elide: Text.ElideRight
                     }
                     Text {
@@ -186,7 +192,7 @@ Column {
                         text: qsTr("%1 min").arg(modelData.minutes) + " · " + modelData.detail
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                         elide: Text.ElideRight
                     }
                 }
@@ -196,7 +202,10 @@ Column {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     width: visible ? rideText.implicitWidth + 28 : 0
-                    height: 40
+                    height: 48
+                    // 40 to see, 48 to touch
+                    topInset: 4
+                    bottomInset: 4
                     pressedRadius: 12
                     fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
                     Accessible.name: qsTr("Ride %1 now").arg(modelData.name)
@@ -206,7 +215,7 @@ Column {
                         text: qsTr("Ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -230,7 +239,7 @@ Column {
                       + modelData.rides.map(function (r) { return r.name }).join(", ")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 wrapMode: Text.WordWrap
             }
         }
@@ -238,7 +247,10 @@ Column {
         PulseButton {
             x: -12
             width: endText.implicitWidth + 24
-            height: 44
+            height: 48
+            // 44 to see, 48 to touch
+            topInset: 2
+            bottomInset: 2
             fill: pressed ? Theme.pressed : "transparent"
             Accessible.name: card.planState && card.planState.over ? qsTr("Close the plan") : qsTr("End the plan")
             onClicked: card.endPlan()
@@ -247,7 +259,7 @@ Column {
                 text: card.planState && card.planState.over ? qsTr("Close the plan") : qsTr("End the plan")
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
@@ -261,14 +273,14 @@ Column {
         text: qsTr("Your levels")
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 15
+        font.pixelSize: Theme.fs(15)
     }
     Text {
         width: card.width
         text: qsTr("A finished workout raises its level, one left early lowers it. Workouts grow with them.")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 12
+        font.pixelSize: Theme.fs(12)
         wrapMode: Text.WordWrap
         bottomPadding: 6
     }
@@ -285,7 +297,7 @@ Column {
                 text: Levels.names()[modelData]
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
             Rectangle {
                 x: levelName.width + 8
@@ -307,7 +319,7 @@ Column {
                 text: (Math.round(parent.value * 10) / 10).toFixed(1)
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
     }
@@ -319,7 +331,7 @@ Column {
         text: qsTr("Routes")
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 15
+        font.pixelSize: Theme.fs(15)
     }
     Repeater {
         model: Route.library().concat([{ id: "gpx", name: qsTr("Open a route file"), detail: qsTr("A .gpx file, from Strava, Komoot or a bike computer") }])
@@ -338,14 +350,14 @@ Column {
                     text: modelData.name
                     color: Theme.text
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
                 Text {
                     width: parent.width
                     text: modelData.detail
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -354,7 +366,7 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "›"
                 color: Theme.text3
-                font.pixelSize: 22
+                font.pixelSize: Theme.fs(22)
             }
             MouseArea {
                 anchors.fill: parent
@@ -375,7 +387,7 @@ Column {
         text: qsTr("Workouts from elsewhere")
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 15
+        font.pixelSize: Theme.fs(15)
     }
     Repeater {
         model: [
@@ -397,14 +409,14 @@ Column {
                     text: modelData.title
                     color: Theme.text
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
                 Text {
                     width: parent.width
                     text: modelData.detail
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -413,7 +425,7 @@ Column {
                 anchors.verticalCenter: parent.verticalCenter
                 text: "›"
                 color: Theme.text3
-                font.pixelSize: 22
+                font.pixelSize: Theme.fs(22)
             }
             MouseArea {
                 anchors.fill: parent
@@ -434,14 +446,14 @@ Column {
         text: qsTr("Test your FTP")
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 15
+        font.pixelSize: Theme.fs(15)
     }
     Text {
         width: card.width
         text: qsTr("The ramp is about 20 minutes and ends when you cannot hold a step. The 20 minute test hurts longer and needs pacing. You choose whether to use the result.")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 12
+        font.pixelSize: Theme.fs(12)
         wrapMode: Text.WordWrap
         bottomPadding: 6
     }
@@ -459,7 +471,7 @@ Column {
                 text: qsTr("Ramp test")
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
@@ -476,7 +488,7 @@ Column {
                 text: qsTr("20 minute test")
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }

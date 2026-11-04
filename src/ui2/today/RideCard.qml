@@ -51,7 +51,7 @@ Column {
                     text: rideCard.ride ? qsTr("%1, %2").arg(Format.title(rideCard.ride)).arg(Format.day(rideCard.ride.start)) : ""
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 17
+                    font.pixelSize: Theme.fs(17)
                     elide: Text.ElideRight
                 }
                 Icon {

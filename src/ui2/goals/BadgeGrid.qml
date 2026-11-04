@@ -118,7 +118,7 @@ Column {
                                     text: badgeCard.subtitle(modelData)
                                     color: Theme.text3
                                     font.family: Theme.bodyMedium
-                                    font.pixelSize: 11
+                                    font.pixelSize: Theme.fs(11)
                                     horizontalAlignment: Text.AlignHCenter
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 2
@@ -136,7 +136,10 @@ Column {
         visible: badgeCard.badges.length > badgeCard.earnedList.length + 3
         x: -12
         width: allLabel.implicitWidth + 24
-        height: 44
+        height: 48
+        // 44 to see, 48 to touch
+        topInset: 2
+        bottomInset: 2
         fill: pressed ? Theme.pressed : "transparent"
         Accessible.name: allLabel.text
         onClicked: badgeCard.showAll = !badgeCard.showAll
@@ -145,7 +148,7 @@ Column {
             text: badgeCard.showAll ? qsTr("Show fewer") : qsTr("See all %1 badges").arg(badgeCard.badges.length)
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

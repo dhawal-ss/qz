@@ -182,7 +182,7 @@ Item {
                 text: modelData.text
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
             }
         }
     }
@@ -197,7 +197,7 @@ Item {
             text: modelData
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 10
+            font.pixelSize: Theme.fs(10)
             Accessible.ignored: true
         }
     }
@@ -313,7 +313,7 @@ Item {
                     text: qsTr("Less")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
                 Repeater {
                     model: heat.shades
@@ -331,7 +331,7 @@ Item {
                     text: qsTr("More")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
         }

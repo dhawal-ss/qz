@@ -149,11 +149,17 @@ QtObject {
     // side margin of the content: 16 on compact windows, 24 above
     function margin(width) { return width < 600 ? 16 : 24 }
 
-    // sizes
-    readonly property int labelSize: 13
-    readonly property int tertiarySize: 12
-    readonly property int bodySize: 15
-    readonly property int titleSize: 19
+    // sizes. Text follows the phone's font size (Android's font scale, set by main2.qml), up to
+    // 1.25 times so the layouts still hold; numerals of 28 px and more keep their size, they are
+    // already big and drawn to fit their room.
+    property real textScale: 1
+    function fs(px) {
+        return px >= 28 ? px : Math.round(px * textScale)
+    }
+    readonly property int labelSize: fs(13)
+    readonly property int tertiarySize: fs(12)
+    readonly property int bodySize: fs(15)
+    readonly property int titleSize: fs(19)
 
     // motion: the expressive curve overshoots a little, the effects curve does not
     readonly property var springCurve: [0.3, 1.35, 0.5, 1, 1, 1]
@@ -204,7 +210,7 @@ QtObject {
     readonly property int riseDistance: 10
 
     // Signature type and shapes
-    readonly property int capSize: 11
+    readonly property int capSize: fs(11)
     readonly property real capSpacing: 1.5
     readonly property int heroRadius: 32
     readonly property color raisedBorder: Qt.rgba(1, 1, 1, 0.05)

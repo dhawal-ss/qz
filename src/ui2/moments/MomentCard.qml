@@ -63,7 +63,7 @@ Item {
             text: card.title
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 15
+            font.pixelSize: Theme.fs(15)
             wrapMode: Text.WordWrap
         }
         Text {
@@ -71,7 +71,7 @@ Item {
             text: card.detail
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             lineHeightMode: Text.FixedHeight
             lineHeight: 18
             wrapMode: Text.WordWrap
@@ -89,13 +89,13 @@ Item {
             id: big
             text: card.value
             color: Theme.text
-            font.pixelSize: 24
+            font.pixelSize: Theme.fs(24)
         }
         Text {
             text: card.unit
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             anchors.baseline: big.baseline
             visible: text !== ""
         }

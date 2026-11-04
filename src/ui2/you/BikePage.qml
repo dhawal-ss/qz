@@ -110,7 +110,7 @@ YouPage {
                 text: you.connected ? (you.deviceName !== "" ? you.deviceName : qsTr("Connected")) : qsTr("Looking nearby")
                 color: you.connected ? page.tint : Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 elide: Text.ElideRight
             }
             Text {
@@ -124,7 +124,7 @@ YouPage {
                     : page.searchStatus
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 wrapMode: Text.WordWrap
             }
         }
@@ -248,7 +248,7 @@ YouPage {
                 text: modelData.line
                 color: Theme.text
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: Math.round(font.pixelSize * 1.45)
                 wrapMode: Text.WordWrap
@@ -294,7 +294,7 @@ YouPage {
                 text: qsTr("Some Echelon firmware blocks other apps.")
                 color: Theme.text
                 font.family: Theme.display
-                font.pixelSize: 24
+                font.pixelSize: Theme.fs(24)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: 27
                 wrapMode: Text.WordWrap
@@ -306,7 +306,7 @@ YouPage {
                 text: qsTr("An Echelon update from July 2025 makes the bike check with Echelon's servers before it talks to any other app. If your bike stopped connecting after an update, that is likely why. It isn't something you did.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: Math.round(font.pixelSize * 1.45)
                 wrapMode: Text.WordWrap
@@ -352,7 +352,7 @@ YouPage {
                     text: qsTr("Keep auto-update off")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     wrapMode: Text.WordWrap
                 }
                 Text {
@@ -360,7 +360,7 @@ YouPage {
                     text: qsTr("If your Echelon still connects, turn off automatic firmware updates in the Echelon app to keep it open to Bikemodo.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: Math.round(font.pixelSize * 1.45)
                     wrapMode: Text.WordWrap

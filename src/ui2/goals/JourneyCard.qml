@@ -154,7 +154,7 @@ Column {
         text: journeyCard.journey ? journeyCard.journey.name : ""
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 21
+        font.pixelSize: Theme.fs(21)
         font.letterSpacing: -0.2
         wrapMode: Text.WordWrap
     }
@@ -238,7 +238,7 @@ Column {
                 text: journeyCard.placeName(modelData)
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 11
+                font.pixelSize: Theme.fs(11)
             }
         }
 
@@ -333,7 +333,7 @@ Column {
                   : (changeButton.finishedNow ? qsTr("Pick the next journey") : qsTr("Change journey"))
             color: changeButton.finishedNow && !journeyCard.choosing ? Theme.accentInk : Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

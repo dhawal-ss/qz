@@ -79,7 +79,7 @@ Item {
                     text: row.label
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
                 // a record from the last two weeks
                 Rectangle {
@@ -96,7 +96,7 @@ Item {
                         text: qsTr("New")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 11
+                        font.pixelSize: Theme.fs(11)
                     }
                 }
             }
@@ -139,14 +139,14 @@ Item {
                     anchors.right: parent.right
                     text: row.valueText
                     color: Theme.text
-                    font.pixelSize: 22
+                    font.pixelSize: Theme.fs(22)
                 }
                 Text {
                     anchors.right: parent.right
                     text: row.stoodText
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                 }
             }
         }
@@ -159,7 +159,10 @@ Item {
         y: 30
         width: Math.max(48, dateLabel.implicitWidth + 12)
         radius: 12
-        height: 40
+        height: 48
+        // 40 to see, 48 to touch
+        topInset: 4
+        bottomInset: 4
         enabled: row.rideId > 0
         fill: pressed ? Theme.chip : "transparent"
         Accessible.name: qsTr("Open the ride of %1").arg(row.dateText)
@@ -170,7 +173,7 @@ Item {
             text: row.dateText
             color: row.rideId > 0 ? Theme.accent : Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             horizontalAlignment: Text.AlignLeft
             verticalAlignment: Text.AlignVCenter
         }
@@ -191,7 +194,7 @@ Item {
             text: row.note
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
             wrapMode: Text.WordWrap
         }
         Item {

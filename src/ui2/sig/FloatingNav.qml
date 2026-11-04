@@ -38,7 +38,7 @@ Item {
     TextMetrics {
         id: widest
         font.family: Theme.bodySemibold
-        font.pixelSize: 14
+        font.pixelSize: Theme.fs(14)
         text: {
             var longest = ""
             for (var i = 0; i < floatingNav.destinations.length; i++)

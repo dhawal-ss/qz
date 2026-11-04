@@ -370,7 +370,7 @@ Item {
         text: chart.name
         color: Theme.text2
         font.family: Theme.bodySemibold
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
         elide: Text.ElideRight
     }
     // the overlay's legend in place of the name
@@ -388,7 +388,7 @@ Item {
             text: chart.overlayName
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
         }
     }
     // the band's label at the top right: what it is, then its value in its color
@@ -402,14 +402,14 @@ Item {
             text: chart.bandLabel
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
         }
         Text {
             anchors.right: parent.right
             text: chart.bandValue
             color: chart.bandColor
             font.family: Theme.bodySemibold
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
         }
     }
     Text {
@@ -420,7 +420,7 @@ Item {
         text: chart.scaleTop + (chart.unit !== "" ? " " + chart.unit : "")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
 
     Item {
@@ -473,7 +473,7 @@ Item {
             text: chart.scaleTop + (chart.unit !== "" ? " " + chart.unit : "")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
 
         // lap starts
@@ -602,7 +602,7 @@ Item {
             text: chart.scaleBottom
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
 
         // the crosshair
@@ -657,7 +657,7 @@ Item {
             }
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
     }
 

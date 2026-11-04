@@ -51,7 +51,7 @@ Item {
                         text: blockRow.entry.name
                         color: blockRow.entry.best ? blocks.tint : Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                     }
                     Text {
                         anchors.baseline: blockName.baseline
@@ -60,7 +60,7 @@ Item {
                               + (blockRow.entry.hr > 0 ? ", " + qsTr("%1 bpm").arg(Math.round(blockRow.entry.hr)) : "")
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                         elide: Text.ElideRight
                     }
                 }
@@ -73,7 +73,7 @@ Item {
                         id: blockWatts
                         text: Math.round(blockRow.entry.watts)
                         color: blockRow.entry.best ? blocks.tint : Theme.text
-                        font.pixelSize: 24
+                        font.pixelSize: Theme.fs(24)
                         font.letterSpacing: -0.6
                     }
                     Text {
@@ -81,7 +81,7 @@ Item {
                         text: "W"
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                     }
                     Text {
                         visible: blocks.estimated
@@ -89,7 +89,7 @@ Item {
                         text: qsTr("est.")
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
                 Text {
@@ -102,7 +102,7 @@ Item {
                     text: blockRow.entry.first ? qsTr("First") : ((blockRow.entry.delta > 0 ? "+" : "") + blockRow.entry.delta + " W")
                     color: blockRow.entry.first ? Theme.text2 : (blockRow.entry.best ? blocks.tint : Theme.text)
                     font.family: blockRow.entry.first ? Theme.bodyMedium : Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                 }
             }
 

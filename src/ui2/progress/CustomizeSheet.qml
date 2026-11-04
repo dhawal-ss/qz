@@ -71,7 +71,7 @@ Item {
                     text: qsTr("Customize")
                     color: Theme.text
                     font.family: Theme.display
-                    font.pixelSize: 24
+                    font.pixelSize: Theme.fs(24)
                     elide: Text.ElideRight
                     Accessible.role: Accessible.Heading
                     Accessible.name: text
@@ -99,7 +99,7 @@ Item {
                     text: qsTr("Done")
                     color: Theme.accentInk
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }

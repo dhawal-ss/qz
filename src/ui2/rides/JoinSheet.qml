@@ -114,7 +114,7 @@ Item {
                     text: sheet.words
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     lineHeightMode: Text.FixedHeight
                     lineHeight: 21
                     wrapMode: Text.WordWrap
@@ -140,7 +140,7 @@ Item {
                             text: sheet.cancelText
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 16
+                            font.pixelSize: Theme.fs(16)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -156,7 +156,7 @@ Item {
                             text: sheet.confirmText
                             color: Theme.accentInk
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 16
+                            font.pixelSize: Theme.fs(16)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }

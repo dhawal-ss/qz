@@ -41,7 +41,7 @@ Rectangle {
                 text: insight.label
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
         Text {
@@ -73,7 +73,7 @@ Rectangle {
             text: insight.line
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             lineHeightMode: Text.FixedHeight
             lineHeight: 20
             wrapMode: Text.WordWrap

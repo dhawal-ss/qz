@@ -178,7 +178,7 @@ Item {
                         text: sheet.shown.what
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                         lineHeightMode: Text.FixedHeight
                         lineHeight: 21
                         wrapMode: Text.WordWrap
@@ -236,7 +236,7 @@ Item {
                                 text: modelData[1]
                                 color: Theme.text
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 lineHeightMode: Text.FixedHeight
                                 lineHeight: 21
                                 wrapMode: Text.WordWrap
@@ -266,7 +266,7 @@ Item {
                                 text: sheet.actionLabel
                                 color: Theme.accentInk
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -299,7 +299,7 @@ Item {
                                             text: Learn.titleOf(modelData)
                                             color: Theme.text
                                             font.family: Theme.bodySemibold
-                                            font.pixelSize: 13
+                                            font.pixelSize: Theme.fs(13)
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
                                         }

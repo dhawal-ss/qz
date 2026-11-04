@@ -73,7 +73,7 @@ Column {
                       : qsTr("Every rung of the distance ladder done.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 wrapMode: Text.WordWrap
             }
         }

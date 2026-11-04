@@ -107,7 +107,7 @@ Column {
         text: qsTr("Ride 20 minutes or more and your FTP estimate shows here.")
         color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: 14
+        font.pixelSize: Theme.fs(14)
         wrapMode: Text.WordWrap
     }
 
@@ -131,7 +131,7 @@ Column {
                 text: "W"
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
             Text {
                 anchors.bottom: ftpNumber.bottom
@@ -139,7 +139,7 @@ Column {
                 text: qsTr("est.")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
         Text {
@@ -149,7 +149,7 @@ Column {
             text: ftp.changeText
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
     }
 
@@ -215,7 +215,7 @@ Column {
                     text: ftp.changes.length > 1 ? ftp.changes[0].value : ""
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
                 Text {
                     visible: ftp.changes.length > 1
@@ -224,7 +224,7 @@ Column {
                     text: Math.round(ftp.current)
                     color: Theme.text2
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
 
@@ -239,7 +239,7 @@ Column {
                     text: Hub.monthShort[new Date(modelData.start).getMonth()]
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
         }
@@ -251,7 +251,7 @@ Column {
         text: qsTr("Your FTP setting is %1 W.").arg(Math.round(ftp.setting))
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 12
+        font.pixelSize: Theme.fs(12)
         wrapMode: Text.WordWrap
     }
 }

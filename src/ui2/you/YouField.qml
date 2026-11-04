@@ -113,7 +113,7 @@ Item {
             selectedTextColor: Theme.accentInk
             selectByMouse: true
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             maximumLength: field.kind === "text" ? 40 : 7
             inputMethodHints: field.kind === "int" ? Qt.ImhDigitsOnly
                               : (field.kind === "number" ? Qt.ImhFormattedNumbersOnly : Qt.ImhNoPredictiveText)

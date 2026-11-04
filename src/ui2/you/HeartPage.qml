@@ -160,7 +160,7 @@ YouPage {
                         text: modelData.name
                         color: modelData.id === "none" ? Theme.text2 : Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                         lineHeight: 1.05
                         wrapMode: Text.WordWrap
                     }
@@ -185,7 +185,7 @@ YouPage {
                                 text: modelData.chip
                                 color: modelData.id === "strap" ? Theme.accent : (tile.on ? Theme.text : Theme.text2)
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.fs(12)
                                 wrapMode: Text.WordWrap
                             }
                         }
@@ -195,7 +195,7 @@ YouPage {
                             text: modelData.note
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fs(12)
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -247,7 +247,7 @@ YouPage {
                     text: index + 1
                     color: Theme.text
                     font.family: Theme.display
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
             }
             Text {
@@ -257,7 +257,7 @@ YouPage {
                 text: modelData
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 16
+                font.pixelSize: Theme.fs(16)
                 wrapMode: Text.WordWrap
             }
             Rectangle {
@@ -371,7 +371,7 @@ YouPage {
                     text: page.wrist ? qsTr("Waiting for your band") : qsTr("Waiting for your strap")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fs(18)
                 }
                 Text {
                     width: parent.width
@@ -381,7 +381,7 @@ YouPage {
                     text: qsTr("Pick it below as soon as it shows up.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     wrapMode: Text.WordWrap
                 }
             }
@@ -498,7 +498,7 @@ YouPage {
                     text: qsTr("bpm")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 20
+                    font.pixelSize: Theme.fs(20)
                 }
             }
             Item {
@@ -521,7 +521,7 @@ YouPage {
                     text: page.chosen === "Disabled" ? qsTr("From the bike") : qsTr("%1 picked").arg(page.chosen)
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 17
+                    font.pixelSize: Theme.fs(17)
                 }
                 Text {
                     visible: page.chosen !== "Disabled" && page.wearable !== "" && page.wearable !== "none"
@@ -529,7 +529,7 @@ YouPage {
                     text: page.wrist ? qsTr("wrist") : qsTr("chest")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                 }
             }
             Text {
@@ -542,7 +542,7 @@ YouPage {
                       : (page.wrist ? qsTr("Move your arm. If the number changes, it's you.") : qsTr("Breathe in deep. If the number moves, it's you."))
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: Math.round(font.pixelSize * 1.45)
                 wrapMode: Text.WordWrap

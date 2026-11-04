@@ -892,7 +892,7 @@ Item {
                         text: Metrics.presetName(screen.preset)
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                     }
                     Icon {
                         anchors { left: presetLabel.right; leftMargin: 4; verticalCenter: parent.verticalCenter }
@@ -925,7 +925,7 @@ Item {
                     text: qsTr("Bike lost. Looking for it")
                     color: "#ffffff"
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
             }
         }
@@ -961,7 +961,7 @@ Item {
                         text: screen.hero.label
                         color: Theme.text
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                     }
                     Text {
                         visible: text !== ""
@@ -995,7 +995,7 @@ Item {
                             text: screen.fromUnit
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 20
+                            font.pixelSize: Theme.fs(20)
                             anchors.baseline: heroOut.baseline
                         }
                     }
@@ -1020,7 +1020,7 @@ Item {
                             text: screen.hero.unit
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 20
+                            font.pixelSize: Theme.fs(20)
                             anchors.baseline: heroNumber.baseline
                         }
                     }
@@ -1059,14 +1059,14 @@ Item {
                                 text: screen.fromName
                                 color: Theme.zoneColors[screen.fromZone - 1]
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                             }
                             Text {
                                 id: zoneLabel
                                 text: screen.zonesNeutral ? qsTr("Set your FTP for power zones") : screen.zoneName(screen.zone)
                                 color: screen.shownTint
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 15
+                                font.pixelSize: Theme.fs(15)
                             }
                         }
                         Text {
@@ -1325,7 +1325,7 @@ Item {
                                        : qsTr("Tap any number to change it. Hold End when the ride is done.")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
             wrapMode: Text.WordWrap
         }
 
@@ -1341,7 +1341,7 @@ Item {
                   : qsTr("Paused. Resume and this stays one ride, or hold End to finish it.")
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             wrapMode: Text.WordWrap
         }
 
@@ -1368,14 +1368,17 @@ Item {
                 text: screen.undoState ? screen.undoState.message : ""
                 color: "#141318"
                 font.family: Theme.bodySemibold
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
             }
             PulseButton {
                 id: undoButton
                 anchors { right: parent.right; rightMargin: 6; verticalCenter: parent.verticalCenter }
                 width: 72
-                height: 36
+                height: 48
+                // 36 to see, 48 to touch
+                topInset: 6
+                bottomInset: 6
                 fill: Theme.accentInk
                 Accessible.name: qsTr("Undo")
                 onClicked: screen.undo()
@@ -1383,7 +1386,7 @@ Item {
                     text: qsTr("Undo")
                     color: Theme.accent
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -1406,7 +1409,7 @@ Item {
                 text: screen.toastText
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 wrapMode: Text.WordWrap
             }
         }
@@ -1423,7 +1426,10 @@ Item {
                      && screen.editing < 0
             PulseButton {
                 width: 64
-                height: 40
+                height: 48
+                // 40 to see, 48 to touch
+                topInset: 4
+                bottomInset: 4
                 fill: Theme.control
                 Accessible.name: qsTr("Lap")
                 onClicked: screen.lapRide()
@@ -1431,7 +1437,7 @@ Item {
                     text: qsTr("Lap")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -1466,7 +1472,10 @@ Item {
                 spacing: 8
                 PulseButton {
                     width: 140
-                    height: 46
+                    height: 48
+                    // 46 to see, 48 to touch
+                    topInset: 1
+                    bottomInset: 1
                     fill: Theme.accent
                     pressedRadius: 16
                     Accessible.name: qsTr("Resume ride")
@@ -1475,7 +1484,7 @@ Item {
                         text: qsTr("Resume")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -1510,12 +1519,15 @@ Item {
                     text: qsTr("End this ride?")
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                     rightPadding: 6
                 }
                 PulseButton {
                     width: 110
-                    height: 44
+                    height: 48
+                    // 44 to see, 48 to touch
+                    topInset: 2
+                    bottomInset: 2
                     fill: Theme.accent
                     pressedRadius: 16
                     Accessible.name: qsTr("End ride")
@@ -1524,14 +1536,17 @@ Item {
                         text: qsTr("End ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
                 PulseButton {
                     width: 110
-                    height: 44
+                    height: 48
+                    // 44 to see, 48 to touch
+                    topInset: 2
+                    bottomInset: 2
                     fill: Theme.chip
                     pressedRadius: 16
                     Accessible.name: qsTr("Keep riding")
@@ -1540,7 +1555,7 @@ Item {
                         text: qsTr("Keep riding")
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -1622,7 +1637,7 @@ Item {
                         text: qsTr("Start ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 17
+                        font.pixelSize: Theme.fs(17)
                     }
                 }
                 Icon {

@@ -101,7 +101,7 @@ LearnTap {
             text: year.best >= 0 ? qsTr("%1 was your biggest month.").arg(year.bestName) : qsTr("Ride a little most weeks and the year fills in.")
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             wrapMode: Text.WordWrap
         }
         Text {
@@ -110,7 +110,7 @@ LearnTap {
             text: qsTr("%1 across the year, %2 in %3.").arg(Format.hours(year.total)).arg(year.best >= 0 ? Format.hours(year.months[year.best].seconds) : "").arg(year.bestName)
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             wrapMode: Text.WordWrap
         }
         Item {
@@ -143,7 +143,7 @@ LearnTap {
                         text: Math.round(modelData.seconds / 3600) + " h"
                         color: Theme.accent
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                         opacity: Math.max(0, Math.min(1, year.grown))
                     }
                     Text {
@@ -152,7 +152,7 @@ LearnTap {
                         text: Format.monthShort[new Date(modelData.start).getMonth()].charAt(0)
                         color: monthColumn.lit ? Theme.accent : (index === 11 ? Theme.text : Theme.text3)
                         font.family: monthColumn.lit || index === 11 ? Theme.bodySemibold : Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
             }

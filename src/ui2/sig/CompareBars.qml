@@ -67,7 +67,7 @@ Column {
                 text: modelData.label
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
                 anchors.baseline: rowValue.baseline
             }
@@ -76,7 +76,7 @@ Column {
                 anchors.right: parent.right
                 text: modelData.valueText
                 color: bars.sample ? Theme.text3 : Theme.text
-                font.pixelSize: 20
+                font.pixelSize: Theme.fs(20)
                 font.letterSpacing: -0.3
             }
             // the track, the bar and the usual
@@ -117,7 +117,7 @@ Column {
                 text: qsTr("usual %1").arg(modelData.usualText)
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }

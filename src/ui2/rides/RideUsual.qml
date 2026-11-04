@@ -96,7 +96,7 @@ LearnTap {
                       : (usualRide.usual.count === 1 ? qsTr("1 ride in 30 days") : qsTr("%1 rides in 30 days").arg(usualRide.usual.count))
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
             }
         }

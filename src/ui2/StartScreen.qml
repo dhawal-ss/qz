@@ -181,7 +181,10 @@ Item {
         x: start.margin + 8
         y: 16
         width: 44
-        height: 44
+        height: 48
+        // 44 to see, 48 to touch
+        topInset: 2
+        bottomInset: 2
         fill: Theme.control
         Accessible.name: start.setup ? qsTr("Back") : qsTr("Close")
         onClicked: start.closeRequested()
@@ -196,7 +199,7 @@ Item {
         text: qsTr("2 of 4")
         color: Theme.text
         font.family: Theme.bodyMedium
-        font.pixelSize: 14
+        font.pixelSize: Theme.fs(14)
     }
 
     Flickable {
@@ -256,7 +259,7 @@ Item {
                                               : qsTr("Looking nearby")
                         color: start.connected ? start.found : Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 17
+                        font.pixelSize: Theme.fs(17)
                         elide: Text.ElideRight
                     }
                     Text {
@@ -269,7 +272,7 @@ Item {
                             : start.searchStatus
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -313,7 +316,7 @@ Item {
                                 text: modelData.line
                                 color: Theme.text2
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                                 lineHeightMode: Text.FixedHeight
                                 lineHeight: Math.round(font.pixelSize * 1.45)
                                 wrapMode: Text.WordWrap
@@ -343,7 +346,7 @@ Item {
                                                           : qsTr("Is your bike one of these?")
                         color: Theme.text2
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         wrapMode: Text.WordWrap
                         bottomPadding: 6
                     }
@@ -415,7 +418,7 @@ Item {
                                     : qsTr("Search again")
                                 color: start.connected || start.blocked ? Theme.accentInk : Theme.text
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 18
+                                font.pixelSize: Theme.fs(18)
                             }
                         }
                     }
@@ -436,7 +439,7 @@ Item {
                                 text: start.setup ? qsTr("Skip for now") : qsTr("Try a demo ride")
                                 color: Theme.accent
                                 font.family: Theme.bodySemibold
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                             }
                             Text {
                                 visible: !start.setup

@@ -518,7 +518,7 @@ Item {
                                                    : qsTr("%1 rides, %2").arg(goals.lastWeek.rides).arg(Format.hours(goals.lastWeek.seconds)))
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 21
+                font.pixelSize: Theme.fs(21)
                 font.letterSpacing: -0.2
                 wrapMode: Text.WordWrap
             }
@@ -528,13 +528,16 @@ Item {
                       .arg(Format.day(Streak.addWeeks(goals.nowMs, 0) - 86400000))
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
                 wrapMode: Text.WordWrap
             }
             PulseButton {
                 x: -12
                 width: weekLabel.implicitWidth + 24
-                height: 44
+                height: 48
+                // 44 to see, 48 to touch
+                topInset: 2
+                bottomInset: 2
                 fill: pressed ? Theme.pressed : "transparent"
                 Accessible.name: qsTr("See your week in review")
                 onClicked: goals.openRecap()
@@ -543,7 +546,7 @@ Item {
                     text: qsTr("See your week")
                     color: Theme.accent
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -675,7 +678,7 @@ Item {
                         text: qsTr("Customize")
                         color: Theme.accent
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -717,7 +720,7 @@ Item {
                     text: qsTr("Every section is hidden. Customize brings them back.")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     wrapMode: Text.WordWrap
                 }
 

@@ -261,7 +261,7 @@ Item {
             text: pr.status
             color: Theme.text
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
         }
     }
 
@@ -288,7 +288,7 @@ Item {
                     text: pr.moment.title || ""
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 26
+                    font.pixelSize: Theme.fs(26)
                     font.letterSpacing: -0.4
                     horizontalAlignment: pr.sideways ? Text.AlignLeft : Text.AlignHCenter
                     wrapMode: Text.WordWrap
@@ -300,7 +300,7 @@ Item {
                     text: pr.moment.detail || ""
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: pr.sideways ? Text.AlignLeft : Text.AlignHCenter
                     wrapMode: Text.WordWrap
                 }
@@ -318,7 +318,7 @@ Item {
                         text: qsTr("Continue")
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -365,7 +365,7 @@ Item {
                         text: qsTr("Continue")
                         color: Theme.text
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                     }
                 }
             }

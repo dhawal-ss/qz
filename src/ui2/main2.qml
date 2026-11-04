@@ -179,11 +179,30 @@ ApplicationWindow {
         id: uiSettings
         category: "ui2"
         property bool reduceMotion: false
+        // 0 follows the phone; another value sets the text scale (for trying large text)
+        property real textScaleOverride: 0
+    }
+    // the phone's own choices: Remove animations, and the font size (read again each time the
+    // app comes to the front, it may have changed in Android's settings)
+    property bool systemReduceMotion: false
+    function readSystemDisplay() {
+        if (core === null)
+            return
+        systemReduceMotion = core.systemAnimationsOff()
+        var scale = uiSettings.textScaleOverride > 0 ? uiSettings.textScaleOverride : core.systemFontScale()
+        Theme.textScale = Math.min(1.25, Math.max(1, scale))
+    }
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state === Qt.ApplicationActive)
+                window.readSystemDisplay()
+        }
     }
     Binding {
         target: Theme
         property: "reduceMotion"
-        value: uiSettings.reduceMotion
+        value: uiSettings.reduceMotion || window.systemReduceMotion
     }
 
     // system bars and the camera cutout in dp, from QZ's AndroidStatusBar (CustomQtActivity.java
@@ -356,6 +375,7 @@ ApplicationWindow {
             return
         core.historyPageOpened()
         core.setKeepScreenOn(keepAwake)
+        readSystemDisplay()
     }
     Connections {
         target: window.core
@@ -888,7 +908,7 @@ ApplicationWindow {
             text: qsTr("Press back again to exit")
             color: Theme.text
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
         }
     }
 
@@ -920,7 +940,7 @@ ApplicationWindow {
             width: Math.min(implicitWidth, parent.parent.width - 68)
             color: Theme.text
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             wrapMode: Text.WordWrap
             horizontalAlignment: Text.AlignHCenter
         }

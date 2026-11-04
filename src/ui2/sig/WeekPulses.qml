@@ -91,7 +91,7 @@ Item {
                     text: week.letters[index]
                     color: dayCell.info.today ? week.tint : Theme.text2
                     font.family: dayCell.info.today ? Theme.bodySemibold : Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                 }
             }
         }

@@ -33,7 +33,7 @@ Item {
             text: qsTr("After your first ride")
             color: Theme.text2
             font.family: Theme.bodySemibold
-            font.pixelSize: 11
+            font.pixelSize: Theme.fs(11)
         }
     }
 }

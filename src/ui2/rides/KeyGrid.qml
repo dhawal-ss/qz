@@ -54,7 +54,7 @@ Item {
                 text: pair.entry.label
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
                 Accessible.ignored: true
             }
@@ -65,7 +65,7 @@ Item {
                     id: pairValue
                     text: pair.entry.value
                     color: Theme.text
-                    font.pixelSize: 24
+                    font.pixelSize: Theme.fs(24)
                     font.letterSpacing: -0.6
                     Accessible.ignored: true
                 }
@@ -75,7 +75,7 @@ Item {
                     text: pair.entry.unit || ""
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                     Accessible.ignored: true
                 }
                 Text {
@@ -84,7 +84,7 @@ Item {
                     text: qsTr("est.")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                     Accessible.ignored: true
                 }
             }

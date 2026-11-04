@@ -138,7 +138,7 @@ Item {
             text: Math.round(curve.scaleTop * (3 - index) / 3) + (index === 0 ? " W" : "")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
         }
     }
     Repeater {
@@ -159,7 +159,7 @@ Item {
                 text: Format.effort(modelData)
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }
@@ -170,7 +170,7 @@ Item {
         text: qsTr("Under 15 s, low confidence")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
 
     Item {
@@ -288,7 +288,7 @@ Item {
             text: mark.entry ? qsTr("%1, new best").arg(Math.round(mark.entry.watts)) : ""
             color: curve.tint
             font.family: Theme.bodySemibold
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
         }
     }
 }

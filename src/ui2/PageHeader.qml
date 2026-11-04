@@ -62,7 +62,7 @@ Item {
             text: header.subtitle
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             wrapMode: Text.WordWrap
         }
     }
@@ -85,7 +85,7 @@ Item {
             text: header.initial
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

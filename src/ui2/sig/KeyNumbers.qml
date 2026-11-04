@@ -62,7 +62,7 @@ Item {
                         text: keyCell.entry.unit || ""
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                     }
                     Text {
                         visible: keyCell.entry.estimated === true
@@ -70,7 +70,7 @@ Item {
                         text: qsTr("est.")
                         color: Theme.text3
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
                 CapLabel {

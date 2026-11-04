@@ -49,7 +49,7 @@ PulseButton {
                 text: row.label
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 wrapMode: Text.WordWrap
                 maximumLineCount: 2
                 elide: Text.ElideRight
@@ -60,7 +60,7 @@ PulseButton {
                 text: row.sub
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 lineHeight: 1.15
                 wrapMode: Text.WordWrap
                 maximumLineCount: 3
@@ -87,7 +87,7 @@ PulseButton {
                     text: row.unit
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                 }
                 Text {
                     visible: row.estimated
@@ -95,7 +95,7 @@ PulseButton {
                     text: qsTr("est.")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 12
+                    font.pixelSize: Theme.fs(12)
                 }
             }
             Text {
@@ -104,7 +104,7 @@ PulseButton {
                 text: row.delta
                 color: row.deltaColor
                 font.family: Theme.bodySemibold
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }

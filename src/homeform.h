@@ -295,6 +295,9 @@ class homeform : public QObject {
     // Monday's notification, kept with the Monday of its week (yyyy-MM-dd)
     Q_INVOKABLE void updateWidget(const QString &value, const QString &detail, const QString &streak,
                                   const QString &weekKey, const QString &recapTitle, const QString &recapText);
+    // the phone's font size (1 is the default) and whether its animations are off, for Theme
+    Q_INVOKABLE double systemFontScale();
+    Q_INVOKABLE bool systemAnimationsOff();
     // spoken words of the ride, through QZ's text to speech
     Q_INVOKABLE void say(const QString &words) { m_speech.say(words); }
     // Heart rate sensor chosen in the settings (name) or a tap on the Bluetooth icon (no name, the saved one):

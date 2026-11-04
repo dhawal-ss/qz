@@ -76,7 +76,7 @@ LearnTap {
             text: Patterns.mixWords(mixCard.mix)
             color: mixCard.sample ? Theme.text2 : Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             wrapMode: Text.WordWrap
         }
         Item {
@@ -156,7 +156,7 @@ LearnTap {
                         text: mixCard.parts[mixCard.lead].name.toLowerCase()
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                     }
                 }
             }
@@ -184,7 +184,7 @@ LearnTap {
                             text: mixCard.parts[index].name
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fs(14)
                         }
                         Text {
                             x: 20
@@ -193,7 +193,7 @@ LearnTap {
                             text: Format.hours(mixCard.parts[index].seconds)
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 12
+                            font.pixelSize: Theme.fs(12)
                             elide: Text.ElideRight
                         }
                         Text {
@@ -203,7 +203,7 @@ LearnTap {
                             text: mixCard.share(index) + "%"
                             color: mixCard.sample ? Theme.text3 : Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 17
+                            font.pixelSize: Theme.fs(17)
                         }
                         Hairline {
                             visible: index < 2

@@ -103,7 +103,7 @@ Item {
                     text: Format.monthNames[month.first.getMonth()] + " " + month.first.getFullYear()
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 16
+                    font.pixelSize: Theme.fs(16)
                     elide: Text.ElideRight
                 }
                 Text {
@@ -154,7 +154,7 @@ Item {
                     text: modelData
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                     horizontalAlignment: Text.AlignHCenter
                     Accessible.ignored: true
                 }
@@ -209,7 +209,7 @@ Item {
                                 text: slot.date
                                 color: slot.rode ? Theme.text : (slot.key > month.todayKey ? Theme.dashed : Theme.text3)
                                 font.family: slot.rode ? Theme.bodySemibold : Theme.bodyMedium
-                                font.pixelSize: 14
+                                font.pixelSize: Theme.fs(14)
                             }
                             Rectangle {
                                 x: parent.width - 11
@@ -228,7 +228,7 @@ Item {
                                 text: slot.rode ? Math.round(slot.entry.seconds / 60) + (month.cellWidth >= 64 ? " min" : "'") : ""
                                 color: Theme.accent
                                 font.family: Theme.bodyMedium
-                                font.pixelSize: 11
+                                font.pixelSize: Theme.fs(11)
                             }
                         }
                     }

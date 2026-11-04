@@ -365,7 +365,7 @@ Item {
                 text: qsTr("Your fitness, fatigue and form are worked out from your FTP. Set it in You, Body and FTP, or take the one Today offers from your rides.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 lineHeightMode: Text.FixedHeight
                 lineHeight: 20
                 wrapMode: Text.WordWrap
@@ -678,7 +678,7 @@ Item {
                             text: qsTr("Customize")
                             color: Theme.accent
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -709,7 +709,7 @@ Item {
                 text: qsTr("Your records and trends start with your first ride.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 wrapMode: Text.WordWrap
             }
 
@@ -719,7 +719,7 @@ Item {
                 text: qsTr("Every section is hidden. Customize brings them back.")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 wrapMode: Text.WordWrap
             }
 

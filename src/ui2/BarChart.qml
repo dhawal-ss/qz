@@ -48,7 +48,7 @@ Item {
                     text: bars.labels[index] || ""
                     color: index === bars.highlight ? Theme.text : Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                 }
             }
         }

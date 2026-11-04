@@ -103,7 +103,7 @@ PulseButton {
                 text: "+"
                 color: Theme.accent
                 font.family: Theme.bodySemibold
-                font.pixelSize: 20
+                font.pixelSize: Theme.fs(20)
                 anchors.verticalCenter: parent.verticalCenter
                 Accessible.ignored: true
             }

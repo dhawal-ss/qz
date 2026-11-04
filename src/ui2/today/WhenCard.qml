@@ -73,7 +73,7 @@ LearnTap {
             text: Patterns.whenWords(whenCard.when)
             color: whenCard.sample ? Theme.text2 : Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 17
+            font.pixelSize: Theme.fs(17)
             wrapMode: Text.WordWrap
         }
         // the weekdays
@@ -129,7 +129,7 @@ LearnTap {
                         text: whenCard.letters[index]
                         color: dayColumn.best && !whenCard.sample ? whenCard.tint : Theme.text2
                         font.family: dayColumn.best ? Theme.bodySemibold : Theme.bodyMedium
-                        font.pixelSize: 13
+                        font.pixelSize: Theme.fs(13)
                     }
                 }
             }
@@ -159,7 +159,7 @@ LearnTap {
                         text: whenCard.slotLabels[index]
                         color: slotCell.best && !whenCard.sample ? whenCard.tint : Theme.text3
                         font.family: slotCell.best ? Theme.bodySemibold : Theme.bodyMedium
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.fs(12)
                         elide: Text.ElideRight
                     }
                 }

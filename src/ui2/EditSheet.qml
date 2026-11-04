@@ -126,7 +126,7 @@ Item {
                               : (sheet.currentEmpty ? qsTr("Add a metric") : Metrics.info(sheet.current.m, sheet.source).label))
                         color: Theme.text
                         font.family: Theme.display
-                        font.pixelSize: 24
+                        font.pixelSize: Theme.fs(24)
                     }
                     Text {
                         text: qsTr("The ride keeps recording.")
@@ -139,7 +139,10 @@ Item {
                     id: done
                     anchors.right: parent.right
                     width: doneLabel.implicitWidth + 32
-                    height: 40
+                    height: 48
+                    // 40 to see, 48 to touch
+                    topInset: 4
+                    bottomInset: 4
                     fill: Theme.accent
                     Accessible.name: qsTr("Done")
                     onClicked: sheet.close()
@@ -148,7 +151,7 @@ Item {
                         text: qsTr("Done")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 14
+                        font.pixelSize: Theme.fs(14)
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -175,7 +178,7 @@ Item {
                             text: modelData[1]
                             color: parent.on ? Theme.accentInk : Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
@@ -237,7 +240,7 @@ Item {
                     text: info.value
                     color: Theme.text
                     font.family: Theme.display
-                    font.pixelSize: 24
+                    font.pixelSize: Theme.fs(24)
                 }
             }
         }
@@ -247,7 +250,10 @@ Item {
             visible: sheet.current !== null && sheet.shownSlot > 0 && !sheet.currentEmpty
             x: 20
             width: panel.width - 40
-            height: 46
+            height: 48
+            // 46 to see, 48 to touch
+            topInset: 1
+            bottomInset: 1
             anchors { bottom: parent.bottom; bottomMargin: 16 }
             fill: Theme.pressed
             Accessible.name: qsTr("Remove, keep the space")
@@ -256,7 +262,7 @@ Item {
                 text: qsTr("Remove, keep the space")
                 color: Theme.danger
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }

@@ -49,7 +49,7 @@ Rectangle {
                 text: panel.route ? panel.route.name : ""
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 elide: Text.ElideRight
             }
             Text {
@@ -58,7 +58,7 @@ Rectangle {
                 text: Format.distance(Math.min(panel.km, panel.total), panel.miles) + " / " + Format.distance(panel.total, panel.miles)
                 color: Theme.text
                 font.family: Theme.display
-                font.pixelSize: 20
+                font.pixelSize: Theme.fs(20)
             }
         }
 
@@ -120,7 +120,7 @@ Rectangle {
                 text: !panel.pos ? "" : panel.pos.done ? qsTr("Route done") : qsTr("%1% now").arg(panel.pos.grade.toFixed(1))
                 color: panel.pos && panel.pos.grade >= 3 ? Theme.zoneColors[4] : Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 17
+                font.pixelSize: Theme.fs(17)
             }
             Text {
                 id: adviceLine
@@ -135,7 +135,7 @@ Rectangle {
                         : qsTr("About %1 W to hold your speed").arg(panel.need)
                 color: Theme.text2
                 font.family: Theme.bodySemibold
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 wrapMode: Text.WordWrap
             }
         }
@@ -147,7 +147,7 @@ Rectangle {
                               : qsTr("No more climbs")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             elide: Text.ElideRight
         }
 
@@ -157,7 +157,7 @@ Rectangle {
             text: panel.ghostText
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
     }
 }

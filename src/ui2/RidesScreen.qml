@@ -347,7 +347,7 @@ Item {
                 text: rides.monthLine(section)
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
                 Accessible.ignored: true
             }

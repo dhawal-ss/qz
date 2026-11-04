@@ -102,7 +102,7 @@ HabitPage {
                 text: welcome.sentence
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 lineHeight: 1.1
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.WordWrap
@@ -166,7 +166,7 @@ HabitPage {
                             text: welcome.plan.name
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 21
+                            font.pixelSize: Theme.fs(21)
                             font.letterSpacing: -0.2
                             wrapMode: Text.WordWrap
                         }
@@ -176,7 +176,7 @@ HabitPage {
                             textFormat: Text.StyledText
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             Accessible.name: qsTr("Endurance, training load %1, estimated").arg(welcome.plan.tss)
                         }
                     }
@@ -206,7 +206,7 @@ HabitPage {
                                     text: qsTr("Start")
                                     color: Theme.accentInk
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 15
+                                    font.pixelSize: Theme.fs(15)
                                 }
                             }
                         }
@@ -232,7 +232,7 @@ HabitPage {
             text: qsTr("Coming back matters more than any single hard ride.")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             lineHeight: 1.1
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap

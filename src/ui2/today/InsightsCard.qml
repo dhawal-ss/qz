@@ -35,7 +35,10 @@ Column {
     }
     PulseButton {
         visible: insightsCard.insights.length > 3
-        height: 44
+        height: 48
+        // 44 to see, 48 to touch
+        topInset: 2
+        bottomInset: 2
         width: moreLabel.implicitWidth + 24
         x: -12
         fill: pressed ? Theme.pressed : "transparent"
@@ -47,7 +50,7 @@ Column {
                   : (insightsCard.insights.length - 3 === 1 ? qsTr("1 more") : qsTr("%1 more").arg(insightsCard.insights.length - 3))
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

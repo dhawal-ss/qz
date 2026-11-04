@@ -20,7 +20,7 @@ PulseButton {
         text: button.text
         color: button.primary ? Theme.accentInk : (button.danger ? Theme.danger : Theme.text)
         font.family: Theme.bodySemibold
-        font.pixelSize: 15
+        font.pixelSize: Theme.fs(15)
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         wrapMode: Text.WordWrap

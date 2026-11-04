@@ -76,7 +76,7 @@ Rectangle {
                                    .arg(Theme.powerZoneNames[panel.step.zone - 1]) : ""
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 elide: Text.ElideRight
             }
             Text {
@@ -100,7 +100,7 @@ Rectangle {
                 text: Workout.target(panel.step) + (panel.estimated && panel.step && panel.step.high > 0 ? " " + qsTr("est.") : "")
                 color: panel.tint
                 font.family: Theme.bodySemibold
-                font.pixelSize: 17
+                font.pixelSize: Theme.fs(17)
                 wrapMode: Text.WordWrap
             }
             Text {
@@ -111,7 +111,7 @@ Rectangle {
                 text: panel.advice
                 color: Theme.text2
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 wrapMode: Text.WordWrap
             }
         }
@@ -124,7 +124,7 @@ Rectangle {
                              : qsTr("Last block")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
             elide: Text.ElideRight
         }
 
@@ -135,7 +135,7 @@ Rectangle {
             text: panel.overText !== "" ? panel.overText : qsTr("Workout done. Keep riding, or hold End to finish.")
             color: Theme.text
             font.family: Theme.bodySemibold
-            font.pixelSize: 15
+            font.pixelSize: Theme.fs(15)
             wrapMode: Text.WordWrap
         }
 
@@ -146,7 +146,7 @@ Rectangle {
             text: qsTr("Riding by feel. Set your FTP in You for watt targets.")
             color: Theme.text3
             font.family: Theme.bodyMedium
-            font.pixelSize: 12
+            font.pixelSize: Theme.fs(12)
             wrapMode: Text.WordWrap
         }
 
@@ -156,7 +156,7 @@ Rectangle {
             text: panel.ghostText
             color: Theme.accent
             font.family: Theme.bodySemibold
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
 
         WorkoutShape {

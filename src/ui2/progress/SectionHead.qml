@@ -38,6 +38,6 @@ Item {
         text: head.note
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 13
+        font.pixelSize: Theme.fs(13)
     }
 }

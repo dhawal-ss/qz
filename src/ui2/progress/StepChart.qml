@@ -93,7 +93,7 @@ Item {
         text: chart.steps.length > 0 ? chart.steps[chart.steps.length - 1].text : ""
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
 
     Text {
@@ -102,7 +102,7 @@ Item {
         text: chart.steps.length > 0 ? Progress.shortDate(chart.first) : ""
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
     Text {
         anchors.right: parent.right
@@ -110,6 +110,6 @@ Item {
         text: qsTr("Today")
         color: Theme.text3
         font.family: Theme.bodyMedium
-        font.pixelSize: 11
+        font.pixelSize: Theme.fs(11)
     }
 }

@@ -67,7 +67,7 @@ Column {
                     text: modelData[1]
                     color: parent.on ? Theme.accentInk : Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 14
+                    font.pixelSize: Theme.fs(14)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                     wrapMode: Text.WordWrap

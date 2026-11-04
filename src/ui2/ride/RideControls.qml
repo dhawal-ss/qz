@@ -106,7 +106,7 @@ Item {
                         color: controls.mainState === "pause" ? "#141011"
                                : (controls.mainState === "cancel" ? Theme.text : Theme.accentInk)
                         font.family: Theme.bodySemibold
-                        font.pixelSize: 15
+                        font.pixelSize: Theme.fs(15)
                     }
                 }
             }
@@ -126,7 +126,7 @@ Item {
                 text: qsTr("Lap")
                 color: Theme.text
                 font.family: Theme.bodySemibold
-                font.pixelSize: 15
+                font.pixelSize: Theme.fs(15)
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }

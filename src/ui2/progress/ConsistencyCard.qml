@@ -112,7 +112,7 @@ Column {
                 text: consistency.streak === 1 ? qsTr("week in a row") : qsTr("weeks in a row")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
         Row {
@@ -129,7 +129,7 @@ Column {
                 text: qsTr("active weeks of 52")
                 color: Theme.text2
                 font.family: Theme.bodyMedium
-                font.pixelSize: 13
+                font.pixelSize: Theme.fs(13)
             }
         }
     }
@@ -191,7 +191,7 @@ Column {
                             text: modelData.text
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 11
+                            font.pixelSize: Theme.fs(11)
                         }
                     }
                 }
@@ -211,7 +211,7 @@ Column {
                   : (consistency.toNextFreeze > 0 ? qsTr("A streak freeze in %1 more goal weeks").arg(consistency.toNextFreeze) : ""))
             color: Theme.text2
             font.family: Theme.bodyMedium
-            font.pixelSize: 13
+            font.pixelSize: Theme.fs(13)
         }
         Row {
             height: 16
@@ -223,7 +223,7 @@ Column {
                 text: qsTr("Easy")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
             Repeater {
                 model: consistency.shades
@@ -241,7 +241,7 @@ Column {
                 text: qsTr("Hard")
                 color: Theme.text3
                 font.family: Theme.bodyMedium
-                font.pixelSize: 12
+                font.pixelSize: Theme.fs(12)
             }
         }
     }

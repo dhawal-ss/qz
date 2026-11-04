@@ -89,7 +89,7 @@ Item {
                 text: page.topLabel
                 color: Theme.text
                 font.family: Theme.bodyMedium
-                font.pixelSize: 14
+                font.pixelSize: Theme.fs(14)
                 elide: Text.ElideRight
             }
             PulseButton {

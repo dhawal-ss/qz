@@ -151,7 +151,7 @@ Column {
         text: qsTr("Your records start with your first ride.")
         color: Theme.text2
         font.family: Theme.bodyMedium
-        font.pixelSize: 14
+        font.pixelSize: Theme.fs(14)
         wrapMode: Text.WordWrap
     }
 

@@ -59,14 +59,14 @@ Column {
                     text: modelData.name
                     color: Theme.text
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
                 Numeral {
                     id: ladderAmount
                     anchors.right: parent.right
                     text: ladder.amount(ladder.value)
                     color: Theme.text
-                    font.pixelSize: 26
+                    font.pixelSize: Theme.fs(26)
                 }
             }
             Text {

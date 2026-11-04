@@ -116,7 +116,7 @@ Item {
             text: weekPage.week ? qsTr("Week of %1").arg(new Date(weekPage.week.monday).toLocaleDateString(Qt.locale(), "d MMMM")) : ""
             color: Theme.text
             font.family: Theme.bodyMedium
-            font.pixelSize: 14
+            font.pixelSize: Theme.fs(14)
             elide: Text.ElideRight
         }
         PulseButton {
@@ -220,7 +220,7 @@ Item {
                     text: weekPage.streak === 1 ? qsTr("week") : qsTr("weeks")
                     color: Theme.text2
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.fs(13)
                 }
             }
         }
@@ -281,7 +281,7 @@ Item {
                                     text: modelData.name
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
-                                    font.pixelSize: 15
+                                    font.pixelSize: Theme.fs(15)
                                 }
                             }
                             Row {
@@ -292,14 +292,14 @@ Item {
                                     id: rowValue
                                     text: weekPage.amount(modelData.measure, modelData.value)
                                     color: Theme.text
-                                    font.pixelSize: 22
+                                    font.pixelSize: Theme.fs(22)
                                 }
                                 Text {
                                     anchors.baseline: rowValue.baseline
                                     text: (modelData.goal ? qsTr("of %1") : qsTr("usual %1")).arg(weekPage.amount(modelData.measure, modelData.target))
                                     color: Theme.text2
                                     font.family: Theme.bodyMedium
-                                    font.pixelSize: 13
+                                    font.pixelSize: Theme.fs(13)
                                 }
                                 Text {
                                     visible: modelData.estimated
@@ -307,7 +307,7 @@ Item {
                                     text: qsTr("est.")
                                     color: Theme.text3
                                     font.family: Theme.bodyMedium
-                                    font.pixelSize: 12
+                                    font.pixelSize: Theme.fs(12)
                                 }
                             }
                             Hairline {
@@ -360,7 +360,7 @@ Item {
                                   : qsTr("Freezes come with goal weeks"))
                             color: Theme.text
                             font.family: Theme.bodySemibold
-                            font.pixelSize: 14
+                            font.pixelSize: Theme.fs(14)
                             wrapMode: Text.WordWrap
                         }
                         Text {
@@ -370,7 +370,7 @@ Item {
                                      : qsTr("%1 more goal weeks earn one.").arg(weekPage.week.toNextFreeze)))
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: 13
+                            font.pixelSize: Theme.fs(13)
                             wrapMode: Text.WordWrap
                         }
                     }
@@ -393,7 +393,7 @@ Item {
             text: qsTr("Plan next week")
             color: Theme.accentInk
             font.family: Theme.bodySemibold
-            font.pixelSize: 18
+            font.pixelSize: Theme.fs(18)
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
         }

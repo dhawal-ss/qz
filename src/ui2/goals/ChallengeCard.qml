@@ -51,7 +51,7 @@ Column {
         text: qsTr("Ride %1 in %2").arg(challengeCard.hoursText(challengeCard.month.target)).arg(Format.monthNames[new Date(challengeCard.nowMs).getMonth()])
         color: Theme.text
         font.family: Theme.bodySemibold
-        font.pixelSize: 21
+        font.pixelSize: Theme.fs(21)
         font.letterSpacing: -0.2
         wrapMode: Text.WordWrap
     }

@@ -83,7 +83,7 @@ Item {
                     text: (readout.cells[index] || ["", ""])[0]
                     color: Theme.text
                     font.family: Theme.display
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fs(18)
                     elide: Text.ElideRight
                 }
                 Text {
@@ -91,7 +91,7 @@ Item {
                     text: (readout.cells[index] || ["", ""])[1]
                     color: Theme.text3
                     font.family: Theme.bodyMedium
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.fs(11)
                     elide: Text.ElideRight
                 }
             }
@@ -133,7 +133,10 @@ Item {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         width: resetText.implicitWidth + 32
-        height: 40
+        height: 48
+        // 40 to see, 48 to touch
+        topInset: 4
+        bottomInset: 4
         fill: pressed ? Theme.pressed : Theme.chip
         Accessible.name: qsTr("Reset zoom")
         onClicked: readout.view.reset()

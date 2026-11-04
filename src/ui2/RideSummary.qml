@@ -556,7 +556,7 @@ Item {
                     text: seeRide.enabled ? qsTr("See the ride") : qsTr("Saving")
                     color: seeRide.enabled ? Theme.text : Theme.text3
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 16
+                    font.pixelSize: Theme.fs(16)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -573,7 +573,7 @@ Item {
                     text: qsTr("Done")
                     color: Theme.accentInk
                     font.family: Theme.bodySemibold
-                    font.pixelSize: 18
+                    font.pixelSize: Theme.fs(18)
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
                 }
