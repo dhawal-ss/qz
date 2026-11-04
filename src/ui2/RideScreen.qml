@@ -4,6 +4,8 @@ import "."
 import "sig"
 import "ride"
 import "Metrics.js" as Metrics
+import "train"
+import "train/Workout.js" as Workout
 
 // The live ride. One big number, four quiet rows, the level dock and the ride ribbon.
 // The screen takes one color, from the current zone. Every number can be swapped, restyled
@@ -28,6 +30,21 @@ Item {
     property bool touched: false
     property var undoState: null
     property string toastText: ""
+
+    // rootItem, for the cues and the level coach (null in previews)
+    property var core: null
+    // the workout under way (today/Coach.js plan(), null for a free ride) and the ride seconds it
+    // started at. Its steps take the ride's own FTP: the rider's on a live ride, the demo's in a demo
+    // (a demo has no "not set").
+    property var workoutPlan: null
+    readonly property var workoutSteps: workoutPlan ? Workout.steps(workoutPlan, source.ftp,
+                                                                    typeof source.ftpSet === "boolean" ? source.ftpSet : true,
+                                                                    Theme.powerZoneStarts) : []
+    readonly property string workoutName: workoutPlan ? workoutPlan.name : ""
+    property int workoutStart: 0
+    readonly property bool inWorkout: workoutSteps.length > 0
+    readonly property int workoutT: Math.max(0, source.elapsed - workoutStart)
+    readonly property var workoutPos: Workout.at(workoutSteps, workoutT)
 
     signal finishRequested()
     // back to the app, the ride stays as it is (paused, or not started)
@@ -181,8 +198,13 @@ Item {
             countNumber.opacity = 0
             screen.startPhase = "go"
             // start once, and only a ride that is still waiting to start
-            if (screen.source.stopped)
+            if (screen.source.stopped) {
                 screen.source.begin()
+                // the saved ride is named after the workout (QZ clears the name when a ride starts)
+                if (screen.inWorkout && typeof screen.source.core !== "undefined" && screen.source.core !== null)
+                    screen.source.core.setWorkoutName(screen.workoutName)
+            }
+            screen.cue(2, screen.inWorkout ? qsTr("%1. Go").arg(screen.workoutName) : "")
             goTimer.restart()
         }
     }
@@ -203,6 +225,8 @@ Item {
     Component.onCompleted: {
         resistanceMode = String(saved.value("resistanceControl", "auto"))
         autoPauseOn = String(saved.value("autoPause", "true")) !== "false"
+        cueSound = String(saved.value("cueSound", "true")) !== "false"
+        cueVoice = String(saved.value("cueVoice", "false")) === "true"
         try {
             var known = JSON.parse(String(saved.value("manualLevelBikes", "[]")))
             manualBikes = Array.isArray(known) ? known : []
@@ -354,12 +378,69 @@ Item {
         if (watts > 0)
             parts.push(qsTr("%1 W avg").arg(watts))
         toast(parts.join("  ·  "), 5000)
+        cue(1, parts.join(", "))
     }
     onStoppedChanged: {
         lapStartElapsed = 0
         lapStartKj = 0
         autoPaused = false
         pedaled = false
+    }
+
+    // Cues (You): a beep and a buzz (on unless switched off), and spoken words (off unless switched
+    // on). kind 0 a tick (a new zone), 1 the count before a change, 2 a change or the start
+    property bool cueSound: true
+    property bool cueVoice: false
+    function cue(kind, words) {
+        if (core === null)
+            return
+        if (cueSound)
+            core.cue(kind)
+        if (cueVoice && words)
+            core.say(words)
+    }
+
+    // the workout: 3, 2, 1 before each new step, then the step said; the end said once
+    property int cuedIndex: -1
+    property int cuedSecond: -1
+    onWorkoutTChanged: {
+        if (!inWorkout || stopped || source.paused)
+            return
+        var p = workoutPos
+        if (p.index !== cuedIndex) {
+            var first = cuedIndex < 0
+            cuedIndex = p.index
+            if (p.done) {
+                cue(2, qsTr("Workout done"))
+                toast(qsTr("Workout done. Keep riding, or hold End to finish."), 5000)
+            } else if (!first) {
+                var s = workoutSteps[p.index]
+                cue(2, qsTr("%1 minutes, %2").arg(Math.round(s.seconds / 60)).arg(Workout.target(s)))
+            }
+            return
+        }
+        if (!p.done && p.left <= 3 && p.left >= 1 && p.index + 1 < workoutSteps.length && cuedSecond !== workoutT) {
+            cuedSecond = workoutT
+            cue(1, "")
+        }
+    }
+    onWorkoutStepsChanged: { cuedIndex = -1; cuedSecond = -1 }
+
+    // watts over the last seconds and the level for the middle of the band (an Echelon's own table),
+    // for what the workout panel says to do
+    property real wattsHeld: 0
+    property int levelTarget: -1
+    Timer {
+        interval: 1000
+        repeat: true
+        running: screen.inWorkout && !screen.stopped
+        onTriggered: {
+            screen.wattsHeld = screen.wattsHeld * 0.6 + screen.source.power * 0.4
+            var p = screen.workoutPos
+            var s = p.index >= 0 && p.index < screen.workoutSteps.length ? screen.workoutSteps[p.index] : null
+            screen.levelTarget = s && s.high > 0 && screen.core !== null && screen.source.cadence > 0
+                    ? screen.core.levelForWatts(Math.round((s.low + s.high) / 2)) : -1
+        }
     }
 
     // Android back while the ride moves: it stays, and the screen says how to leave
@@ -723,8 +804,8 @@ Item {
             id: heroButton
             x: screen.portrait ? 24 : 32
             y: screen.portrait ? 74 : 66
-            width: screen.portrait ? stage.width - 48 : (screen.focusMode ? dock.x - 32 - 36 : rows.x - 32 - 36)
-            height: screen.portrait ? (screen.focusMode ? Math.max(270, ribbon.y - 40 - y) : 270) : 300
+            width: screen.portrait ? stage.width - 48 : (screen.focusMode && !screen.inWorkout ? dock.x - 32 - 36 : rows.x - 32 - 36)
+            height: screen.portrait ? (screen.focusMode ? Math.max(270, ribbon.y - 40 - y - (screen.inWorkout ? workoutPanel.height + 16 : 0)) : 270) : 300
             radius: 28
             pressedScale: 0.985
             fill: screen.editing === 0 ? Theme.accentWash(0.06) : "transparent"
@@ -926,7 +1007,8 @@ Item {
             y: screen.portrait ? heroButton.y + heroButton.height + 6 : 62
             width: screen.portrait ? stage.width - 48 : 290
             Repeater {
-                model: 4
+                // a workout takes the room of the last two
+                model: screen.inWorkout ? 2 : 4
                 MetricRow {
                     width: rows.width
                     source: screen.source
@@ -934,11 +1016,27 @@ Item {
                     kind: screen.slots[index + 1].st
                     tint: screen.shownTint
                     selected: screen.editing === index + 1
-                    lastRow: index === 3
+                    lastRow: index === (screen.inWorkout ? 1 : 3)
                     animate: screen.settled
                     onClicked: screen.edit(index + 1)
                 }
             }
+        }
+
+        // the workout under way: under the rows, or under the number in Focus on a phone
+        WorkoutPanel {
+            id: workoutPanel
+            visible: screen.inWorkout
+            x: rows.x
+            width: rows.width
+            y: screen.focusMode ? (screen.portrait ? heroButton.y + heroButton.height + 6 : 62) : rows.y + rows.height + 10
+            height: implicitHeight
+            steps: screen.workoutSteps
+            t: screen.workoutT
+            watts: screen.wattsHeld
+            level: screen.source.level
+            levelTarget: screen.levelTarget
+            estimated: screen.source.powerEstimated === true
         }
 
         // the dock: harder, the level, easier and pause for a bike the app can set; the ride
@@ -1402,6 +1500,8 @@ Item {
 
     // only a zone the screen shows crosses: none while power zones need an FTP
     onShownZoneChanged: {
+        if (lastZone > 0 && lastZone !== shownZone && !inWorkout && !idle && startPhase === "")
+            cue(0, "")
         if (lastZone > 0 && lastZone !== shownZone)
             cross(lastZone, hero.value, hero.unit)
         lastZone = shownZone

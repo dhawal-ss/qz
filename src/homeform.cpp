@@ -2130,6 +2130,24 @@ void homeform::setKeepScreenOn(bool on) {
 #endif
 }
 
+int homeform::levelForWatts(int watts) {
+    bluetoothdevice *dev = bluetoothManager ? bluetoothManager->device() : nullptr;
+    echelonconnectsport *echelon = qobject_cast<echelonconnectsport *>(dev);
+    if (!echelon || watts <= 0 || echelon->currentCadence().value() <= 0)
+        return -1;
+    return (int)echelon->resistanceFromPowerRequest((uint16_t)watts);
+}
+
+void homeform::cue(int kind) {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoCues", "cue",
+                                              "(Landroid/content/Context;I)V", QtAndroid::androidContext().object(),
+                                              (jint)kind);
+#else
+    Q_UNUSED(kind);
+#endif
+}
+
 void homeform::discardRide() {
     m_discardRide = true;
     Stop();

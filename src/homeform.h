@@ -268,6 +268,15 @@ class homeform : public QObject {
     Q_INVOKABLE void setKeepScreenOn(bool on);
     // ends the ride without saving it, for a ride of a few seconds started by mistake
     Q_INVOKABLE void discardRide();
+    // the name the ride is saved with (a Bikemodo workout); QZ clears it when a ride starts
+    Q_INVOKABLE void setWorkoutName(const QString &name) { stravaPelotonActivityName = name; }
+    // The level that gives these watts at the cadence now, from the bike's own power table: only an
+    // Echelon has one Bikemodo trusts (-1 for every other bike). Nothing is set on the bike.
+    Q_INVOKABLE int levelForWatts(int watts);
+    // a beep and a buzz of the ride (0 a tick, 1 a count, 2 a change), quiet on silent
+    Q_INVOKABLE void cue(int kind);
+    // spoken words of the ride, through QZ's text to speech
+    Q_INVOKABLE void say(const QString &words) { m_speech.say(words); }
     // Heart rate sensor chosen in the settings (name) or a tap on the Bluetooth icon (no name, the saved one):
     // connect it without a restart
     Q_INVOKABLE void reconnectHeartRateBelt(const QString &name = QString()) {

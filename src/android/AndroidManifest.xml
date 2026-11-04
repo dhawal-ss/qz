@@ -164,6 +164,7 @@
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<uses-permission android:name="android.permission.VIBRATE"/>
 <uses-permission android:name="android.permission.RECEIVE_MEDIA_BUTTON" />
     <uses-permission android:name="android.permission.ACCESS_CHECKIN_PROPERTIES"/>
     <!-- Qt 5 historically auto-injected these permissions. Keep the legacy

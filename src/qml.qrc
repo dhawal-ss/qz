@@ -256,6 +256,8 @@
         <file>ui2/goals/GoalSetup.qml</file>
         <file>ui2/goals/PauseSheet.qml</file>
         <file>ui2/onboarding/Onboarding.qml</file>
+        <file>ui2/train/Workout.js</file>
+        <file>ui2/train/WorkoutPanel.qml</file>
         <file>ui2/goals/WelcomeBack.qml</file>
         <file>ui2/moments/PrMoment.qml</file>
         <file>ui2/moments/WeekClosed.qml</file>

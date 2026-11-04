@@ -16,6 +16,8 @@ Rectangle {
     property bool showLoad: true
 
     signal rideRequested()
+    // Start: the idea as a workout, its steps on the ride screen (train/Workout.js)
+    signal workoutRequested()
     signal swap()
     signal demoRequested()
 
@@ -109,8 +111,8 @@ Rectangle {
             fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
             pressedRadius: 20
             pressedScale: 0.97
-            Accessible.name: suggestion.firstRide ? qsTr("Start ride") : qsTr("Start a free ride and follow this idea by feel")
-            onClicked: suggestion.rideRequested()
+            Accessible.name: suggestion.plan ? qsTr("Start the workout %1").arg(suggestion.plan.name) : qsTr("Start ride")
+            onClicked: suggestion.plan ? suggestion.workoutRequested() : suggestion.rideRequested()
             contentItem: Item {
                 Row {
                     anchors.centerIn: parent
@@ -123,7 +125,7 @@ Rectangle {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: suggestion.firstRide ? qsTr("Start ride") : qsTr("Start a free ride")
+                        text: suggestion.plan ? qsTr("Start workout") : qsTr("Start ride")
                         color: Theme.accentInk
                         font.family: Theme.bodySemibold
                         font.pixelSize: 18

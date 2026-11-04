@@ -207,7 +207,20 @@ ApplicationWindow {
     function leaveRide() {
         if (mode === "demo")
             demoRide.running = false
+        // a workout that never started is let go; one under way waits with its ride
+        if (mode === "demo" || live.stopped)
+            workoutPlan = null
         mode = "home"
+    }
+
+    // A workout from Today (today/Coach.js plan()): the ride screen shows its steps from the start of
+    // the ride, or from now when a ride is already open. It ends with the ride.
+    property var workoutPlan: null
+    property int workoutStart: 0
+    function startWorkout(plan) {
+        workoutPlan = plan
+        workoutStart = rideOpen ? live.elapsed : 0
+        requestRide()
     }
 
     // a ride with time on it that has not ended: closing the app first asks to end and save it
@@ -392,6 +405,7 @@ ApplicationWindow {
         if (mode === "demo") {
             if (demoRide.stopped)
                 return
+            workoutPlan = null
             finishedDemo = true
             finishedRide = copyRide(demoRide)
             demoRide.end()
@@ -485,6 +499,9 @@ ApplicationWindow {
     Connections {
         target: live
         function onStoppedChanged() {
+            // the workout ends with the ride
+            if (live.stopped && window.mode !== "demo")
+                window.workoutPlan = null
             if (!live.stopped || window.finishing || window.mode === "demo" || window.metricsObject === null
                     || window.metricsObject.elapsed <= 0)
                 return
@@ -591,6 +608,7 @@ ApplicationWindow {
             ridePaused: live.paused && !live.stopped && live.elapsed > 0 && window.mode === "home"
             pausedAt: live.pausedAt
             onRideRequested: window.requestRide()
+            onWorkoutRequested: window.startWorkout(plan)
             onEndRideRequested: window.finishRide()
             onDemoRequested: window.openDemo()
             onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
@@ -664,10 +682,14 @@ ApplicationWindow {
                         window.restart()
                 }
                 onCloseRequested: {
-                    if (setup)
+                    if (setup) {
                         window.setupStep = 0
-                    else
+                    } else {
+                        // a workout picked on Today goes when the rider does not ride
+                        if (!window.rideOpen)
+                            window.workoutPlan = null
                         window.mode = "home"
+                    }
                 }
             }
 
@@ -677,6 +699,9 @@ ApplicationWindow {
                 active: window.mode === "ride" || window.mode === "demo"
                 sourceComponent: RideScreen {
                     source: window.mode === "demo" ? demoRide : live
+                    core: window.core
+                    workoutPlan: window.workoutPlan
+                    workoutStart: window.workoutStart
                     onFinishRequested: window.finishRide()
                     onLeaveRequested: window.leaveRide()
                 }

@@ -8,6 +8,8 @@ Item {
 
     property var blocks: []          // [[minutes, zone]]
     property string summary: ""      // for the screen reader
+    // the minutes ridden of a workout under way, marked on the shape; the blocks behind fade (-1: none)
+    property real doneMinutes: -1
     readonly property var heights: [0.22, 0.33, 0.5, 0.7, 0.93, 1, 1]
     readonly property real gap: 4
     readonly property real total: {
@@ -40,14 +42,38 @@ Item {
         easing.bezierCurve: Theme.defaultSpatialCurve
     }
 
+    function widthOf(minutes) {
+        return 6 + shape.spread * minutes / shape.total
+    }
+    function startOf(index) {
+        var m = 0
+        for (var i = 0; i < index; i++)
+            m += blocks[i][0]
+        return m
+    }
+    // where on the shape a number of minutes is
+    function xAt(minutes) {
+        var x = 0
+        var left = minutes
+        for (var i = 0; i < blocks.length; i++) {
+            var w = widthOf(blocks[i][0])
+            if (left <= blocks[i][0])
+                return x + w * Math.max(0, left) / Math.max(0.001, blocks[i][0])
+            x += w + gap
+            left -= blocks[i][0]
+        }
+        return width
+    }
+
     Row {
         spacing: shape.gap
         height: shape.height
         Repeater {
             model: shape.blocks
             Item {
-                width: 6 + shape.spread * modelData[0] / shape.total
+                width: shape.widthOf(modelData[0])
                 height: shape.height
+                opacity: shape.doneMinutes >= 0 && shape.startOf(index) + modelData[0] <= shape.doneMinutes ? 0.35 : 1
                 Rectangle {
                     readonly property real full: Math.max(8, shape.height * shape.heights[Math.max(1, modelData[1]) - 1])
                     width: parent.width
@@ -58,5 +84,16 @@ Item {
                 }
             }
         }
+    }
+
+    // now
+    Rectangle {
+        visible: shape.doneMinutes >= 0
+        x: Math.min(shape.width - width, Math.max(0, shape.xAt(shape.doneMinutes) - 1))
+        y: -4
+        width: 3
+        height: shape.height + 8
+        radius: 1.5
+        color: Theme.text
     }
 }

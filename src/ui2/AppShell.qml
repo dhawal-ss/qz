@@ -33,6 +33,7 @@ Item {
     property int insetRight: 0
 
     signal rideRequested()
+    signal workoutRequested(var plan)
     // End on the paused ride banner of Today
     signal endRideRequested()
     signal demoRequested()
@@ -226,6 +227,7 @@ Item {
             ridePaused: shell.ridePaused
             pausedAt: shell.pausedAt
             onRideRequested: shell.rideRequested()
+            onWorkoutRequested: shell.workoutRequested(plan)
             onEndRideRequested: shell.endRideRequested()
             onDemoRequested: shell.demoRequested()
             onSearchAgain: shell.searchAgain()

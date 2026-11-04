@@ -52,6 +52,8 @@ Item {
     property real pauseClock: Date.now()
 
     signal rideRequested()
+    // Start on the idea for today: the plan (today/Coach.js plan()) as a workout
+    signal workoutRequested(var plan)
     // End on the paused ride banner
     signal endRideRequested()
     signal demoRequested()
@@ -1104,6 +1106,7 @@ Item {
                         swapLabel: todayPage.swapped ? qsTr("Back to %1").arg(todayPage.suggestion.main.name) : todayPage.suggestion.otherLabel
                         firstRide: todayPage.rideCount === 0
                         onRideRequested: todayPage.rideRequested()
+                        onWorkoutRequested: todayPage.workoutRequested(todayPage.plan)
                         onSwap: todayPage.swapped = !todayPage.swapped
                         onDemoRequested: todayPage.demoRequested()
                     }

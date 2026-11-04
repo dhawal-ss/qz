@@ -183,6 +183,20 @@ Column {
         onSwitched: prefs.you.setLook("autoPause", value)
     }
 
+    YouSwitch {
+        title: qsTr("Beeps and buzz")
+        detail: qsTr("3, 2, 1 before each step of a workout, and a tick at a new zone. Quiet when the phone is on silent.")
+        isOn: prefs.look.cueSound !== false
+        onSwitched: prefs.you.setLook("cueSound", value)
+    }
+
+    YouSwitch {
+        title: qsTr("Spoken cues")
+        detail: qsTr("Each step of a workout and each lap, said out loud.")
+        isOn: prefs.look.cueVoice === true
+        onSwitched: prefs.you.setLook("cueVoice", value)
+    }
+
     // the gap under which two rides become one, 0 for never; on a narrow column the stepper goes
     // under the words
     Item {
