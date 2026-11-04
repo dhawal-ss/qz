@@ -34,6 +34,10 @@ Item {
 
     signal rideRequested()
     signal workoutRequested(var plan)
+    signal workoutFileRequested()
+    signal intervalsRequested()
+    signal routeRequested(var route)
+    signal routeFileRequested()
     // End on the paused ride banner of Today
     signal endRideRequested()
     signal demoRequested()
@@ -208,6 +212,7 @@ Item {
 
         TodayScreen {
             id: todayScreen
+            core: shell.core
             width: parent.width
             height: parent.height
             visible: shell.pageShown("today")
@@ -276,6 +281,10 @@ Item {
             bottomClearance: shell.navClearance + shell.insetBottom
             onRideRequested: shell.rideRequested()
             onWorkoutRequested: shell.workoutRequested(workout)
+            onWorkoutFileRequested: shell.workoutFileRequested()
+            onIntervalsRequested: shell.intervalsRequested()
+            onRouteRequested: shell.routeRequested(route)
+            onRouteFileRequested: shell.routeFileRequested()
             visible: shell.pageShown("goals")
             opacity: shell.pageOpacity("goals")
             scale: shell.pageScale("goals")

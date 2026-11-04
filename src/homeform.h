@@ -275,6 +275,26 @@ class homeform : public QObject {
     Q_INVOKABLE int levelForWatts(int watts);
     // a beep and a buzz of the ride (0 a tick, 1 a count, 2 a change), quiet on silent
     Q_INVOKABLE void cue(int kind);
+    // A workout file (.zwo, the format of Zwift and intervals.icu) as the blocks of a Bikemodo workout:
+    // { name, blocks: [[minutes, zone, watts], ...] } with watts from the FTP setting, -1 for a free
+    // block; empty when it cannot be read. Ramps become steps of 30 s or more.
+    Q_INVOKABLE QVariantMap workoutFile(const QString &path);
+    // A route file (.gpx) as a profile to ride: { name, points: [[km, elevation m], ...] } every 50 m
+    // or so, from the start; empty when it cannot be read
+    Q_INVOKABLE QVariantMap routeFile(const QString &path);
+    // today's workout downloaded from intervals.icu (training/intervals-icu), "" for none yet
+    Q_INVOKABLE QString intervalsWorkoutToday();
+    // Readiness from Health Connect (BikemodoHealth.kt): whether it is there, the dialog to allow
+    // reading HRV, resting heart rate and sleep, a read of the last 35 days in the background, and
+    // its answer once (JSON, "" while it is not there)
+    Q_INVOKABLE bool healthAvailable();
+    Q_INVOKABLE void healthRequestRead();
+    Q_INVOKABLE void healthRefresh();
+    Q_INVOKABLE QString healthTake();
+    // the home screen widget's numbers (the week, the goal, the streak), and the week's recap for
+    // Monday's notification, kept with the Monday of its week (yyyy-MM-dd)
+    Q_INVOKABLE void updateWidget(const QString &value, const QString &detail, const QString &streak,
+                                  const QString &weekKey, const QString &recapTitle, const QString &recapText);
     // spoken words of the ride, through QZ's text to speech
     Q_INVOKABLE void say(const QString &words) { m_speech.say(words); }
     // Heart rate sensor chosen in the settings (name) or a tap on the Bluetooth icon (no name, the saved one):

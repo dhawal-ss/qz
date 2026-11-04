@@ -8,6 +8,7 @@ import "rides"
 import "learn"
 import "Format.js" as Format
 import "rides/Analysis.js" as Analysis
+import "progress/Analytics.js" as Pro
 import "learn/Learn.js" as Learn
 
 // One ride in depth, in the Signature language: the ride's name and day, what a coach would
@@ -75,6 +76,10 @@ Item {
     // a sheet covers the ride
     readonly property bool covering: learnOpen || asking !== ""
     property var durable: null
+    // Pro: W′ balance through the ride from the critical power of the 90 days before it
+    // (progress/Analytics.js), and the time at each cadence band
+    property var wbalInfo: null
+    property var cadenceBands: []
     property var changes: []
     property var blocks: ({ blocks: [], work: false })
     property int pickedLap: -1
@@ -150,7 +155,14 @@ Item {
         if (stretch !== null)
             stretch.seconds = length
         segment = stretch
-        durable = has.power && has.heart ? Analysis.durability(all) : null
+        // decoupling says something on a steady ride only
+        durable = has.power && has.heart && Pro.steady(r) ? Analysis.durability(all) : null
+        var model = has.power ? Pro.criticalPower(curve90) : null
+        var balance = model ? Pro.wbal(all.power || [], model.cp, model.wprime) : null
+        if (balance)
+            balance.model = model
+        wbalInfo = balance
+        cadenceBands = has.cadence ? Pro.cadenceProfile(all.cadence || []) : []
         changes = Analysis.changes(r, similar, spread, similarSpread, Date.now())
         blocks = Analysis.workBlocks(r.laps || [], r.avgPower || 0, r.ftp || 0)
         ride = r
@@ -1170,6 +1182,120 @@ Item {
                         font.pixelSize: 14
                         lineHeight: 1.2
                         wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
+            // W′ balance: how much of the anaerobic reserve was left, second by second
+            Rise {
+                cue: proCue
+                order: 5
+                width: parent.width
+                visible: detail.pro && detail.wbalInfo !== null
+                Column {
+                    width: parent.width
+                    spacing: 12
+                    Text {
+                        text: qsTr("W′ balance")
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.titleSize
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    TimeChart {
+                        width: parent.width
+                        height: 150
+                        view: chartView
+                        seconds: detail.samples.seconds || []
+                        values: detail.wbalInfo ? detail.wbalInfo.series : []
+                        name: qsTr("W′ balance")
+                        unit: "kJ"
+                        color: Theme.zoneColors[4]
+                        filled: true
+                        showAverage: false
+                    }
+                    Text {
+                        width: parent.width
+                        text: !detail.wbalInfo ? ""
+                              : qsTr("Lowest %1 of %2 kJ (%3%), at %4 into the ride. From a critical power of %5 W and a W′ of %6 kJ, fitted to your best 3 to 20 minutes of the 90 days before.")
+                                .arg((detail.wbalInfo.lowest / 1000).toFixed(1)).arg((detail.wbalInfo.model.wprime / 1000).toFixed(1))
+                                .arg(Math.round(detail.wbalInfo.lowest / detail.wbalInfo.model.wprime * 100))
+                                .arg(Format.duration(detail.wbalInfo.lowestAt)).arg(detail.wbalInfo.model.cp)
+                                .arg((detail.wbalInfo.model.wprime / 1000).toFixed(1))
+                                + (detail.estimated ? " " + qsTr("Estimated, like the watts of this bike.") : "")
+                        color: Theme.text2
+                        font.family: Theme.bodyMedium
+                        font.pixelSize: 14
+                        lineHeight: 1.2
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+
+            // the time at each cadence band
+            Rise {
+                cue: proCue
+                order: 5
+                width: parent.width
+                visible: detail.pro && detail.cadenceBands.length > 0
+                Column {
+                    width: parent.width
+                    spacing: 8
+                    Text {
+                        text: qsTr("Cadence profile")
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.titleSize
+                        Accessible.role: Accessible.Heading
+                        Accessible.name: text
+                    }
+                    Repeater {
+                        model: detail.cadenceBands
+                        Item {
+                            width: parent.width
+                            height: 26
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: qsTr("%1 rpm, %2% of the time").arg(modelData.label).arg(Math.round(modelData.share * 100))
+                            Text {
+                                id: bandLabel
+                                width: 72
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.label
+                                color: Theme.text2
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 13
+                            }
+                            Rectangle {
+                                x: bandLabel.width + 8
+                                width: parent.width - x - 48
+                                height: 10
+                                radius: 5
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.control
+                                Rectangle {
+                                    width: parent.width * modelData.share
+                                    height: parent.height
+                                    radius: 5
+                                    color: detail.tint
+                                }
+                            }
+                            Text {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: Math.round(modelData.share * 100) + "%"
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 13
+                            }
+                        }
+                    }
+                    Text {
+                        width: parent.width
+                        text: qsTr("rpm, of the time you pedaled")
+                        color: Theme.text3
+                        font.family: Theme.bodyMedium
+                        font.pixelSize: 12
                     }
                 }
             }

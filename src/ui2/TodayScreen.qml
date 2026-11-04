@@ -13,6 +13,7 @@ import "today/Coach.js" as Coach
 import "train/Levels.js" as Levels
 import "train/Plans.js" as Plans
 import "train/Ftp.js" as Ftp
+import "today/Body.js" as Body
 import "today/Patterns.js" as Patterns
 import "progress/Fitness.js" as Fitness
 import "learn/Learn.js" as Learn
@@ -36,6 +37,14 @@ Item {
     objectName: "todayScreen"
 
     property var library: null
+    // rootItem, for Health Connect (null in previews)
+    property var core: null
+    // readiness from the body (today/Body.js): the rider said yes (ui2/healthRead) or not now
+    // (ui2/healthDismissed), and the answer of the last read
+    property bool healthAsked: false
+    property bool healthDismissed: false
+    property var bodyNow: null
+    readonly property bool healthOffered: core !== null && !healthAsked && !healthDismissed && core.healthAvailable()
     property bool connected: false
     property string deviceName: ""
     property string searchStatus: ""
@@ -312,6 +321,75 @@ Item {
         suggestion = { main: planState.workout, other: Coach.easySpin(), otherLabel: qsTr("Swap for an easy spin") }
     }
 
+    // Health Connect: ask, then read; the answer comes back on Android's time
+    function connectHealth() {
+        uiStore.setValue("healthRead", true)
+        healthAsked = true
+        if (core !== null)
+            core.healthRequestRead()
+        // the dialog takes a while: read once it has had time, and again when Today shows
+        healthAgain.restart()
+    }
+    function readBody() {
+        if (core === null)
+            return
+        core.healthRefresh()
+        healthWait = 20
+        healthPoll.start()
+    }
+    property int healthWait: 0
+    Timer {
+        id: healthPoll
+        interval: 500
+        repeat: true
+        onTriggered: {
+            var text = todayPage.core !== null ? todayPage.core.healthTake() : ""
+            if (text !== "") {
+                stop()
+                var o = Body.parse(text)
+                todayPage.bodyNow = o && o.granted ? Body.today(o.days || [], Date.now()) : (o ? { state: "none", words: "", inputs: [], need: 0 } : null)
+                refreshLater.restart()
+            } else if (--todayPage.healthWait <= 0) {
+                stop()
+            }
+        }
+    }
+    Timer {
+        id: healthAgain
+        interval: 8000
+        onTriggered: todayPage.readBody()
+    }
+
+    // the body says take it easy: a recovery spin in place of a harder idea (a plan keeps its ride)
+    function applyBody() {
+        if (bodyNow === null || bodyNow.state !== "easy" || (planState !== null && planState.workout !== null))
+            return
+        if (suggestion.main.zone <= 1)
+            return
+        suggestion = { main: Coach.plan("recovery", qsTr("Recovery spin"), qsTr("Easy pedaling, legs only"), [[5, 1], [15, 1], [5, 1]]),
+                       other: suggestion.main, otherLabel: qsTr("Ride %1 anyway").arg(suggestion.main.name) }
+        kicker = qsTr("Your body says take it easy")
+    }
+
+    // The home screen widget and Monday's recap (BikemodoWidget.java): this week against the goal and
+    // the streak, as of now. week: Streak.perWeek() of this week, or null
+    function pushWidget(week, now) {
+        if (core === null)
+            return
+        var value = Coach.goalText(weekValue, goalValue, goalKind, miles)
+        var rides = week ? week.rides : 0
+        var detail = rides === 0 ? qsTr("No rides yet this week")
+                   : (rides === 1 ? qsTr("1 ride, %1").arg(Format.hours(week.seconds)) : qsTr("%1 rides, %2").arg(rides).arg(Format.hours(week.seconds)))
+        var streak = goalStreak >= 2 ? qsTr("%1 week streak").arg(goalStreak) : ""
+        var key = String(Streak.weekKey(now))
+        var monday = key.substr(0, 4) + "-" + key.substr(4, 2) + "-" + key.substr(6, 2)
+        var title = rides === 0 ? "" : qsTr("Your week: %1").arg(detail)
+        var text = weekValue >= goalValue ? qsTr("Goal reached: %1.").arg(value) : qsTr("%1 of your weekly goal.").arg(value)
+        if (streak !== "")
+            text += " " + streak + "."
+        core.updateWidget(value, detail, streak, monday, title, text)
+    }
+
     // the FTP test result: used, or let go
     function settleFtpTest(use) {
         if (use && ftpTest !== null) {
@@ -329,6 +407,10 @@ Item {
         restWeeks = Streak.parseList(String(uiStore.value("restWeeks", "[]")))
         levels = Levels.levels(Levels.parse(String(uiStore.value("workoutLog", "[]"))), Date.now())
         trainingPlan = Plans.parse(String(uiStore.value("trainingPlan", "")))
+        healthAsked = String(uiStore.value("healthRead", "false")) === "true"
+        healthDismissed = String(uiStore.value("healthDismissed", "false")) === "true"
+        if (healthAsked && core !== null)
+            readBody()
         try {
             var test = JSON.parse(String(uiStore.value("ftpTestResult", "")) || "null")
             ftpTest = test && test.watts > 0 ? test : null
@@ -448,6 +530,7 @@ Item {
             coachWords = Coach.words(ready)
             suggestion = Coach.suggest(ready, null, "", levels)
             applyPlan([], now)
+            applyBody()
             weekDays = Coach.weekDays([], now)
             usual = Patterns.usualSample()
             whenData = Patterns.whenSample()
@@ -473,6 +556,7 @@ Item {
         weekValue = Streak.measure(weeks[Streak.weekKey(now)], goalKind)
         streakInfo = Streak.run(weeks, { kind: goalKind, goal: goalValue, rest: restWeeks, now: now })
         goalStreak = streakInfo.streak
+        pushWidget(weeks[Streak.weekKey(now)] || null, now)
         found = Insights.build({
             rides: recent,
             days: allDays,
@@ -498,6 +582,7 @@ Item {
         ftpOffer = best20 > 0 ? Math.round(best20 * 0.95) : 0
         suggestion = Coach.suggest(ready, found.reach, found.reach ? Format.effort(found.reach.seconds) : "", levels)
         applyPlan(recent, now)
+        applyBody()
         weekDays = Coach.weekDays(recent, now)
         usual = Patterns.usual(recent, now)
         whenData = Patterns.whenBest(recent, now)
@@ -1062,6 +1147,19 @@ Item {
                 }
                 Item { width: 1; height: 14 }
                 // FTP still QZ's guess: offer one from the rides, or the place to set it
+                // readiness from the body: the offer, or last night against the usual
+                BodyCard {
+                    visible: todayPage.healthOffered || todayPage.healthAsked
+                    height: visible ? implicitHeight : 0
+                    body: todayPage.bodyNow
+                    asked: todayPage.healthAsked
+                    onConnect: todayPage.connectHealth()
+                    onDismiss: {
+                        uiStore.setValue("healthDismissed", true)
+                        todayPage.healthDismissed = true
+                    }
+                }
+                Item { width: 1; height: todayPage.healthOffered || todayPage.healthAsked ? 14 : 0 }
                 // an FTP test result, waiting for the rider to use it or not
                 Rectangle {
                     objectName: "ftpTestResult"

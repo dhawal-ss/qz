@@ -7,6 +7,8 @@ import "Metrics.js" as Metrics
 import "train"
 import "train/Workout.js" as Workout
 import "train/Ftp.js" as Ftp
+import "train/Route.js" as Route
+import "Format.js" as Format
 
 // The live ride. One big number, four quiet rows, the level dock and the ride ribbon.
 // The screen takes one color, from the current zone. Every number can be swapped, restyled
@@ -41,7 +43,20 @@ Item {
     readonly property var workoutSteps: workoutPlan ? Workout.steps(workoutPlan, source.ftp,
                                                                     typeof source.ftpSet === "boolean" ? source.ftpSet : true,
                                                                     Theme.powerZoneStarts) : []
-    readonly property string workoutName: workoutPlan ? workoutPlan.name : ""
+    // a route instead (train/Route.js, null for none) and the km it started at; the ride is named
+    // after the workout or the route
+    property var route: null
+    property real routeStartKm: 0
+    readonly property bool inRoute: route !== null && !inWorkout
+    readonly property real kmNow: source.miles === true ? source.distance / 0.621371 : source.distance
+    readonly property real routeKm: Math.max(0, kmNow - routeStartKm)
+    readonly property string workoutName: workoutPlan ? workoutPlan.name : (route ? route.name : "")
+    // the rider's weight (kg), for what a climb takes
+    property real weight: 75
+    // Ghost: the last ride of the same workout or route ({ values, unit: "kj" or "km", day }, null for
+    // none), where the rider is against it now; only from the start of a ride
+    property var ghost: null
+    property string ghostText: ""
     property int workoutStart: 0
     readonly property bool inWorkout: workoutSteps.length > 0
     readonly property int workoutT: Math.max(0, source.elapsed - workoutStart)
@@ -202,7 +217,7 @@ Item {
             if (screen.source.stopped) {
                 screen.source.begin()
                 // the saved ride is named after the workout (QZ clears the name when a ride starts)
-                if (screen.inWorkout && typeof screen.source.core !== "undefined" && screen.source.core !== null)
+                if ((screen.inWorkout || screen.inRoute) && typeof screen.source.core !== "undefined" && screen.source.core !== null)
                     screen.source.core.setWorkoutName(screen.workoutName)
             }
             screen.cue(2, screen.inWorkout ? qsTr("%1. Go").arg(screen.workoutName) : "")
@@ -510,11 +525,25 @@ Item {
     // for what the workout panel says to do
     property real wattsHeld: 0
     property int levelTarget: -1
+    property bool routeDoneSaid: false
+    onRouteChanged: routeDoneSaid = false
     Timer {
         interval: 1000
         repeat: true
-        running: screen.inWorkout && !screen.stopped
+        running: (screen.inWorkout || screen.inRoute) && !screen.stopped
         onTriggered: {
+            screen.ghostText = screen.ghostLine()
+            if (screen.inRoute) {
+                var at = Route.at(screen.route, screen.routeKm)
+                if (at.done && !screen.routeDoneSaid) {
+                    screen.routeDoneSaid = true
+                    screen.cue(2, qsTr("Route done"))
+                    screen.toast(qsTr("Route done. Keep riding, or hold End to finish."), 5000)
+                }
+                var need = at.done ? 0 : Route.watts(at.grade, Math.max(screen.source.speed * (screen.source.miles === true ? 1.609344 : 1), 12), screen.weight)
+                screen.levelTarget = need > 0 && screen.core !== null && screen.source.cadence > 0 ? screen.core.levelForWatts(need) : -1
+                return
+            }
             screen.measureTest()
             screen.wattsHeld = screen.wattsHeld * 0.6 + screen.source.power * 0.4
             var p = screen.workoutPos
@@ -522,6 +551,24 @@ Item {
             screen.levelTarget = s && s.high > 0 && screen.core !== null && screen.source.cadence > 0
                     ? screen.core.levelForWatts(Math.round((s.low + s.high) / 2)) : -1
         }
+    }
+    // "3.2 kJ ahead of your ride on 12 Oct"
+    function ghostLine() {
+        if (ghost === null || stopped || ghost.values.length === 0)
+            return ""
+        var t = Math.min(ghost.values.length - 1, source.elapsed)
+        if (ghost.unit === "kj") {
+            if (workoutStart > 0)
+                return ""
+            var dk = source.kilojoules - ghost.values[t]
+            return Math.abs(dk) < 0.5 ? qsTr("Level with your ride of %1").arg(ghost.day)
+                 : (dk > 0 ? qsTr("%1 kJ ahead of your ride of %2") : qsTr("%1 kJ behind your ride of %2")).arg(Math.abs(dk).toFixed(1)).arg(ghost.day)
+        }
+        if (routeStartKm > 0)
+            return ""
+        var dd = routeKm - ghost.values[t]
+        return Math.abs(dd) < 0.02 ? qsTr("Level with your ride of %1").arg(ghost.day)
+             : (dd > 0 ? qsTr("%1 ahead of your ride of %2") : qsTr("%1 behind your ride of %2")).arg(Format.distance(Math.abs(dd), source.miles === true)).arg(ghost.day)
     }
 
     // Android back while the ride moves: it stays, and the screen says how to leave
@@ -888,8 +935,8 @@ Item {
             id: heroButton
             x: screen.portrait ? 24 : 32
             y: screen.portrait ? 74 : 66
-            width: screen.portrait ? stage.width - 48 : (screen.focusMode && !screen.inWorkout ? dock.x - 32 - 36 : rows.x - 32 - 36)
-            height: screen.portrait ? (screen.focusMode ? Math.max(270, ribbon.y - 40 - y - (screen.inWorkout ? workoutPanel.height + 16 : 0)) : 270) : 300
+            width: screen.portrait ? stage.width - 48 : (screen.focusMode && !screen.inWorkout && !screen.inRoute ? dock.x - 32 - 36 : rows.x - 32 - 36)
+            height: screen.portrait ? (screen.focusMode ? Math.max(270, ribbon.y - 40 - y - (screen.inWorkout ? workoutPanel.height + 16 : (screen.inRoute ? routePanel.height + 16 : 0))) : 270) : 300
             radius: 28
             pressedScale: 0.985
             fill: screen.editing === 0 ? Theme.accentWash(0.06) : "transparent"
@@ -1091,8 +1138,8 @@ Item {
             y: screen.portrait ? heroButton.y + heroButton.height + 6 : 62
             width: screen.portrait ? stage.width - 48 : 290
             Repeater {
-                // a workout takes the room of the last two
-                model: screen.inWorkout ? 2 : 4
+                // a workout or a route takes the room of the last two
+                model: screen.inWorkout || screen.inRoute ? 2 : 4
                 MetricRow {
                     width: rows.width
                     source: screen.source
@@ -1100,7 +1147,7 @@ Item {
                     kind: screen.slots[index + 1].st
                     tint: screen.shownTint
                     selected: screen.editing === index + 1
-                    lastRow: index === (screen.inWorkout ? 1 : 3)
+                    lastRow: index === (screen.inWorkout || screen.inRoute ? 1 : 3)
                     animate: screen.settled
                     onClicked: screen.edit(index + 1)
                 }
@@ -1121,8 +1168,27 @@ Item {
             level: screen.source.level
             levelTarget: screen.levelTarget
             estimated: screen.source.powerEstimated === true
+            ghostText: screen.ghostText
             overText: screen.testOver ? (screen.testWatts > 0 ? qsTr("Test over: FTP %1 W. Spin easy, then hold End.").arg(screen.testWatts)
                                                               : qsTr("Too short for an FTP. Spin easy, then hold End.")) : ""
+        }
+
+        // the route under way, where the workout would be
+        RoutePanel {
+            id: routePanel
+            visible: screen.inRoute
+            x: rows.x
+            width: rows.width
+            y: screen.focusMode ? (screen.portrait ? heroButton.y + heroButton.height + 6 : 62) : rows.y + rows.height + 10
+            height: implicitHeight
+            route: screen.route
+            km: screen.routeKm
+            speed: screen.source.speed * (screen.source.miles === true ? 1.609344 : 1)
+            weight: screen.weight
+            miles: screen.source.miles === true
+            level: screen.source.level
+            levelTarget: screen.levelTarget
+            ghostText: screen.ghostText
         }
 
         // the dock: harder, the level, easier and pause for a bike the app can set; the ride

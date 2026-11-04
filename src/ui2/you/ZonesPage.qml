@@ -22,6 +22,31 @@ YouPage {
         return qsTr("%1 to %2 bpm").arg(starts[zone - 2]).arg(starts[zone - 1] - 1)
     }
 
+    // What the heart zones start from (ui2/heartZoneBasis): the share of max heart rate as QZ keeps
+    // them, heart rate reserve (Karvonen: 60, 70, 80 and 90% of the way from resting to max), or the
+    // threshold heart rate (lactate threshold, the zones Joe Friel gives: 81, 90, 94 and 100% of it).
+    // The last two are written as QZ's four steps, so the ride screen, saved rides and QZ agree.
+    property string basis: String(you.prefs.value("heartZoneBasis", "max"))
+    property int lthr: Number(you.prefs.value("lthr", 0)) || 0
+
+    function applyBasis(b) {
+        basis = b
+        you.prefs.setValue("heartZoneBasis", b)
+        var max = you.maxHeartRate
+        var rest = qz.heart_rate_resting
+        var out
+        if (b === "reserve" && max > rest && rest > 0)
+            out = [0.6, 0.7, 0.8, 0.9].map(function (f) { return (rest + f * (max - rest)) / max * 100 })
+        else if (b === "threshold" && lthr > 0 && max > 0)
+            out = [0.81, 0.90, 0.94, 1.0].map(function (f) { return f * lthr / max * 100 })
+        else if (b === "max")
+            out = [60, 70, 80, 90]
+        if (!out)
+            return
+        for (var i = 0; i < 4; i++)
+            setStep(i, Math.round(out[i] * 10) / 10)
+    }
+
     // also in Theme, so the ride screen uses the new steps at once
     function setStep(i, percent) {
         if (i === 0) {
@@ -101,6 +126,31 @@ YouPage {
     YouText {
         text: you.qz.heart_max_override_enable ? qsTr("From your max heart rate of %1 bpm.").arg(you.maxHeartRate)
               : qsTr("From your max heart rate of %1 bpm, worked out from your age. Set your own in Body and FTP.").arg(you.maxHeartRate)
+    }
+
+    YouChoice {
+        title: qsTr("Heart zones from")
+        detail: page.basis === "reserve" ? qsTr("Your heart rate reserve, between resting (%1 bpm) and max.").arg(page.qz.heart_rate_resting)
+                : page.basis === "threshold" ? (page.lthr > 0 ? qsTr("Your threshold heart rate of %1 bpm.").arg(page.lthr)
+                                                              : qsTr("Type your threshold heart rate below: the average of the last 20 minutes of a 30 minute all-out ride."))
+                : qsTr("A share of your max heart rate, as set below.")
+        options: [["max", qsTr("Max")], ["reserve", qsTr("Reserve")], ["threshold", qsTr("Threshold")]]
+        current: page.basis
+        onPicked: page.applyBasis(value)
+    }
+    YouField {
+        visible: page.basis === "threshold"
+        title: qsTr("Threshold heart rate")
+        unit: "bpm"
+        kind: "int"
+        minimum: 100
+        maximum: 220
+        value: page.lthr > 0 ? String(page.lthr) : ""
+        onCommitted: {
+            page.lthr = Number(text)
+            you.prefs.setValue("lthr", page.lthr)
+            page.applyBasis("threshold")
+        }
     }
 
     Repeater {

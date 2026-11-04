@@ -155,6 +155,14 @@
                                         <action android:name="android.media.VOLUME_CHANGED_ACTION" />
                                     </intent-filter>
                                 </receiver>
+                                <!-- Bikemodo's home screen widget and its Monday recap -->
+                                <receiver android:name=".BikemodoWidget" android:exported="true" android:label="Bikemodo week">
+                                    <intent-filter>
+                                        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                                    </intent-filter>
+                                    <meta-data android:name="android.appwidget.provider" android:resource="@xml/bikemodo_widget_info" />
+                                </receiver>
+                                <receiver android:name=".BikemodoRecap" android:exported="false" />
 		  <!-- For adding service(s) please check: https://wiki.qt.io/AndroidServices -->
 		</application>
 
@@ -204,4 +212,8 @@
          <uses-permission android:name="android.permission.health.WRITE_STEPS" />
          <uses-permission android:name="android.permission.health.WRITE_STEPS_CADENCE" />
          <uses-permission android:name="android.permission.health.WRITE_HEART_RATE_VARIABILITY" />
+         <!-- Bikemodo's readiness on Today, read only once the rider asks for it -->
+         <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+         <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+         <uses-permission android:name="android.permission.health.READ_SLEEP" />
 </manifest>

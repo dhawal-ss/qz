@@ -21,6 +21,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
+#include <QTextStream>
 #include <QTimer>
 #include <QtMath>
 #include <algorithm>
@@ -1563,4 +1564,70 @@ void RideLibraryWorker::updateRecords() {
         write.exec();
     }
     db.commit();
+}
+
+QString RideLibrary::exportCsv(const QString &folder) {
+    QDir().mkpath(folder);
+    const QString path = QDir(folder).filePath(QStringLiteral("bikemodo-rides.csv"));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+        return QString();
+    QTextStream out(&file);
+    out << "date,start,duration_min,distance_km,avg_power_w,np_w,max_power_w,power_estimated,avg_hr_bpm,max_hr_bpm,"
+           "avg_cadence_rpm,kj,kcal,tss,intensity,title\n";
+    const QVariantList list = rides(0, qMax(1, m_rideCount));
+    auto number = [](const QVariant &v, int decimals) {
+        const double d = v.toDouble();
+        return d > 0 ? QString::number(d, 'f', decimals) : QString();
+    };
+    for (const QVariant &item : list) {
+        const QVariantMap r = item.toMap();
+        const QDateTime start = QDateTime::fromMSecsSinceEpoch(r.value(QStringLiteral("start")).toLongLong());
+        QString title = r.value(QStringLiteral("title")).toString();
+        title.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+        out << start.toString(QStringLiteral("yyyy-MM-dd")) << ',' << start.toString(QStringLiteral("HH:mm")) << ','
+            << QString::number(r.value(QStringLiteral("duration")).toInt() / 60.0, 'f', 1) << ','
+            << number(r.value(QStringLiteral("distance")), 2) << ',' << number(r.value(QStringLiteral("avgPower")), 0) << ','
+            << number(r.value(QStringLiteral("np")), 0) << ',' << number(r.value(QStringLiteral("maxPower")), 0) << ','
+            << (r.value(QStringLiteral("powerKnown")).toBool() ? (r.value(QStringLiteral("powerEstimated")).toBool() ? "yes" : "no") : "")
+            << ',' << number(r.value(QStringLiteral("avgHr")), 0) << ',' << number(r.value(QStringLiteral("maxHr")), 0) << ','
+            << number(r.value(QStringLiteral("avgCadence")), 0) << ',' << number(r.value(QStringLiteral("kj")), 0) << ','
+            << number(r.value(QStringLiteral("kcal")), 0) << ',' << number(r.value(QStringLiteral("tss")), 0) << ','
+            << number(r.value(QStringLiteral("intensity")), 2) << ",\"" << title << "\"\n";
+    }
+    file.close();
+    return path;
+}
+
+QString RideLibrary::backup(const QString &folder) {
+    const QString dirPath = QDir(folder).filePath(QStringLiteral("Bikemodo backup ") +
+                                                  QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd HH-mm")));
+    if (!QDir().mkpath(dirPath))
+        return QString();
+    // a consistent copy of the database while it is open, then the settings file as it is
+    QSqlQuery query(QSqlDatabase::database(uiConnection));
+    const QString dbCopy = QDir(dirPath).filePath(QStringLiteral("bikemodo-library.sqlite"));
+    if (!query.exec(QStringLiteral("VACUUM INTO '") + QString(dbCopy).replace(QLatin1Char('\''), QStringLiteral("''")) +
+                    QStringLiteral("'"))) {
+        qDebug() << "RideLibrary: backup of the library failed" << query.lastError().text();
+        return QString();
+    }
+    // the settings, without anything that signs in somewhere: the backup sits in shared storage
+    QSettings settings;
+    QSettings copy(QDir(dirPath).filePath(QStringLiteral("bikemodo-settings.ini")), QSettings::IniFormat);
+    const QStringList secret = {QStringLiteral("token"),  QStringLiteral("password"), QStringLiteral("secret"),
+                                QStringLiteral("cookie"), QStringLiteral("refresh"),  QStringLiteral("code"),
+                                QStringLiteral("session"), QStringLiteral("apikey"),  QStringLiteral("api_key"),
+                                QStringLiteral("username"), QStringLiteral("email"),  QStringLiteral("athlete")};
+    for (const QString &key : settings.allKeys()) {
+        const QString lower = key.toLower();
+        bool skip = false;
+        for (const QString &word : secret)
+            if (lower.contains(word))
+                skip = true;
+        if (!skip)
+            copy.setValue(key, settings.value(key));
+    }
+    copy.sync();
+    return dirPath;
 }

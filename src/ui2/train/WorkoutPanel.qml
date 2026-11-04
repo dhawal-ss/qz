@@ -23,6 +23,8 @@ Rectangle {
     property bool estimated: false
     // said in place of the step once an FTP test is over ("" while it runs)
     property string overText: ""
+    // against the last ride of this workout (RideScreen.ghostLine), "" for none
+    property string ghostText: ""
     readonly property bool finished: pos.done || overText !== ""
 
     readonly property var pos: Workout.at(steps, t)
@@ -146,6 +148,15 @@ Rectangle {
             font.family: Theme.bodyMedium
             font.pixelSize: 12
             wrapMode: Text.WordWrap
+        }
+
+        Text {
+            visible: panel.ghostText !== ""
+            width: parent.width
+            text: panel.ghostText
+            color: Theme.accent
+            font.family: Theme.bodySemibold
+            font.pixelSize: 13
         }
 
         WorkoutShape {

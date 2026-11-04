@@ -12,6 +12,8 @@ import "Metrics.js" as Metrics
 import "train/Workout.js" as Workout
 import "train/Levels.js" as Levels
 import "train/Ftp.js" as Ftp
+import "today/Coach.js" as Coach
+import "Format.js" as Format
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
@@ -97,6 +99,8 @@ ApplicationWindow {
         property bool fit_file_saved_on_quit: false
         // the first run asks for it, for the estimated max heart rate
         property int age: 35
+        // what a climb on a route takes depends on it
+        property real weight: 75
         // QZ keeps the screen on for as long as the app runs with this on; Bikemodo keeps it on
         // only on the ride screen (setKeepScreenOn), from the next start
         property bool android_wakelock: true
@@ -210,9 +214,11 @@ ApplicationWindow {
     function leaveRide() {
         if (mode === "demo")
             demoRide.running = false
-        // a workout that never started is let go; one under way waits with its ride
-        if (mode === "demo" || live.stopped)
+        // a workout or route that never started is let go; one under way waits with its ride
+        if (mode === "demo" || live.stopped) {
             workoutPlan = null
+            routePlan = null
+        }
         mode = "home"
     }
 
@@ -237,7 +243,100 @@ ApplicationWindow {
             finished: ridden >= total * 0.9 })))
     }
 
+    // A workout file (.zwo, from the picker or intervals.icu) as a workout to ride: its blocks keep
+    // their watts with the rider's own FTP, and only how they should feel without one.
+    function rideWorkoutFile(path) {
+        if (core === null || path === "")
+            return
+        var w = core.workoutFile(path)
+        if (!w.blocks || w.blocks.length === 0) {
+            toastHost.show(qsTr("That workout could not be read"))
+            return
+        }
+        var blocks = Theme.ftpSet ? w.blocks : w.blocks.map(function (b) { return [b[0], b[1]] })
+        startWorkout(Coach.plan("file", w.name, qsTr("From a workout file"), blocks))
+    }
+    // intervals.icu: today's workout downloads (QZ), then rides once it is there
+    property int intervalsWait: 0
+    function rideIntervalsToday() {
+        if (core === null)
+            return
+        var have = core.intervalsWorkoutToday()
+        if (have !== "") {
+            rideWorkoutFile(have)
+            return
+        }
+        intervalsicu_download_todays_workout_clicked()
+        intervalsWait = 20
+        intervalsTimer.start()
+    }
+    Timer {
+        id: intervalsTimer
+        interval: 1000
+        repeat: true
+        onTriggered: {
+            var path = window.core !== null ? window.core.intervalsWorkoutToday() : ""
+            if (path !== "") {
+                stop()
+                window.rideWorkoutFile(path)
+            } else if (--window.intervalsWait <= 0) {
+                stop()
+            }
+        }
+    }
+
+    // A route (train/Route.js) to ride by distance; it ends with the ride, as a workout does.
+    property var routePlan: null
+    property real routeStartKm: 0
+    function startRoute(route) {
+        workoutPlan = null
+        routePlan = route
+        var km = live.miles ? live.distance / 0.621371 : live.distance
+        routeStartKm = rideOpen ? km : 0
+        ghost = findGhost(route.name, "km")
+        requestRide()
+    }
+    function rideRouteFile(path) {
+        if (core === null || path === "")
+            return
+        var r = core.routeFile(path)
+        if (!r.points || r.points.length < 2) {
+            toastHost.show(qsTr("That route could not be read"))
+            return
+        }
+        startRoute({ id: "file", name: r.name, detail: qsTr("From a route file"), points: r.points })
+    }
+
+    // The ghost: the last ride with the same name (a workout or a route saves its name), as work
+    // (kJ) or distance (km) second by second from its start; null when there is none.
+    property var ghost: null
+    function findGhost(name, unit) {
+        if (libraryObject === null || !name)
+            return null
+        var list = libraryObject.rides(0, 300)
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].title !== name)
+                continue
+            var s = libraryObject.samples(list[i].id, 0)
+            var values = []
+            if (unit === "kj") {
+                var sum = 0
+                var power = s.power || []
+                for (var k = 0; k < power.length; k++) {
+                    sum += (power[k] || 0) / 1000
+                    values.push(sum)
+                }
+            } else {
+                values = (s.distance || []).slice()
+            }
+            return values.length > 60 ? { values: values, unit: unit, day: Format.day(list[i].start) } : null
+        }
+        return null
+    }
+
     function startWorkout(plan) {
+        routePlan = null
+        ghost = Ftp.isTest(plan) ? null : findGhost(plan.name, "kj")
         workoutPlan = plan
         workoutStart = rideOpen ? live.elapsed : 0
         requestRide()
@@ -264,6 +363,13 @@ ApplicationWindow {
         function onHistoryRecoveryOfferRequested() { window.askingImport = true }
         // QZ's messages ("12 workouts imported", "No workout files found", ...)
         function onToastRequestedChanged(value) { if (value !== "") toastHost.show(value) }
+        // a workout file picked to ride
+        function onAndroidDocumentPicked(kind, localUrl) {
+            if (kind === "training")
+                window.rideWorkoutFile(localUrl.toString())
+            else if (kind === "gpx")
+                window.rideRouteFile(localUrl.toString())
+        }
         // imported rides have no power source: the next bike that connects gives them its own
         function onFitImportRunningChanged() {
             if (window.core.fitImportRunning)
@@ -426,6 +532,7 @@ ApplicationWindow {
             if (demoRide.stopped)
                 return
             workoutPlan = null
+            routePlan = null
             finishedDemo = true
             finishedRide = copyRide(demoRide)
             demoRide.end()
@@ -525,6 +632,8 @@ ApplicationWindow {
                 if (!window.finishing && window.metricsObject !== null)
                     window.logWorkout(window.metricsObject.elapsed)
                 window.workoutPlan = null
+                window.routePlan = null
+                window.ghost = null
             }
             if (!live.stopped || window.finishing || window.mode === "demo" || window.metricsObject === null
                     || window.metricsObject.elapsed <= 0)
@@ -633,6 +742,10 @@ ApplicationWindow {
             pausedAt: live.pausedAt
             onRideRequested: window.requestRide()
             onWorkoutRequested: window.startWorkout(plan)
+            onWorkoutFileRequested: if (window.core !== null) window.core.openAndroidDocumentPicker("training")
+            onIntervalsRequested: window.rideIntervalsToday()
+            onRouteRequested: window.startRoute(route)
+            onRouteFileRequested: if (window.core !== null) window.core.openAndroidDocumentPicker("gpx")
             onEndRideRequested: window.finishRide()
             onDemoRequested: window.openDemo()
             onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
@@ -710,8 +823,10 @@ ApplicationWindow {
                         window.setupStep = 0
                     } else {
                         // a workout picked on Today goes when the rider does not ride
-                        if (!window.rideOpen)
+                        if (!window.rideOpen) {
                             window.workoutPlan = null
+                            window.routePlan = null
+                        }
                         window.mode = "home"
                     }
                 }
@@ -725,6 +840,10 @@ ApplicationWindow {
                     source: window.mode === "demo" ? demoRide : live
                     core: window.core
                     workoutPlan: window.workoutPlan
+                    route: window.routePlan
+                    routeStartKm: window.routeStartKm
+                    weight: qzSettings.weight
+                    ghost: window.ghost
                     workoutStart: window.workoutStart
                     onFinishRequested: window.finishRide()
                     onLeaveRequested: window.leaveRide()

@@ -48,8 +48,9 @@ Item {
     // the charts draw in again
     signal replay()
 
-    readonly property var cardIds: ["insight", "fitness", "ftp", "curve", "volume", "year", "consistency", "records", "compare"]
+    readonly property var cardIds: ["insight", "fitness", "ftp", "curve", "physio", "volume", "year", "consistency", "records", "compare"]
     readonly property var cardTitles: ({
+        physio: qsTr("Physiology"),
         year: qsTr("Your year in one picture"),
         insight: qsTr("This period"),
         fitness: qsTr("Fitness and form"),
@@ -262,6 +263,8 @@ Item {
             return ftpSection
         if (cardId === "curve")
             return curveSection
+        if (cardId === "physio")
+            return physioSection
         if (cardId === "volume")
             return volumeSection
         if (cardId === "year")
@@ -301,6 +304,9 @@ Item {
         }
         readSettings()
         refresh()
+        // the sections read the library again too: one read at start may come before the
+        // library is open, and a library with nothing new to read in says nothing after it
+        reload()
         entered()
     }
     Component.onCompleted: {
@@ -408,6 +414,22 @@ Item {
                     function onReplay() { ftpTrend.play() }
                     function onEntered() { ftpTrend.play() }
                 }
+            }
+        }
+    }
+    Component {
+        id: physioSection
+        PhysioCard {
+            id: physioCard
+            width: parent ? parent.width : 0
+            library: progressPage.library
+            weight: progressPage.weight
+            series: progressPage.series
+            pro: progressPage.pro
+            Component.onCompleted: refresh()
+            Connections {
+                target: progressPage
+                function onReload() { physioCard.refresh() }
             }
         }
     }

@@ -11,6 +11,24 @@ YouPage {
 
     readonly property string folder: you.core !== null ? you.core.getWritableAppDir() + "fit/" : ""
     readonly property bool importing: you.core !== null && you.core.fitImportRunning === true
+    // the ride library (homeform sets it on the root), for the export and the backup
+    readonly property var library: typeof rideLibrary !== "undefined" ? rideLibrary : null
+    // what the last export or backup said
+    property string savedWords: ""
+
+    function exportRides() {
+        if (library === null || you.core === null)
+            return
+        var path = library.exportCsv(you.core.getWritableAppDir())
+        savedWords = path !== "" ? qsTr("Saved as %1").arg(path) : qsTr("Could not write the file.")
+    }
+
+    function backUp() {
+        if (library === null || you.core === null)
+            return
+        var path = library.backup(you.core.getWritableAppDir() + "backup")
+        savedWords = path !== "" ? qsTr("Backed up in %1").arg(path) : qsTr("Could not write the backup.")
+    }
 
     function importFile() {
         if (you.core === null)
@@ -74,6 +92,32 @@ YouPage {
         visible: page.importing
         color: Theme.accent
         text: qsTr("Importing rides...")
+    }
+
+    YouText {
+        kind: "heading"
+        text: qsTr("Take your rides with you")
+    }
+
+    YouRow {
+        title: qsTr("Save every ride as a CSV file")
+        detail: qsTr("One line a ride, for a spreadsheet: date, time, distance, power, heart rate, load")
+        trailing: "next"
+        onClicked: page.exportRides()
+    }
+
+    YouRow {
+        title: qsTr("Back up the library")
+        detail: qsTr("Your merges, splits and settings (never your sign-ins), in a dated folder next to the rides. The FIT files are the rides themselves.")
+        trailing: "next"
+        hairline: false
+        onClicked: page.backUp()
+    }
+
+    YouText {
+        visible: page.savedWords !== ""
+        color: Theme.accent
+        text: page.savedWords
     }
 
     Loader {

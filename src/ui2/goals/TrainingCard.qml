@@ -5,6 +5,7 @@ import "../you"
 import "../train/Plans.js" as Plans
 import "../train/Levels.js" as Levels
 import "../train/Ftp.js" as Ftp
+import "../train/Route.js" as Route
 
 // Training, on Goals: a plan (train/Plans.js) to start, or the one under way with this week's
 // three rides, the next weeks to come and End plan; the training levels the coach picks workouts
@@ -20,6 +21,12 @@ Column {
     signal startPlan(string id, int weeks)
     signal endPlan()
     signal workoutRequested(var workout)
+    // a workout file (.zwo) to ride, and today's workout from intervals.icu
+    signal workoutFileRequested()
+    signal intervalsRequested()
+    // a route to ride (train/Route.js), or a .gpx file to pick one from
+    signal routeRequested(var route)
+    signal routeFileRequested()
 
     property int eventWeeks: 8
 
@@ -301,6 +308,121 @@ Column {
                 color: Theme.text
                 font.family: Theme.bodySemibold
                 font.pixelSize: 13
+            }
+        }
+    }
+
+    // ---- routes: ridden by distance, the screen says what each climb takes
+    Item { width: 1; height: 14 }
+    Text {
+        width: card.width
+        text: qsTr("Routes")
+        color: Theme.text
+        font.family: Theme.bodySemibold
+        font.pixelSize: 15
+    }
+    Repeater {
+        model: Route.library().concat([{ id: "gpx", name: qsTr("Open a route file"), detail: qsTr("A .gpx file, from Strava, Komoot or a bike computer") }])
+        Item {
+            width: card.width
+            height: Math.max(56, routeColumn.implicitHeight + 20)
+            Accessible.role: Accessible.Button
+            Accessible.name: modelData.name
+            Column {
+                id: routeColumn
+                width: parent.width - 32
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+                Text {
+                    width: parent.width
+                    text: modelData.name
+                    color: Theme.text
+                    font.family: Theme.bodyMedium
+                    font.pixelSize: 15
+                }
+                Text {
+                    width: parent.width
+                    text: modelData.detail
+                    color: Theme.text3
+                    font.family: Theme.bodyMedium
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+            }
+            Text {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "›"
+                color: Theme.text3
+                font.pixelSize: 22
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: modelData.id === "gpx" ? card.routeFileRequested() : card.routeRequested(modelData)
+            }
+            Hairline {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                visible: index < 3
+            }
+        }
+    }
+
+    // ---- workouts from elsewhere
+    Item { width: 1; height: 14 }
+    Text {
+        width: card.width
+        text: qsTr("Workouts from elsewhere")
+        color: Theme.text
+        font.family: Theme.bodySemibold
+        font.pixelSize: 15
+    }
+    Repeater {
+        model: [
+            { title: qsTr("Open a workout file"), detail: qsTr("A .zwo file, as Zwift, TrainerRoad and intervals.icu export"), file: true },
+            { title: qsTr("Today's workout from intervals.icu"), detail: qsTr("The one on your intervals.icu calendar. Connect it in You first."), file: false }
+        ]
+        Item {
+            width: card.width
+            height: Math.max(56, fromColumn.implicitHeight + 20)
+            Accessible.role: Accessible.Button
+            Accessible.name: modelData.title
+            Column {
+                id: fromColumn
+                width: parent.width - 32
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 2
+                Text {
+                    width: parent.width
+                    text: modelData.title
+                    color: Theme.text
+                    font.family: Theme.bodyMedium
+                    font.pixelSize: 15
+                }
+                Text {
+                    width: parent.width
+                    text: modelData.detail
+                    color: Theme.text3
+                    font.family: Theme.bodyMedium
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+            }
+            Text {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "›"
+                color: Theme.text3
+                font.pixelSize: 22
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: modelData.file ? card.workoutFileRequested() : card.intervalsRequested()
+            }
+            Hairline {
+                anchors.bottom: parent.bottom
+                width: parent.width
+                visible: index === 0
             }
         }
     }

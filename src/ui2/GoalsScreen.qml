@@ -47,6 +47,10 @@ Item {
     signal rideRequested()
     // a ride of the training plan or an FTP test (Coach.plan, train/Ftp.js): to the ride screen
     signal workoutRequested(var workout)
+    signal workoutFileRequested()
+    signal intervalsRequested()
+    signal routeRequested(var route)
+    signal routeFileRequested()
     // each time the screen shows: the blocks rise in again
     signal entered()
 
@@ -583,6 +587,10 @@ Item {
             onStartPlan: goals.startPlan(id, weeks)
             onEndPlan: goals.endPlan()
             onWorkoutRequested: goals.workoutRequested(workout)
+            onWorkoutFileRequested: goals.workoutFileRequested()
+            onIntervalsRequested: goals.intervalsRequested()
+            onRouteRequested: goals.routeRequested(route)
+            onRouteFileRequested: goals.routeFileRequested()
         }
     }
     Component {

@@ -236,10 +236,14 @@
         <file>ui2/today/Coach.js</file>
         <file>ui2/today/SuggestionCard.qml</file>
         <file>ui2/today/WorkoutShape.qml</file>
+        <file>ui2/today/Body.js</file>
+        <file>ui2/today/BodyCard.qml</file>
         <file>ui2/progress/Hub.js</file>
         <file>ui2/progress/DrawIn.qml</file>
         <file>ui2/progress/SectionHead.qml</file>
         <file>ui2/progress/FtpTrend.qml</file>
+        <file>ui2/progress/Analytics.js</file>
+        <file>ui2/progress/PhysioCard.qml</file>
         <file>ui2/progress/InsightBlock.qml</file>
         <file>ui2/progress/ConsistencyCard.qml</file>
         <file>ui2/you/PowerPage.qml</file>
@@ -261,6 +265,8 @@
         <file>ui2/train/Ftp.js</file>
         <file>ui2/train/Levels.js</file>
         <file>ui2/train/Plans.js</file>
+        <file>ui2/train/Route.js</file>
+        <file>ui2/train/RoutePanel.qml</file>
         <file>ui2/goals/TrainingCard.qml</file>
         <file>ui2/goals/WelcomeBack.qml</file>
         <file>ui2/moments/PrMoment.qml</file>

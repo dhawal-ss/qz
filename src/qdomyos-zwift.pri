@@ -986,6 +986,9 @@ DISTFILES += \
     $$PWD/android/src/IQMessageReceiverWrapper.java \
     $$PWD/android/src/LocationHelper.java \
     $$PWD/android/src/BikemodoCues.java \
+    $$PWD/android/src/BikemodoWidget.java \
+    $$PWD/android/src/BikemodoRecap.java \
+    $$PWD/android/src/BikemodoHealth.kt \
     $$PWD/android/src/MediaButtonReceiver.java \
     $$PWD/android/src/MediaProjection.java \
     $$PWD/android/src/NotificationUtils.java \

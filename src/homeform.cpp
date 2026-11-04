@@ -2138,6 +2138,174 @@ int homeform::levelForWatts(int watts) {
     return (int)echelon->resistanceFromPowerRequest((uint16_t)watts);
 }
 
+QVariantMap homeform::workoutFile(const QString &path) {
+    QVariantMap out;
+    QString local = path.startsWith(QStringLiteral("file:")) ? QUrl(path).toLocalFile() : path;
+    QFile file(local);
+    if (!file.open(QIODevice::ReadOnly))
+        return out;
+    const QByteArray content = file.readAll();
+    file.close();
+    QList<trainrow> rows = zwiftworkout::load(content);
+    if (rows.isEmpty())
+        return out;
+
+    QSettings settings;
+    const double ftp = qMax(1.0, settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble());
+    const double starts[] = {0.555, 0.755, 0.905, 1.055, 1.205, 1.505};
+    auto zoneOf = [&](double watts) {
+        if (watts <= 0)
+            return 2;
+        int zone = 1;
+        for (double s : starts)
+            if (watts >= ftp * s)
+                zone++;
+        return zone;
+    };
+
+    // a block goes on while the power stays within 3% of FTP of it, and lasts 30 s at least (a
+    // ramp comes as 1 s rows)
+    QVariantList blocks;
+    int seconds = 0;
+    double work = 0;
+    bool free = false;
+    auto flush = [&]() {
+        if (seconds <= 0)
+            return;
+        const double avg = free ? -1 : work / seconds;
+        QVariantList b;
+        b << seconds / 60.0 << zoneOf(avg) << (free ? -1 : qRound(avg / 5.0) * 5);
+        blocks.append(QVariant(b));
+        seconds = 0;
+        work = 0;
+    };
+    for (const trainrow &row : qAsConst(rows)) {
+        const int s = QTime(0, 0, 0).secsTo(row.duration);
+        if (s <= 0)
+            continue;
+        const bool rowFree = row.power <= 0;
+        const double avg = seconds > 0 && !free ? work / seconds : 0;
+        const bool same = seconds > 0 && rowFree == free && (rowFree || qAbs(row.power - avg) <= ftp * 0.03);
+        if (seconds > 0 && !same && seconds >= 30)
+            flush();
+        if (seconds == 0)
+            free = rowFree;
+        seconds += s;
+        work += rowFree ? 0 : row.power * s;
+    }
+    flush();
+
+    // the name in the file, else the file's own
+    QString name = QFileInfo(local).completeBaseName();
+    const QString text = QString::fromUtf8(content);
+    const int a = text.indexOf(QStringLiteral("<name>"));
+    const int b = text.indexOf(QStringLiteral("</name>"));
+    if (a >= 0 && b > a)
+        name = text.mid(a + 6, b - a - 6).trimmed();
+    out[QStringLiteral("name")] = name;
+    out[QStringLiteral("blocks")] = blocks;
+    return out;
+}
+
+QVariantMap homeform::routeFile(const QString &path) {
+    QVariantMap out;
+    const QString local = path.startsWith(QStringLiteral("file:")) ? QUrl(path).toLocalFile() : path;
+    if (!QFile::exists(local))
+        return out;
+    gpx reader;
+    const QList<gpx_altitude_point_for_treadmill> list = reader.open(local, BIKE, true);
+    if (list.size() < 2)
+        return out;
+    QVariantList points;
+    double km = 0;
+    double lastKept = -1;
+    for (const gpx_altitude_point_for_treadmill &p : list) {
+        km += p.distance;
+        if (lastKept < 0 || km - lastKept >= 0.05) {
+            QVariantList pt;
+            pt << km << p.elevation;
+            points.append(QVariant(pt));
+            lastKept = km;
+        }
+    }
+    QString name = QFileInfo(local).completeBaseName();
+    QFile file(local);
+    if (file.open(QIODevice::ReadOnly)) {
+        const QString text = QString::fromUtf8(file.read(64 * 1024));
+        const int a = text.indexOf(QStringLiteral("<name>"));
+        const int b = text.indexOf(QStringLiteral("</name>"));
+        if (a >= 0 && b > a)
+            name = text.mid(a + 6, b - a - 6).trimmed();
+    }
+    out[QStringLiteral("name")] = name;
+    out[QStringLiteral("points")] = points;
+    return out;
+}
+
+QString homeform::intervalsWorkoutToday() {
+    QDir dir(getWritableAppDir() + QStringLiteral("training/intervals-icu"));
+    const QString today = QDate::currentDate().toString(Qt::ISODate);
+    const QStringList files = dir.entryList({today + QStringLiteral("_*.zwo")}, QDir::Files, QDir::Time);
+    return files.isEmpty() ? QString() : dir.absoluteFilePath(files.first());
+}
+
+void homeform::updateWidget(const QString &value, const QString &detail, const QString &streak, const QString &weekKey,
+                            const QString &recapTitle, const QString &recapText) {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject jValue = QAndroidJniObject::fromString(value);
+    QAndroidJniObject jDetail = QAndroidJniObject::fromString(detail);
+    QAndroidJniObject jStreak = QAndroidJniObject::fromString(streak);
+    QAndroidJniObject jWeek = QAndroidJniObject::fromString(weekKey);
+    QAndroidJniObject jTitle = QAndroidJniObject::fromString(recapTitle);
+    QAndroidJniObject jText = QAndroidJniObject::fromString(recapText);
+    QAndroidJniObject::callStaticMethod<void>(
+        "org/cagnulen/qdomyoszwift/BikemodoWidget", "update",
+        "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;"
+        "Ljava/lang/String;)V",
+        QtAndroid::androidContext().object(), jValue.object<jstring>(), jDetail.object<jstring>(), jStreak.object<jstring>(),
+        jWeek.object<jstring>(), jTitle.object<jstring>(), jText.object<jstring>());
+#else
+    Q_UNUSED(value);
+    Q_UNUSED(detail);
+    Q_UNUSED(streak);
+    Q_UNUSED(weekKey);
+    Q_UNUSED(recapTitle);
+    Q_UNUSED(recapText);
+#endif
+}
+
+bool homeform::healthAvailable() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoHealth", "available",
+                                                         "(Landroid/content/Context;)Z",
+                                                         QtAndroid::androidContext().object());
+#else
+    return false;
+#endif
+}
+
+void homeform::healthRequestRead() {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoHealth", "requestRead",
+                                              "(Landroid/content/Context;)V", QtAndroid::androidActivity().object());
+#endif
+}
+
+void homeform::healthRefresh() {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoHealth", "refresh",
+                                              "(Landroid/content/Context;)V", QtAndroid::androidContext().object());
+#endif
+}
+
+QString homeform::healthTake() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticObjectMethod<jstring>("org/cagnulen/qdomyoszwift/BikemodoHealth", "take").toString();
+#else
+    return QString();
+#endif
+}
+
 void homeform::cue(int kind) {
 #ifdef Q_OS_ANDROID
     QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoCues", "cue",

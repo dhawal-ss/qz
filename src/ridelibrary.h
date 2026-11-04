@@ -81,6 +81,13 @@ class RideLibrary : public QObject {
     // way it, and every backup older than it, is not offered again
     Q_INVOKABLE void recoverUnfinished();
     Q_INVOKABLE void dismissUnfinished();
+    // every ride as a line of a CSV file (date, time, distance, power, heart rate, load...) in
+    // folder; the file's path, "" when it could not be written
+    Q_INVOKABLE QString exportCsv(const QString &folder);
+    // a copy of the library (with the rider's merges and splits) and of the settings, in a dated
+    // folder inside folder; its path, "" when it could not be written. The .fit files stay where
+    // they are: they are the rides themselves.
+    Q_INVOKABLE QString backup(const QString &folder);
 
   signals:
     void changed();

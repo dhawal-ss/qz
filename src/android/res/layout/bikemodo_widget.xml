@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bikemodo's home screen widget: the week against the weekly goal, and the streak -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bikemodo_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/bikemodo_widget_bg">
+
+    <TextView
+        android:id="@+id/bikemodo_widget_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="THIS WEEK"
+        android:letterSpacing="0.12"
+        android:textColor="#9A9AA6"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/bikemodo_widget_value"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Open Bikemodo"
+        android:textColor="#F2F2F5"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/bikemodo_widget_detail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text=""
+        android:textColor="#C9C9D2"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/bikemodo_widget_streak"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text=""
+        android:textColor="#8FE3CB"
+        android:textSize="13sp" />
+</LinearLayout>
