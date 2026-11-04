@@ -249,6 +249,15 @@ class homeform : public QObject {
     Q_INVOKABLE QString bluetoothSearchStatus();
     // Tap on the Bluetooth icon: search right away, or when Android allows it again (with a toast saying when)
     Q_INVOKABLE void bluetoothSearchNow();
+    // What keeps the search from finding anything on Android: "permission" (Nearby devices, or Location on
+    // Android 11 and earlier), "bluetooth" (switched off), "location" (off, Android 11 and earlier), or empty
+    Q_INVOKABLE QString connectionProblem();
+    // The fix for connectionProblem(): asks for the permission (or opens the app's settings once Android
+    // no longer asks), or asks to switch Bluetooth or Location on
+    Q_INVOKABLE void fixConnectionProblem();
+    // Connect to this bike (filter_device, "Disabled" for any) without a restart. False when QZ is set to
+    // quit when the connection is lost: then the app restarts to switch
+    Q_INVOKABLE bool switchBike(const QString &name);
     // Heart rate sensor chosen in the settings (name) or a tap on the Bluetooth icon (no name, the saved one):
     // connect it without a restart
     Q_INVOKABLE void reconnectHeartRateBelt(const QString &name = QString()) {

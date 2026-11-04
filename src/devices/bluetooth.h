@@ -467,6 +467,11 @@ class bluetooth : public QObject, public SignalHandler {
     void restart();
     void reconnectHeartRateBelt(const QString &name = QString());
     void selectGymModeDevice(const QString &deviceName);
+    /**
+     * @brief switchDevice Drops the connected equipment and searches for deviceName ("Disabled" for any),
+     * the way selectGymModeDevice does, without restarting the app. The caller stores filter_device.
+     */
+    void switchDevice(const QString &deviceName);
     void debug(const QString &string);
     void heartRate(uint8_t heart);
     void deviceDiscovered(const QBluetoothDeviceInfo &device);

@@ -1995,9 +1995,93 @@ QString homeform::bluetoothSearchStatus() {
 void homeform::bluetoothSearchNow() {
     if (!bluetoothManager || bluetoothManager->device())
         return;
+    const bool wasSearching = bluetoothManager->isSearching();
     const int waitSec = bluetoothManager->searchNow();
     if (waitSec > 0)
         setToastRequested(tr("Android allows 5 Bluetooth searches in 30 s, the next one starts in %1 s").arg(waitSec));
+    else if (wasSearching)
+        // the search goes on longer, and the tap still gets an answer
+        setToastRequested(tr("Still searching. Pedal a few turns to wake the bike."));
+}
+
+#ifdef Q_OS_ANDROID
+// The runtime permissions the Bluetooth search needs on this Android version
+static QStringList bluetoothSearchPermissions() {
+    const int sdk = QAndroidJniObject::getStaticField<jint>("android/os/Build$VERSION", "SDK_INT");
+    if (sdk >= 31)
+        return {QStringLiteral("android.permission.BLUETOOTH_SCAN"), QStringLiteral("android.permission.BLUETOOTH_CONNECT")};
+    return {QStringLiteral("android.permission.ACCESS_FINE_LOCATION")};
+}
+
+static QStringList missingPermissions() {
+    QStringList missing;
+    for (const QString &p : bluetoothSearchPermissions()) {
+        if (QtAndroid::checkPermission(p) == QtAndroid::PermissionResult::Denied)
+            missing.append(p);
+    }
+    return missing;
+}
+#endif
+
+QString homeform::connectionProblem() {
+#ifdef Q_OS_ANDROID
+    if (!missingPermissions().isEmpty())
+        return QStringLiteral("permission");
+    if (!QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/LocationHelper", "bluetoothEnabled",
+                                                      "()Z"))
+        return QStringLiteral("bluetooth");
+    if (!QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/LocationHelper", "locationEnabled",
+                                                      "(Landroid/content/Context;)Z",
+                                                      QtAndroid::androidContext().object()))
+        return QStringLiteral("location");
+#endif
+    return QString();
+}
+
+void homeform::fixConnectionProblem() {
+#ifdef Q_OS_ANDROID
+    const QString problem = connectionProblem();
+    if (problem == QStringLiteral("permission")) {
+        const QStringList missing = missingPermissions();
+        // Android stops showing the dialog after the rider declines twice: only the app's settings can allow it then
+        bool canAsk = false;
+        for (const QString &p : missing) {
+            if (QtAndroid::shouldShowRequestPermissionRationale(p))
+                canAsk = true;
+        }
+        QSettings settings;
+        const bool askedBefore = settings.value(QStringLiteral("ui2/nearbyAsked"), false).toBool();
+        if (askedBefore && !canAsk) {
+            QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/LocationHelper", "openAppSettings",
+                                                      "(Landroid/content/Context;)V",
+                                                      QtAndroid::androidContext().object());
+            return;
+        }
+        settings.setValue(QStringLiteral("ui2/nearbyAsked"), true);
+        // the answer comes on Android's thread: the search starts on this one
+        QtAndroid::requestPermissions(missing, [this](const QtAndroid::PermissionResultMap &) {
+            QMetaObject::invokeMethod(this, [this]() {
+                if (missingPermissions().isEmpty())
+                    bluetoothSearchNow();
+            }, Qt::QueuedConnection);
+        });
+    } else if (!problem.isEmpty()) {
+        enableLocationServices();
+    }
+#endif
+}
+
+bool homeform::switchBike(const QString &name) {
+    QSettings settings;
+    settings.setValue(QZSettings::filter_device, name);
+    if (!bluetoothManager)
+        return false;
+    // QZ quits when the connection drops with this on, and dropping it is how the switch works
+    if (settings.value(QZSettings::bluetooth_no_reconnection, QZSettings::default_bluetooth_no_reconnection).toBool())
+        return false;
+    lastFoundDevice.clear();
+    bluetoothManager->switchDevice(name);
+    return true;
 }
 
 void homeform::selectGymModeDevice(const QString &deviceName) {

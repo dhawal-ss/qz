@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 import org.cagnulen.qdomyoszwift.QLog;
@@ -41,6 +42,23 @@ public class LocationHelper {
 
     public static boolean check(Context context) {
         return isLocationEnabled(context) && isBluetoothEnabled();
+    }
+
+    // Each one on its own, so the app can say which one is off
+    public static boolean bluetoothEnabled() {
+        return isBluetoothEnabled();
+    }
+
+    public static boolean locationEnabled(Context context) {
+        return isLocationEnabled(context);
+    }
+
+    // The app's page in Android's settings, where a permission Android no longer asks for can be allowed
+    public static void openAppSettings(Context context) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                   Uri.fromParts("package", context.getPackageName(), null));
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
     }
 
     private static boolean isLocationEnabled(Context context) {

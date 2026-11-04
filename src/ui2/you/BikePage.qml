@@ -21,13 +21,29 @@ YouPage {
         return list
     }
     readonly property string searchStatus: you.connected ? "" : you.ask("bluetoothSearchStatus", "")
+    // Bluetooth off, Nearby devices not allowed or Location off: the button fixes it first
+    readonly property string problem: you.connected ? "" : you.ask("connectionProblem", "")
     readonly property color tint: you.connected ? Theme.zoneColors[1] : Theme.accent
+
+    // a ride with time on it keeps its bike: the samples of another one would land in it
+    readonly property bool rideOpen: {
+        var fresh = you.tick
+        return you.metrics !== null && you.metrics.elapsed > 0 && you.core !== null && !you.core.rideStopped()
+    }
+    property bool triedDuringRide: false
 
     function choose(name) {
         if (name === chosen)
             return
+        if (rideOpen) {
+            triedDuringRide = true
+            return
+        }
         qz.filter_device = name
-        // written at once, QZ reads it when it starts and the restart may come right away
+        // switchBike() drops the bike and looks for the new one, no restart; QZ set to quit on a lost
+        // connection takes one (then written at once, the restart may come right away)
+        if (you.core !== null && you.core.switchBike(name))
+            return
         qz.setValue("filter_device", name)
         you.needRestart()
     }
@@ -101,7 +117,11 @@ YouPage {
                 id: statusLabel
                 width: parent.width
                 horizontalAlignment: Text.AlignHCenter
-                text: you.connected ? qsTr("Connected") : page.searchStatus
+                text: you.connected ? qsTr("Connected")
+                    : page.problem === "bluetooth" ? qsTr("Bluetooth is off")
+                    : page.problem === "permission" ? qsTr("Bikemodo needs Nearby devices to look for the bike")
+                    : page.problem === "location" ? qsTr("This version of Android needs Location on to find the bike")
+                    : page.searchStatus
                 color: Theme.text2
                 font.family: Theme.bodyMedium
                 font.pixelSize: 13
@@ -119,8 +139,18 @@ YouPage {
             x: 12
             width: parent.width - 24
             primary: true
-            text: qsTr("Search again")
-            onClicked: if (you.core !== null) you.core.bluetoothSearchNow()
+            text: page.problem === "bluetooth" ? qsTr("Turn on Bluetooth")
+                : page.problem === "permission" ? qsTr("Allow Nearby devices")
+                : page.problem === "location" ? qsTr("Turn on Location")
+                : qsTr("Search again")
+            onClicked: {
+                if (you.core === null)
+                    return
+                if (page.problem !== "")
+                    you.core.fixConnectionProblem()
+                else
+                    you.core.bluetoothSearchNow()
+            }
         }
     }
 
@@ -131,6 +161,13 @@ YouPage {
     YouText {
         topPadding: 0
         text: qsTr("Bikemodo connects to the first bike it recognizes. Pick yours to connect to that one only, useful with other bikes or sensors nearby.")
+    }
+
+    YouText {
+        visible: page.triedDuringRide && page.rideOpen
+        topPadding: 0
+        color: Theme.accent
+        text: qsTr("End the ride first. The bike changes once it is saved.")
     }
 
     YouRow {

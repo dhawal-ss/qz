@@ -4106,6 +4106,14 @@ void bluetooth::selectGymModeDevice(const QString &deviceName) {
     restart();
 }
 
+void bluetooth::switchDevice(const QString &deviceName) {
+    filterDevice = deviceName.trimmed();
+    onlyDiscover = false;
+    forceHeartBeltOffForTimeout = false;
+    discoveryFinishedHandled = false;
+    restart();
+}
+
 void bluetooth::connectHeartRateBelt(const QBluetoothDeviceInfo &b) {
     QSettings settings;
     settings.setValue(QZSettings::hrm_lastdevice_name, b.name());

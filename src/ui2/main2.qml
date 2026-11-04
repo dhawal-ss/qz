@@ -408,13 +408,39 @@ ApplicationWindow {
         signal largeButton_clicked(string name)
 
         property string searchStatus: ""
+        // what keeps the search from working, the bike Bikemodo waits for and the last one connected,
+        // read fresh: switchBike() and QZ write them in C++
+        property string connectionProblem: ""
+        property string chosenBike: "Disabled"
+        property string lastBike: ""
+        // the heart rate sensor chosen in You: not a bike, so not in the list of bikes
+        property string heartBelt: ""
+        // the devices the search has seen, by name, without "Disabled", "Wifi" and the signal strength
+        readonly property var nearbyDevices: {
+            var list = window.core !== null && window.core.bluetoothDevices ? window.core.bluetoothDevices : []
+            var names = []
+            for (var i = 0; i < list.length; i++) {
+                var entry = list[i]
+                var cut = entry.lastIndexOf(" (")
+                var name = cut > 0 && entry.substring(entry.length - 2) === "%)" ? entry.substring(0, cut) : entry
+                if (name !== "Disabled" && name !== "Wifi" && name !== home.heartBelt && names.indexOf(name) < 0)
+                    names.push(name)
+            }
+            return names
+        }
 
         Timer {
             interval: 1000
             repeat: true
             running: window.core !== null && (window.mode === "home" || window.mode === "launcher")
             triggeredOnStart: true
-            onTriggered: home.searchStatus = window.core.bluetoothSearchStatus()
+            onTriggered: {
+                home.searchStatus = window.core.bluetoothSearchStatus()
+                home.connectionProblem = live.connected ? "" : window.core.connectionProblem()
+                home.chosenBike = String(qzSettings.value("filter_device", "Disabled"))
+                home.lastBike = String(qzSettings.value("bluetooth_lastdevice_name", ""))
+                home.heartBelt = String(qzSettings.value("heart_rate_belt_name", ""))
+            }
         }
 
         AppShell {
@@ -462,9 +488,22 @@ ApplicationWindow {
                 deviceName: live.deviceName
                 searchStatus: home.searchStatus
                 rideInProgress: live.elapsed > 0 && !live.stopped
+                problem: home.connectionProblem
+                devices: home.nearbyDevices
+                chosen: home.chosenBike
+                lastDevice: home.lastBike
                 onOpenRide: window.mode = "ride"
                 onOpenDemo: window.openDemo()
                 onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
+                onFixProblem: if (window.core !== null) window.core.fixConnectionProblem()
+                onChooseBike: {
+                    if (window.core === null)
+                        return
+                    home.chosenBike = name
+                    // QZ set to quit on a lost connection: the switch takes a restart
+                    if (!window.core.switchBike(name))
+                        window.restart()
+                }
                 onCloseRequested: window.mode = "home"
             }
 
