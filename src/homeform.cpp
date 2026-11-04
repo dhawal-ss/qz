@@ -2084,6 +2084,44 @@ bool homeform::switchBike(const QString &name) {
     return true;
 }
 
+void homeform::showRideNotification(const QString &title, const QString &text, double startedAtMs, bool paused) {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject jTitle = QAndroidJniObject::fromString(title);
+    QAndroidJniObject jText = QAndroidJniObject::fromString(text);
+    QAndroidJniObject jToggle = QAndroidJniObject::fromString(paused ? tr("Resume") : tr("Pause"));
+    QAndroidJniObject jLap = QAndroidJniObject::fromString(tr("Lap"));
+    QAndroidJniObject::callStaticMethod<void>(
+        "org/cagnulen/qdomyoszwift/NotificationClient", "showRide",
+        "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;Ljava/lang/String;)V",
+        QtAndroid::androidContext().object(), jTitle.object<jstring>(), jText.object<jstring>(), (jlong)startedAtMs,
+        (jboolean)paused, jToggle.object<jstring>(), jLap.object<jstring>());
+#else
+    Q_UNUSED(title);
+    Q_UNUSED(text);
+    Q_UNUSED(startedAtMs);
+    Q_UNUSED(paused);
+#endif
+}
+
+void homeform::hideRideNotification() {
+#ifdef Q_OS_ANDROID
+    //: Android notification: title shown while QZ works in the background.
+    QAndroidJniObject ready = QAndroidJniObject::fromString(tr("Bikemodo is ready"));
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/NotificationClient", "hideRide",
+                                              "(Landroid/content/Context;Ljava/lang/String;)V",
+                                              QtAndroid::androidContext().object(), ready.object<jstring>());
+#endif
+}
+
+int homeform::takeRideNotificationAction() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jint>("org/cagnulen/qdomyoszwift/NotificationClient", "takeAction",
+                                                     "()I");
+#else
+    return 0;
+#endif
+}
+
 void homeform::setKeepScreenOn(bool on) {
 #ifdef Q_OS_ANDROID
     KeepAwakeHelper::keepScreenOn(on);

@@ -435,6 +435,48 @@ ApplicationWindow {
         toastHost.show(qsTr("Ride discarded"))
     }
 
+    // The ride in the Android notification: the clock, the watts and Pause and Lap, every 2 s
+    // while a ride is open; its buttons are taken once a second
+    readonly property bool notifying: core !== null && live.elapsed > 0 && !live.stopped
+    onNotifyingChanged: if (!notifying && core !== null) core.hideRideNotification()
+    Timer {
+        interval: 2000
+        repeat: true
+        triggeredOnStart: true
+        running: window.notifying
+        onTriggered: {
+            var words = []
+            if (live.connected) {
+                words.push(Math.round(live.power) + " W")
+                words.push(Math.round(live.cadence) + " rpm")
+                if (live.heartRate > 0)
+                    words.push(Math.round(live.heartRate) + " bpm")
+            } else {
+                words.push(qsTr("Looking for the bike"))
+            }
+            var startedAt = Date.now() - live.elapsed * 1000
+            window.core.showRideNotification(live.paused ? qsTr("Paused at %1").arg(Metrics.clock(live.elapsed)) : qsTr("Riding"),
+                                             words.join("  ·  "), startedAt, live.paused)
+        }
+    }
+    Timer {
+        interval: 1000
+        repeat: true
+        running: window.notifying
+        onTriggered: {
+            var action = window.core.takeRideNotificationAction()
+            if (action === 0)
+                return
+            if (window.mode === "ride" && rideLoader.item !== null) {
+                rideLoader.item.notificationAction(action)
+            } else if (action === 1) {
+                live.togglePause()
+            } else if (action === 2) {
+                live.lap()
+            }
+        }
+    }
+
     // the engine ended the ride by itself (a workout program at its end, the bike's own stop
     // button, the web page), on the ride screen or while the rider was elsewhere in the app: save it
     // and show its summary as End would, from rideMetrics, which still holds the totals (LiveSource

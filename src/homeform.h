@@ -258,6 +258,12 @@ class homeform : public QObject {
     // Connect to this bike (filter_device, "Disabled" for any) without a restart. False when QZ is set to
     // quit when the connection is lost: then the app restarts to switch
     Q_INVOKABLE bool switchBike(const QString &name);
+    // The ride in the Android notification: the clock counts from startedAtMs while it moves, the
+    // text holds the numbers, and Pause (or Resume) and Lap; hidden when the ride is over
+    Q_INVOKABLE void showRideNotification(const QString &title, const QString &text, double startedAtMs, bool paused);
+    Q_INVOKABLE void hideRideNotification();
+    // a tap on the notification's buttons: 0 none, 1 pause or resume, 2 lap; each one is taken once
+    Q_INVOKABLE int takeRideNotificationAction();
     // the screen stays on while this is on (Bikemodo: on the ride screen only)
     Q_INVOKABLE void setKeepScreenOn(bool on);
     // ends the ride without saving it, for a ride of a few seconds started by mistake
