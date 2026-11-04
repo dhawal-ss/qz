@@ -19,6 +19,8 @@ Item {
     property real glowLow: 0.3
     property real glowHigh: 0.46
     property int beat: 4000
+    // how many breaths (and turns of the Pulse) each time it shows, 0 for as long as it shows
+    property int breaths: 0
 
     implicitWidth: 136
     implicitHeight: 136
@@ -35,14 +37,16 @@ Item {
         beat: hero.beat
         low: hero.glowLow
         high: hero.glowHigh
+        breaths: hero.breaths
     }
 
     Item {
         id: breather
         anchors.fill: parent
         SequentialAnimation on scale {
+            id: breath
             running: !Theme.reduceMotion && hero.visible
-            loops: Animation.Infinite
+            loops: hero.breaths > 0 ? hero.breaths : Animation.Infinite
             NumberAnimation { from: 1; to: 1.035; duration: hero.beat / 2; easing.type: Easing.InOutSine }
             NumberAnimation { from: 1.035; to: 1; duration: hero.beat / 2; easing.type: Easing.InOutSine }
         }
@@ -53,7 +57,7 @@ Item {
             anchors.centerIn: parent
             zone: hero.zone
             color: hero.tint
-            turning: true
+            turning: hero.breaths > 0 ? breath.running : true
         }
     }
 

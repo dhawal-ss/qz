@@ -77,7 +77,7 @@ Item {
                 }
                 Text {
                     width: parent.width
-                    text: qsTr("Pick the Today cards and their order. The bike stays on top.")
+                    text: qsTr("Pick the Today cards and their order. Today shows the week and the first three that have something to say.")
                     color: Theme.text3
                     font.family: Theme.bodyMedium
                     font.pixelSize: Theme.tertiarySize

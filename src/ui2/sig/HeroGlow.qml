@@ -9,13 +9,15 @@ Glow {
 
     property real low: 0.36
     property real high: 0.52
+    // how many breaths each time it shows, 0 for as long as it shows
+    property int breaths: 0
 
     breathing: false
     opacity: low
 
     SequentialAnimation on opacity {
         running: !Theme.reduceMotion && heroGlow.visible
-        loops: Animation.Infinite
+        loops: heroGlow.breaths > 0 ? heroGlow.breaths : Animation.Infinite
         NumberAnimation { from: heroGlow.low; to: heroGlow.high; duration: heroGlow.beat / 2; easing.type: Easing.InOutSine }
         NumberAnimation { from: heroGlow.high; to: heroGlow.low; duration: heroGlow.beat / 2; easing.type: Easing.InOutSine }
     }

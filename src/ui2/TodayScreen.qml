@@ -138,9 +138,14 @@ Item {
         return best < 0 ? sentence : sentence.substring(0, best) + "\n" + sentence.substring(best + 1)
     }
 
+    // the cards under the week on Today, at most
+    readonly property int maxCards: 3
+
     function componentFor(cardId) {
         if (cardId === "first")
             return firstComponent
+        if (cardId === "unlock")
+            return unlockComponent
         if (cardId === "week")
             return weekComponent
         if (cardId === "usual")
@@ -346,13 +351,21 @@ Item {
         // the coach line already welcomes the rider back
         var told = ["welcome"]
         if (rideCount === 0) {
-            // what each picture will look like, as samples; the history being read in first
-            ids = library && library.busy ? ["week", "first", "usual", "mix", "whenbest"] : ["week", "usual", "mix", "whenbest"]
+            // what fills in as the rider rides, as chips; the history being read in first
+            ids = library && library.busy ? ["week", "first", "unlock"] : ["week", "unlock"]
         } else {
+            // a calm page: the week, then the first three cards of the rider's order that have
+            // something to say (Customize picks them)
+            var others = 0
             for (var i = 0; i < cards.length; i++) {
                 var cardId = cards[i].id
                 if (!cards[i].shown || !hasContent(cardId))
                     continue
+                if (cardId !== "week") {
+                    if (others >= maxCards)
+                        continue
+                    others++
+                }
                 ids.push(cardId)
                 if (cardId === "reach")
                     told.push("reach")
@@ -521,6 +534,55 @@ Item {
             toIndex: todayPage.library ? todayPage.library.toIndex : 0
         }
     }
+    // before the first ride: what fills in, and what it takes (the same rules as the cards)
+    Component {
+        id: unlockComponent
+        Column {
+            spacing: 12
+            CapLabel {
+                text: qsTr("Fills in as you ride")
+            }
+            Flow {
+                width: parent.width
+                spacing: 8
+                Repeater {
+                    model: [
+                        { name: qsTr("Your usual week"), when: qsTr("after your first full week") },
+                        { name: qsTr("Effort mix"), when: Theme.ftpSet ? qsTr("after your first ride") : qsTr("once your FTP is set") },
+                        { name: qsTr("Best days and times"), when: qsTr("after 8 rides") },
+                        { name: qsTr("Best power"), when: qsTr("after your first ride") }
+                    ]
+                    Rectangle {
+                        width: chipColumn.implicitWidth + 28
+                        height: chipColumn.implicitHeight + 20
+                        radius: 16
+                        color: Theme.control
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: modelData.name + ", " + modelData.when
+                        Column {
+                            id: chipColumn
+                            x: 14
+                            y: 10
+                            spacing: 2
+                            Text {
+                                text: modelData.name
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 14
+                            }
+                            Text {
+                                text: modelData.when
+                                color: Theme.text3
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 12
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Component {
         id: weekComponent
         WeekCard {
@@ -652,6 +714,8 @@ Item {
         x: center.x - width / 2
         y: center.y - height / 2
         tint: hero.tint
+        // three breaths each time Today shows, then it rests so the screen can idle
+        breaths: 3
         Accessible.ignored: true
     }
 
@@ -902,6 +966,7 @@ Item {
                             width: 136
                             height: 136
                             glow: false
+                            breaths: 3
                             zone: 2
                             value: todayPage.formShown ? String(todayPage.ready.ready) : todayPage.heroWeek.value
                             word: todayPage.formShown ? todayPage.ready.word : todayPage.heroWeek.word
