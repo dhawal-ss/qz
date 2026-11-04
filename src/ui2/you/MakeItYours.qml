@@ -54,7 +54,7 @@ Column {
         title: qsTr("Ride screen")
         detail: prefs.look.ridePreset === "custom" ? qsTr("Now your own layout. Picking one here replaces it.")
                 : qsTr("The numbers a ride opens with. Tap any number during a ride to change it.")
-        options: [["power", qsTr("Power")], ["simple", qsTr("Simple")], ["heart", qsTr("Heart")]]
+        options: [["power", qsTr("Power")], ["simple", qsTr("Simple")], ["heart", qsTr("Heart")], ["focus", qsTr("Focus")]]
         current: prefs.look.ridePreset
         onPicked: prefs.you.setLook("ridePreset", value)
     }
@@ -174,6 +174,13 @@ Column {
         options: [["auto", qsTr("Auto")], ["on", qsTr("Always on")], ["off", qsTr("Off")]]
         current: prefs.look.resistanceControl
         onPicked: prefs.you.setLook("resistanceControl", value)
+    }
+
+    YouSwitch {
+        title: qsTr("Pause when you stop")
+        detail: qsTr("After 5 seconds without pedaling, or when the bike drops out. Pedal again and the ride goes on.")
+        isOn: prefs.look.autoPause !== false
+        onSwitched: prefs.you.setLook("autoPause", value)
     }
 
     // the gap under which two rides become one, 0 for never; on a narrow column the stepper goes

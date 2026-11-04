@@ -18,7 +18,7 @@ class KeepAwakeHelper {
     virtual ~KeepAwakeHelper();
     static QAndroidJniObject *antObject(bool forceCreate);
     static int heart();
-    void keepScreenOn(bool on);
+    static void keepScreenOn(bool on);
 
   private:
     QAndroidJniObject m_wakeLock;

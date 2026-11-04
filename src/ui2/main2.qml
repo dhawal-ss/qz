@@ -8,6 +8,7 @@ import "."
 import "rides"
 import "onboarding"
 import "goals/Streak.js" as Streak
+import "Metrics.js" as Metrics
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
@@ -93,6 +94,9 @@ ApplicationWindow {
         property bool fit_file_saved_on_quit: false
         // the first run asks for it, for the estimated max heart rate
         property int age: 35
+        // QZ keeps the screen on for as long as the app runs with this on; Bikemodo keeps it on
+        // only on the ride screen (setKeepScreenOn), from the next start
+        property bool android_wakelock: true
     }
 
     // once, on the first start of Bikemodo: rides begin when the rider presses Start ride, so
@@ -107,6 +111,7 @@ ApplicationWindow {
         // the first run setup: done (or skipped), and begun (it comes back if the app closed during it)
         property bool onboarded: false
         property bool onboardingStarted: false
+        property bool wakeLockSet: false
     }
 
     // the first run of a new install shows the setup; an install that has been opened before
@@ -139,6 +144,11 @@ ApplicationWindow {
 
     Component.onCompleted: {
         startSetupIfNew()
+        if (!firstRun.wakeLockSet) {
+            qzSettings.android_wakelock = false
+            qzSettings.sync()
+            firstRun.wakeLockSet = true
+        }
         if (!firstRun.pauseOnStartSet) {
             qzSettings.pause_on_start = true
             qzSettings.sync()
@@ -183,6 +193,10 @@ ApplicationWindow {
         readonly property int insetRight: active && landscape ? AndroidStatusBar.rightInset : 0
     }
 
+    // the screen stays on while the ride screen shows, and may sleep everywhere else
+    readonly property bool keepAwake: mode === "ride" || mode === "demo"
+    onKeepAwakeChanged: if (core !== null) core.setKeepScreenOn(keepAwake)
+
     // the Ride button: straight into the ride once the bike is there, else find it first
     function requestRide() {
         mode = live.connected ? "ride" : "launcher"
@@ -205,7 +219,12 @@ ApplicationWindow {
     // in, with the folder picker. It waits for its workout page to be open; Bikemodo has none, so
     // it says so as soon as rootItem is there.
     property bool askingImport: false
-    onCoreChanged: if (core !== null) core.historyPageOpened()
+    onCoreChanged: {
+        if (core === null)
+            return
+        core.historyPageOpened()
+        core.setKeepScreenOn(keepAwake)
+    }
     Connections {
         target: window.core
         ignoreUnknownSignals: true
@@ -228,9 +247,10 @@ ApplicationWindow {
     onClosing: {
         if (Qt.platform.os !== "android")
             return
-        if (askingToClose || askingImport) {
+        if (askingToClose || askingImport || askingDiscard) {
             askingToClose = false
             askingImport = false
+            askingDiscard = false
             close.accepted = false
         } else if (mode === "setup") {
             if (setupStep > 0)
@@ -244,6 +264,8 @@ ApplicationWindow {
             var shown = mode === "demo" ? demoRide : live
             if (shown.paused || shown.stopped)
                 leaveRide()
+            else if (rideLoader.item !== null)
+                rideLoader.item.backPressed()
         } else if (shell.goBack()) {
             close.accepted = false
         } else if (rideOpen) {
@@ -379,6 +401,12 @@ ApplicationWindow {
         live.refresh()
         if (live.stopped)
             return
+        // under a minute: save it, or let it go (askingDiscard)
+        if (live.elapsed < 60 && !askingDiscard) {
+            askingDiscard = true
+            return
+        }
+        askingDiscard = false
         finishedDemo = false
         finishedRide = copyRide(live)
         finishing = true
@@ -390,6 +418,21 @@ ApplicationWindow {
         if (core !== null)
             core.save_screenshot()
         mode = "summary"
+    }
+
+    // End on a ride of less than a minute: Discard ends it without a file, Save it goes on as End
+    property bool askingDiscard: false
+    function discardRide() {
+        askingDiscard = false
+        live.refresh()
+        if (live.stopped || core === null)
+            return
+        finishing = true
+        core.discardRide()
+        live.refresh()
+        finishing = false
+        mode = "home"
+        toastHost.show(qsTr("Ride discarded"))
     }
 
     // the engine ended the ride by itself (a workout program at its end, the bike's own stop
@@ -587,6 +630,7 @@ ApplicationWindow {
             }
 
             Loader {
+                id: rideLoader
                 anchors.fill: parent
                 active: window.mode === "ride" || window.mode === "demo"
                 sourceComponent: RideScreen {
@@ -701,5 +745,18 @@ ApplicationWindow {
             window.finishRide()
         }
         onClose: window.askingToClose = false
+    }
+
+    // End on a ride of less than a minute: let it go, or save it as any other (also a tap outside)
+    JoinSheet {
+        anchors.fill: parent
+        open: window.askingDiscard
+        bottomInset: insets.insetBottom
+        title: qsTr("Save a ride this short?")
+        words: qsTr("It is under a minute. Discard leaves no ride behind, Save it keeps it with the others.")
+        confirmText: qsTr("Discard")
+        cancelText: qsTr("Save it")
+        onConfirm: window.discardRide()
+        onClose: if (window.askingDiscard) window.finishRide()
     }
 }

@@ -74,9 +74,11 @@ function info(id, m) {
 var presets = {
     power: [["power", "number"], ["cadence", "number"], ["heart", "number"], ["np", "number"], ["kcal", "number"]],
     simple: [["time", "number"], ["kcal", "bar"], ["dist", "number"], ["cadence", "number"], ["heart", "trend"]],
-    heart: [["heart", "number"], ["power", "bar"], ["cadence", "trend"], ["time", "number"], ["kcal", "number"]]
+    heart: [["heart", "number"], ["power", "bar"], ["cadence", "trend"], ["time", "number"], ["kcal", "number"]],
+    // one big number: the ride screen hides the rows
+    focus: [["power", "number"], ["cadence", "number"], ["heart", "number"], ["np", "number"], ["kcal", "number"]]
 }
-var presetOrder = ["power", "simple", "heart"]
+var presetOrder = ["power", "simple", "heart", "focus"]
 
 function presetName(id) {
     if (id === "simple")
@@ -85,6 +87,8 @@ function presetName(id) {
         return qsTr("Heart")
     if (id === "power")
         return qsTr("Power")
+    if (id === "focus")
+        return qsTr("Focus")
     return qsTr("Custom")
 }
 

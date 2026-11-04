@@ -2084,6 +2084,20 @@ bool homeform::switchBike(const QString &name) {
     return true;
 }
 
+void homeform::setKeepScreenOn(bool on) {
+#ifdef Q_OS_ANDROID
+    KeepAwakeHelper::keepScreenOn(on);
+#else
+    Q_UNUSED(on);
+#endif
+}
+
+void homeform::discardRide() {
+    m_discardRide = true;
+    Stop();
+    m_discardRide = false;
+}
+
 void homeform::selectGymModeDevice(const QString &deviceName) {
     if (!bluetoothManager)
         return;
@@ -6428,8 +6442,8 @@ void homeform::Stop() {
 
     emit workoutEventStateChanged(bluetoothdevice::STOPPED);
 
-    // Save session as training program only if it's not a Peloton workout
-    if (!(pelotonHandler && !pelotonHandler->current_ride_id.isEmpty())) {
+    // Save session as training program only if it's not a Peloton workout (and not a discarded ride)
+    if (!m_discardRide && !(pelotonHandler && !pelotonHandler->current_ride_id.isEmpty())) {
         saveSessionAsTrainingProgram();
     }
 
@@ -10023,6 +10037,9 @@ static void healthConnectWriteWorkout(const QList<SessionLine> &session, bluetoo
 #endif
 
 void homeform::fit_save_clicked() {
+    // a ride ended with discardRide(): nothing is written or uploaded
+    if (m_discardRide)
+        return;
 
     QString path = getWritableAppDir();
     bluetoothdevice *dev = bluetoothManager->device();

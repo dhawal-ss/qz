@@ -258,6 +258,10 @@ class homeform : public QObject {
     // Connect to this bike (filter_device, "Disabled" for any) without a restart. False when QZ is set to
     // quit when the connection is lost: then the app restarts to switch
     Q_INVOKABLE bool switchBike(const QString &name);
+    // the screen stays on while this is on (Bikemodo: on the ride screen only)
+    Q_INVOKABLE void setKeepScreenOn(bool on);
+    // ends the ride without saving it, for a ride of a few seconds started by mistake
+    Q_INVOKABLE void discardRide();
     // Heart rate sensor chosen in the settings (name) or a tap on the Bluetooth icon (no name, the saved one):
     // connect it without a restart
     Q_INVOKABLE void reconnectHeartRateBelt(const QString &name = QString()) {
@@ -1177,6 +1181,8 @@ public:
     QString pelotonAbortedInstructor = QStringLiteral("");
 
     QString lastFitFileSaved = QLatin1String("");
+    // set by discardRide() while it stops the ride: fit_save_clicked() saves nothing
+    bool m_discardRide = false;
     QString lastTrainProgramFileSaved = QLatin1String("");
 
     // Perceived exertion (RPE, 0-10) and feel (0-100) entered in the post-workout popup; -1 means not set

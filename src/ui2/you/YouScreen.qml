@@ -31,7 +31,7 @@ Item {
     // Bikemodo's own choices (ui2), read fresh each time You shows: other screens write some of
     // them (the ride screen its layout, Progress the detail level), and Settings objects do not
     // see each other's writes
-    property var look: ({ detailLevel: "simple", reduceMotion: false, ridePreset: "power", accentChoice: "lavender",
+    property var look: ({ detailLevel: "simple", reduceMotion: false, ridePreset: "power", accentChoice: "lavender", autoPause: true,
                           weekStart: 1, resistanceControl: "auto", mergeGapMinutes: 10 })
 
     // the end of the page the floating navigation covers: the content scrolls under it
@@ -140,7 +140,8 @@ Item {
         look = {
             detailLevel: String(prefStore.value("detailLevel", "simple")) === "pro" ? "pro" : "simple",
             reduceMotion: flag(prefStore.value("reduceMotion", false), false),
-            ridePreset: ["power", "simple", "heart"].indexOf(preset) >= 0 ? preset : "custom",
+            ridePreset: ["power", "simple", "heart", "focus"].indexOf(preset) >= 0 ? preset : "custom",
+            autoPause: flag(prefStore.value("autoPause", true), true),
             accentChoice: Theme.accentChoice,
             weekStart: first === 0 ? 0 : 1,
             resistanceControl: ["auto", "on", "off"].indexOf(String(prefStore.value("resistanceControl", "auto"))) >= 0

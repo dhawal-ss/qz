@@ -15,6 +15,8 @@ Item {
     property string title: ""
     property string words: ""
     property string confirmText: ""
+    // the other button, and what a tap on the dimmed page does too (close)
+    property string cancelText: qsTr("Cancel")
     // the system bar under the sheet: the buttons stay clear of it
     property real bottomInset: 0
 
@@ -132,10 +134,10 @@ Item {
                         height: 56
                         pressedRadius: 18
                         fill: pressed ? Theme.chip : Theme.pressed
-                        Accessible.name: qsTr("Cancel")
+                        Accessible.name: sheet.cancelText
                         onClicked: sheet.close()
                         contentItem: Text {
-                            text: qsTr("Cancel")
+                            text: sheet.cancelText
                             color: Theme.text
                             font.family: Theme.bodySemibold
                             font.pixelSize: 16

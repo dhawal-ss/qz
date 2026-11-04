@@ -50,8 +50,25 @@ Item {
     property double lastToggle: 0
 
     readonly property bool heartDriven: preset === "heart" && source.heartRate > 0
-    readonly property int zone: heartDriven ? Theme.heartZone(source.heartRate, source.maxHeartRate)
-                                            : Theme.powerZone(source.power, source.ftp)
+    readonly property int rawZone: heartDriven ? Theme.heartZone(source.heartRate, source.maxHeartRate)
+                                               : Theme.powerZone(source.power, source.ftp)
+    // the zone the screen shows follows the number once it has stayed in a new zone for 2 s, so
+    // watts on a zone boundary do not flicker the colors
+    property int zone: rawZone
+    onRawZoneChanged: {
+        if (rawZone === zone)
+            zoneHold.stop()
+        else if (!zoneHold.running)
+            zoneHold.start()
+    }
+    onHeartDrivenChanged: { zoneHold.stop(); zone = rawZone }
+    Timer {
+        id: zoneHold
+        interval: 2000
+        onTriggered: screen.zone = screen.rawZone
+    }
+    // Focus: the layout of one big number, the clock and the controls
+    readonly property bool focusMode: preset === "focus"
     // power zones need the rider's own FTP: until it is set (Theme.ftpSet) the screen keeps the
     // accent and one numeral cut whatever the watts, and the zone line says so. shownZone is the
     // zone the colors, the numeral and the Pulse follow.
@@ -185,6 +202,7 @@ Item {
 
     Component.onCompleted: {
         resistanceMode = String(saved.value("resistanceControl", "auto"))
+        autoPauseOn = String(saved.value("autoPause", "true")) !== "false"
         try {
             var known = JSON.parse(String(saved.value("manualLevelBikes", "[]")))
             manualBikes = Array.isArray(known) ? known : []
@@ -230,6 +248,9 @@ Item {
     function toggleRide() {
         if (source.stopped)
             return
+        autoPaused = false
+        pedaled = false
+        stillFor = 0
         if (source.paused)
             source.resume()
         else
@@ -259,6 +280,62 @@ Item {
         onTriggered: screen.pausedFor = Math.max(0, Math.round((Date.now() - screen.source.pausedAt) / 1000))
     }
 
+    // Auto-pause (You, on unless switched off): 5 s at 0 rpm after pedaling, or the bike lost for
+    // 3 s, pauses the ride; pedaling again with the bike there resumes it. Only a pause the screen
+    // made by itself ends by itself, a pause the rider pressed waits for Resume.
+    property bool autoPauseOn: true
+    property bool autoPaused: false
+    property bool pedaled: false
+    property int stillFor: 0
+    property int lostFor: 0
+    property int movingFor: 0
+    readonly property bool bikeLost: source.connected === false && !stopped
+    Timer {
+        interval: 1000
+        repeat: true
+        running: !screen.stopped && screen.startPhase === ""
+        onTriggered: screen.autoPauseTick()
+    }
+    function autoPauseTick() {
+        lostFor = source.connected === false ? lostFor + 1 : 0
+        if (!autoPauseOn)
+            return
+        if (!source.paused) {
+            if (lostFor >= 3) {
+                autoPause()
+                return
+            }
+            if (source.cadence > 0) {
+                pedaled = true
+                stillFor = 0
+                return
+            }
+            if (!pedaled)
+                return
+            stillFor++
+            if (stillFor >= 5)
+                autoPause()
+        } else if (autoPaused) {
+            movingFor = source.connected !== false && source.cadence > 0 ? movingFor + 1 : 0
+            if (movingFor >= 2) {
+                source.resume()
+                autoPaused = false
+                stillFor = 0
+                movingFor = 0
+                toast(qsTr("Riding again"))
+            }
+        }
+    }
+    function autoPause() {
+        source.pause()
+        autoPaused = true
+        stillFor = 0
+        movingFor = 0
+    }
+
+    // the lap that ends: its number, time and average power, from the ride's totals at its start
+    property int lapStartElapsed: 0
+    property real lapStartKj: 0
     // a second Lap within a second is a double tap, not a lap of one second
     property real lastLap: 0
     function lapRide() {
@@ -268,8 +345,38 @@ Item {
         if (stopped || Date.now() - lastLap < 1000)
             return
         lastLap = Date.now()
+        var seconds = source.elapsed - lapStartElapsed
+        var watts = seconds > 0 ? Math.round((source.kilojoules - lapStartKj) * 1000 / seconds) : 0
+        lapStartElapsed = source.elapsed
+        lapStartKj = source.kilojoules
         source.lap()
-        toast(qsTr("Lap %1").arg(source.laps))
+        var parts = [qsTr("Lap %1").arg(source.laps), Metrics.clock(Math.max(0, seconds))]
+        if (watts > 0)
+            parts.push(qsTr("%1 W avg").arg(watts))
+        toast(parts.join("  ·  "), 5000)
+    }
+    onStoppedChanged: {
+        lapStartElapsed = 0
+        lapStartKj = 0
+        autoPaused = false
+        pedaled = false
+    }
+
+    // Android back while the ride moves: it stays, and the screen says how to leave
+    function backPressed() {
+        toast(qsTr("Pause the ride to leave it."))
+    }
+
+    // Pause or Lap from the notification: on purpose, so the lock does not stop them
+    function notificationAction(action) {
+        if (action === 1 && !stopped && startPhase === "") {
+            toggleRide()
+        } else if (action === 2 && !stopped) {
+            var wasLocked = locked
+            locked = false
+            lapRide()
+            locked = wasLocked
+        }
     }
 
     function askEnd() {
@@ -478,16 +585,16 @@ Item {
         Item {
             id: topBar
             x: screen.portrait ? 24 : 32
-            y: 14
+            y: 10
             width: stage.width - x - (screen.portrait ? 24 : 24)
-            height: 40
+            height: 48
 
             // back to the app while the ride is paused or has not started; it stays as it is
             PulseButton {
                 id: leaveButton
                 anchors.verticalCenter: parent.verticalCenter
-                width: 36
-                height: 36
+                width: 48
+                height: 48
                 visible: screen.idle && screen.startPhase === "" && screen.editing < 0
                 fill: Theme.control
                 Accessible.name: screen.stopped ? qsTr("Back") : qsTr("Back, the ride stays paused")
@@ -532,14 +639,14 @@ Item {
                             : Metrics.clock(screen.source.elapsed)))
                 color: Theme.text
                 font.family: screen.idle ? Theme.bodySemibold : Theme.display
-                font.pixelSize: screen.idle ? 16 : 20
+                font.pixelSize: screen.idle ? 17 : 32
             }
 
             PulseButton {
                 id: lockButton
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                width: 36
-                height: 36
+                width: 48
+                height: 48
                 fill: screen.locked ? Theme.accent : Theme.control
                 Accessible.name: screen.locked ? qsTr("Unlock the screen") : qsTr("Lock the screen")
                 onClicked: {
@@ -553,15 +660,15 @@ Item {
                         anchors.centerIn: parent
                         name: screen.locked ? "lock" : "unlock"
                         color: screen.locked ? Theme.accentInk : Theme.text2
-                        size: 16
+                        size: 18
                     }
                 }
             }
             PulseButton {
                 id: presetPill
-                anchors { right: lockButton.left; rightMargin: 10; verticalCenter: parent.verticalCenter }
+                anchors { right: lockButton.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
                 width: presetLabel.implicitWidth + 44
-                height: 36
+                height: 48
                 fill: Theme.control
                 Accessible.name: qsTr("Layout %1. Switch layout").arg(Metrics.presetName(screen.preset))
                 onClicked: screen.cyclePreset()
@@ -585,13 +692,39 @@ Item {
             }
         }
 
+        // the bike dropped out: said at the top until it is back (the ride pauses by itself)
+        Rectangle {
+            visible: screen.bikeLost && screen.lostFor >= 2
+            anchors.horizontalCenter: topBar.horizontalCenter
+            y: topBar.y + topBar.height + 6
+            width: lostRow.implicitWidth + 32
+            height: 40
+            radius: 20
+            color: Theme.recording
+            z: 2
+            Accessible.role: Accessible.AlertMessage
+            Accessible.name: lostText.text
+            Row {
+                id: lostRow
+                anchors.centerIn: parent
+                spacing: 8
+                Text {
+                    id: lostText
+                    text: qsTr("Bike lost. Looking for it")
+                    color: "#ffffff"
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: 15
+                }
+            }
+        }
+
         // the hero: one big number in the zone color
         PulseButton {
             id: heroButton
             x: screen.portrait ? 24 : 32
             y: screen.portrait ? 74 : 66
-            width: screen.portrait ? stage.width - 48 : rows.x - 32 - 36
-            height: screen.portrait ? 270 : 300
+            width: screen.portrait ? stage.width - 48 : (screen.focusMode ? dock.x - 32 - 36 : rows.x - 32 - 36)
+            height: screen.portrait ? (screen.focusMode ? Math.max(270, ribbon.y - 40 - y) : 270) : 300
             radius: 28
             pressedScale: 0.985
             fill: screen.editing === 0 ? Theme.accentWash(0.06) : "transparent"
@@ -601,6 +734,8 @@ Item {
             Column {
                 id: heroContent
                 spacing: 10
+                // in Focus the number sits in the middle of its room
+                y: screen.focusMode && screen.portrait ? Math.max(0, (heroButton.height - height) / 2 - 20) : 0
                 // the count takes the place of the number while it runs
                 opacity: screen.startPhase === "count" ? 0 : 1
                 Behavior on opacity {
@@ -661,7 +796,8 @@ Item {
                             text: screen.hero.value
                             color: screen.zonesNeutral ? Theme.text : Theme.zoneLight[screen.zone - 1]
                             font.family: Theme.heroFamily(screen.shownZone)
-                            font.pixelSize: screen.hero.value.length > 4 ? (screen.portrait ? 104 : 118) : (screen.portrait ? 140 : 156)
+                            font.pixelSize: (screen.hero.value.length > 4 ? (screen.portrait ? 104 : 118) : (screen.portrait ? 140 : 156))
+                                            * (screen.focusMode ? 1.2 : 1)
                             font.letterSpacing: -4
                             Behavior on color {
                                 enabled: !Theme.reduceMotion
@@ -785,6 +921,7 @@ Item {
         // the four rows
         Column {
             id: rows
+            visible: !screen.focusMode
             x: screen.portrait ? 24 : dock.x - 35 - width
             y: screen.portrait ? heroButton.y + heroButton.height + 6 : 62
             width: screen.portrait ? stage.width - 48 : 290
@@ -949,7 +1086,9 @@ Item {
             width: Math.min(420, ribbon.width)
             visible: !screen.levelControls && screen.source.paused && !screen.stopped && screen.editing < 0
                      && screen.toastText === "" && screen.undoState === null && !screen.confirmingEnd
-            text: qsTr("Paused. Resume and this stays one ride, or hold End to finish it.")
+            text: screen.bikeLost ? qsTr("Bike lost. The ride is paused while Bikemodo finds it again.")
+                  : screen.autoPaused ? qsTr("Paused while you stopped. Pedal to go on, or hold End to finish.")
+                  : qsTr("Paused. Resume and this stays one ride, or hold End to finish it.")
             color: Theme.text2
             font.family: Theme.bodyMedium
             font.pixelSize: 14
