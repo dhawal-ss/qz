@@ -7,7 +7,7 @@ YouPage {
     id: page
 
     title: qsTr("Your data")
-    lead: qsTr("Every ride is saved on this device as a FIT file, the format Strava, Garmin and most training apps read. After a reinstall, or for rides recorded with QZ, Look in the folder again brings them back.")
+    lead: qsTr("Every ride is saved on this device as a FIT file, the format Strava, Garmin and most training apps read, in Documents/Bikemodo. Rides recorded with QZ, or left by an earlier install, come in with Bring in rides from a folder.")
 
     readonly property string folder: you.core !== null ? you.core.getWritableAppDir() + "fit/" : ""
     readonly property bool importing: you.core !== null && you.core.fitImportRunning === true
@@ -80,8 +80,8 @@ YouPage {
     }
 
     YouRow {
-        title: qsTr("Look in the folder again")
-        detail: qsTr("After a reinstall, finds the rides that are still in the folder")
+        title: qsTr("Bring in rides from a folder")
+        detail: qsTr("Pick Documents/QZ/fit for QZ's rides, or Documents/Bikemodo/fit after a reinstall: Bikemodo copies them in")
         trailing: "next"
         enabled: !page.importing
         hairline: false

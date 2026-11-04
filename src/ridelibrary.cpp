@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPair>
 #include <QSet>
 #include <QSettings>
 #include <QSqlDatabase>
@@ -478,6 +479,41 @@ void bindRange(QSqlQuery &query, qint64 fromMs, qint64 toMs) {
     query.bindValue(QStringLiteral(":to"), toMs > 0 ? toMs : std::numeric_limits<qint64>::max());
 }
 
+// The fit folder moved (Documents/QZ to Documents/Bikemodo, homeform::getWritableAppDir): every
+// file the library knows that is now in the new folder under the same name gets its new path, in
+// every table, so its ride, merges and splits stay as they were.
+void relocate(QSqlDatabase &db, const QString &fitDir) {
+    QSqlQuery query(db);
+    if (!query.exec(QStringLiteral("SELECT file_path FROM parts UNION SELECT file_path FROM skipped "
+                                   "UNION SELECT file_path FROM merge_links")))
+        return;
+    const QString prefix = QDir(fitDir).absolutePath() + QStringLiteral("/");
+    QList<QPair<QString, QString>> moves;
+    while (query.next()) {
+        const QString old = query.value(0).toString();
+        if (old.startsWith(prefix))
+            continue;
+        const QString moved = prefix + QFileInfo(old).fileName();
+        if (QFile::exists(moved))
+            moves.append(qMakePair(old, moved));
+    }
+    if (moves.isEmpty())
+        return;
+    db.transaction();
+    for (const auto &m : moves) {
+        for (const QString &table : {QStringLiteral("rides"), QStringLiteral("parts"), QStringLiteral("merge_links"),
+                                     QStringLiteral("skipped")}) {
+            QSqlQuery update(db);
+            update.prepare(QStringLiteral("UPDATE ") + table + QStringLiteral(" SET file_path = :moved WHERE file_path = :old"));
+            update.bindValue(QStringLiteral(":moved"), m.second);
+            update.bindValue(QStringLiteral(":old"), m.first);
+            update.exec();
+        }
+    }
+    db.commit();
+    qDebug() << "ride library:" << moves.size() << "files found in the new fit folder";
+}
+
 // a FIT field that was not written reads back as its "invalid" value: those become 0
 RideSample toSample(const SessionLine &line, const RideSample &previous) {
     RideSample s;
@@ -516,10 +552,12 @@ RideLibrary::RideLibrary(const QString &appDir, QObject *parent) : QObject(paren
         }
         ready = db.open() && createTables(db);
     }
-    if (ready)
+    if (ready) {
+        relocate(db, m_fitDir);
         onInserted();
-    else
+    } else {
         qDebug() << "ride library: cannot open" << m_dbPath << db.lastError().text();
+    }
 
     m_worker = new RideLibraryWorker(m_dbPath);
     m_worker->moveToThread(&m_thread);
@@ -575,6 +613,12 @@ void RideLibrary::setPowerGroup(int group) {
 // what the .fit files hold, so it then goes to the private folder of the app.
 QString RideLibrary::databasePath(const QString &appDir) {
     const QString path = appDir + databaseName;
+    const QString privatePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/") +
+                                databaseName;
+    // a library kept in the private folder stays there when the folder of the rides has none (a new
+    // folder, Documents/Bikemodo): it holds the rider's merges and splits
+    if (!QFile::exists(path) && QFile::exists(privatePath))
+        return privatePath;
     bool usable = true;
     for (const QString &suffix : {QString(), QStringLiteral("-wal"), QStringLiteral("-shm")}) {
         QFile file(path + suffix);

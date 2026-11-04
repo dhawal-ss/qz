@@ -952,7 +952,7 @@ ApplicationWindow {
         open: window.askingImport && window.mode === "home"
         bottomInset: insets.insetBottom
         title: qsTr("Rides from before")
-        words: qsTr("Rides of an earlier install may still be in the QZ folder, where this one cannot see them. In the next window, allow access to that folder and Bikemodo copies them in.")
+        words: qsTr("Rides of an earlier install, or of QZ, may still be in Documents/Bikemodo or Documents/QZ, where this install cannot see them. In the next window, pick that fit folder and Bikemodo copies them in.")
         confirmText: qsTr("Find my rides")
         onConfirm: {
             window.askingImport = false

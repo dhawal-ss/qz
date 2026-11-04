@@ -1786,13 +1786,50 @@ void homeform::pelotonWorkoutChanged(const QString &name, const QString &instruc
 
 }
 
+#if defined(Q_OS_ANDROID)
+// Bikemodo keeps its rides in Documents/Bikemodo (QZ: Documents/QZ). The first time, it copies what
+// it can read of Documents/QZ there (rides, the ride library, workouts, routes, backups; not the
+// logs), so nothing is lost and QZ's folder stays as it was. Files another install left in QZ's
+// folder cannot be read on Android 14 and later: Your data brings them in with the folder picker.
+static const QString appFolderName = QStringLiteral("Bikemodo");
+
+static void copyReadable(const QString &from, const QString &to) {
+    QDir source(from);
+    QDir().mkpath(to);
+    for (const QFileInfo &info : source.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden)) {
+        const QString target = to + QStringLiteral("/") + info.fileName();
+        if (info.isDir()) {
+            copyReadable(info.absoluteFilePath(), target);
+        } else if (!info.fileName().endsWith(QStringLiteral(".log")) && !QFile::exists(target)) {
+            if (!QFile::copy(info.absoluteFilePath(), target))
+                qDebug() << "Bikemodo folder: could not copy" << info.absoluteFilePath();
+        }
+    }
+}
+
+static void moveIntoOwnFolder(const QString &documents) {
+    static bool done = false;
+    if (done)
+        return;
+    done = true;
+    const QString own = documents + QStringLiteral("/") + appFolderName;
+    const QString qz = documents + QStringLiteral("/QZ");
+    if (QDir(own).exists() || !QDir(qz).exists())
+        return;
+    qDebug() << "Bikemodo folder: copying" << qz << "to" << own;
+    copyReadable(qz, own);
+}
+#endif
+
 QString homeform::getWritableAppDir() {
     QString path = QLatin1String("");
 #if defined(Q_OS_ANDROID)
     QSettings settings;
     bool android_documents_folder = settings.value(QZSettings::android_documents_folder, QZSettings::default_android_documents_folder).toBool();
     if (android_documents_folder || QOperatingSystemVersion::current() >= QOperatingSystemVersion(QOperatingSystemVersion::Android, 14)) {
-        path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) + "/QZ/";
+        const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+        moveIntoOwnFolder(documents);
+        path = documents + QStringLiteral("/") + appFolderName + QStringLiteral("/");
         QDir().mkdir(path);
         // Create .nomedia file to prevent gallery indexing
         QFile nomediaFile(path + ".nomedia");
