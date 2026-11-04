@@ -374,7 +374,7 @@ Column {
                 Hairline {
                     y: Math.round(fitness.formY(0))
                     width: strip.width
-                    color: Qt.rgba(1, 1, 1, 0.16)
+                    color: Theme.overlay(0.16)
                 }
                 Repeater {
                     model: fitness.shownDays.length
@@ -389,7 +389,7 @@ Column {
                         height: Math.max(1, Math.abs(fitness.formY(tsb) - zero))
                         y: tsb >= 0 ? zero - height : zero
                         radius: width > 3 ? 1 : 0
-                        color: last || fitness.cursor === index ? Theme.text : Qt.rgba(1, 1, 1, 0.26)
+                        color: last || fitness.cursor === index ? Theme.text : Theme.overlay(0.26)
                     }
                 }
             }
@@ -420,7 +420,7 @@ Column {
                     y: plot.y
                     width: 1
                     height: strip.y + strip.height - plot.y
-                    color: Qt.rgba(1, 1, 1, 0.5)
+                    color: Theme.overlay(0.5)
                 }
                 Rectangle {
                     x: fitness.xOf(fitness.cursor) - width / 2

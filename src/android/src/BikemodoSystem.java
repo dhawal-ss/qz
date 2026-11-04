@@ -13,6 +13,16 @@ public class BikemodoSystem {
         }
     }
 
+    // true when the phone uses its dark theme (Display > Dark theme)
+    public static boolean nightMode(Context context) {
+        try {
+            int night = context.getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
+            return night == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        } catch (Exception e) {
+            return true;
+        }
+    }
+
     // true when Android's animations are off (Accessibility > Remove animations, or the animator
     // duration scale at 0 in the developer options)
     public static boolean animationsOff(Context context) {

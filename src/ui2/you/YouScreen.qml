@@ -31,7 +31,7 @@ Item {
     // Bikemodo's own choices (ui2), read fresh each time You shows: other screens write some of
     // them (the ride screen its layout, Progress the detail level), and Settings objects do not
     // see each other's writes
-    property var look: ({ detailLevel: "simple", reduceMotion: false, ridePreset: "power", accentChoice: "lavender", autoPause: true, cueSound: true, cueVoice: false,
+    property var look: ({ detailLevel: "simple", reduceMotion: false, ridePreset: "power", accentChoice: "lavender", appearance: "system", autoPause: true, cueSound: true, cueVoice: false,
                           weekStart: 1, resistanceControl: "auto", mergeGapMinutes: 10 })
 
     // the end of the page the floating navigation covers: the content scrolls under it
@@ -147,6 +147,7 @@ Item {
             cueSound: flag(prefStore.value("cueSound", true), true),
             cueVoice: flag(prefStore.value("cueVoice", false), false),
             accentChoice: Theme.accentChoice,
+            appearance: Theme.appearance,
             weekStart: first === 0 ? 0 : 1,
             resistanceControl: ["auto", "on", "off"].indexOf(String(prefStore.value("resistanceControl", "auto"))) >= 0
                                ? String(prefStore.value("resistanceControl", "auto")) : "auto",
@@ -163,6 +164,8 @@ Item {
             Theme.reduceMotion = value
         if (key === "accentChoice")
             Theme.accentChoice = value
+        if (key === "appearance")
+            Theme.appearance = value
         // every week of the app counts from it: Theme tells the bindings and the JavaScript files
         if (key === "weekStart")
             Theme.weekStart = Number(value) === 0 ? 0 : 1

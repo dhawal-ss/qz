@@ -126,7 +126,7 @@ Item {
             y: Math.round(curve.yOf(curve.scaleTop * (3 - index) / 3))
             width: curve.width - 16
             height: 1
-            color: Qt.rgba(1, 1, 1, 0.06)
+            color: Theme.overlay(0.06)
         }
     }
     Repeater {
@@ -149,7 +149,7 @@ Item {
                 y: curve.plotTop - 8
                 width: 1
                 height: curve.plotBottom - curve.plotTop + 8
-                color: Qt.rgba(1, 1, 1, 0.06)
+                color: Theme.overlay(0.06)
                 visible: modelData !== curve.maxSeconds
             }
             Text {

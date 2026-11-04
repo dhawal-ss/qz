@@ -251,7 +251,7 @@ Column {
                         height: Math.max(v > 0 ? 3 : 0, plot.height - volume.yOf(v))
                         y: plot.height - height
                         radius: Math.min(3.5, width / 2)
-                        color: last ? Theme.accent : Qt.rgba(1, 1, 1, 0.2)
+                        color: last ? Theme.accent : Theme.overlay(0.2)
                     }
                 }
 

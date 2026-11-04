@@ -186,7 +186,7 @@ Item {
         var a = i === n - 1 ? 0.92 : 0.22 + 0.3 * i / Math.max(1, n - 1)
         if (selectedLap >= 0 && i !== n - 1)
             a = a * 0.6
-        return Qt.rgba(1, 1, 1, a)
+        return Theme.overlay(a)
     }
 
     function lineWidth(i) {
@@ -363,7 +363,7 @@ Item {
                     width: barPlot.width
                     height: 1
                     y: Math.round(barPlot.height * (1 - laps.ftp / barsView.scaleTop))
-                    color: Qt.rgba(1, 1, 1, 0.28)
+                    color: Theme.overlay(0.28)
                 }
 
                 Repeater {
@@ -448,7 +448,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 16
                     height: 1
-                    color: Qt.rgba(1, 1, 1, 0.5)
+                    color: Theme.overlay(0.5)
                 }
                 Text {
                     text: qsTr("FTP %1 W").arg(Math.round(laps.ftp))

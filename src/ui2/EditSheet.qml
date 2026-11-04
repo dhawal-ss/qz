@@ -216,7 +216,7 @@ Item {
                 Rectangle {
                     anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 6; rightMargin: 6 }
                     height: 1
-                    color: Qt.rgba(1, 1, 1, 0.06)
+                    color: Theme.overlay(0.06)
                 }
                 Column {
                     x: 6

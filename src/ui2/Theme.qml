@@ -7,38 +7,50 @@ import "Format.js" as Format
 QtObject {
     id: theme
 
+    // light: the light palette, for bright rooms (main2.qml sets it from ui2/appearance and the
+    // phone's dark theme). Every color below has a dark and a light value; the light ones are
+    // chosen by contrast (text 4.5:1 or more on bg and cards, accents and zones 3:1 or more).
+    property bool light: false
+
     // surfaces
-    readonly property color bg: "#09090b"
-    readonly property color surface: "#111114"
-    readonly property color card: "#121215"
-    readonly property color control: "#141417"
-    readonly property color floating: "#18181c"
-    readonly property color pressed: "#1d1c22"
-    readonly property color chip: "#222228"
-    readonly property color hairline: Qt.rgba(1, 1, 1, 0.07)
-    readonly property color dashed: "#3a3842"
+    readonly property color bg: light ? "#f6f5f8" : "#09090b"
+    readonly property color surface: light ? "#ffffff" : "#111114"
+    readonly property color card: light ? "#ffffff" : "#121215"
+    readonly property color control: light ? "#efedf2" : "#141417"
+    readonly property color floating: light ? "#ffffff" : "#18181c"
+    readonly property color pressed: light ? "#e7e5ec" : "#1d1c22"
+    readonly property color chip: light ? "#e4e2ea" : "#222228"
+    readonly property color hairline: overlay(light ? 0.09 : 0.07)
+    readonly property color dashed: light ? "#c4c1cc" : "#3a3842"
+    // a wash over a surface: white on the dark palette, black on the light one (lines, tracks,
+    // empty bars). Not for a mark on a zone or accent fill, which keeps its own color.
+    function overlay(alpha) {
+        return light ? Qt.rgba(0, 0, 0, alpha) : Qt.rgba(1, 1, 1, alpha)
+    }
 
     // text
-    readonly property color text: "#f5f3f8"
-    readonly property color text2: "#a7a3b0"
-    readonly property color text3: "#8a8694"
-    readonly property color danger: "#ffb3a8"
-    readonly property color recording: "#ff5e5e"
+    readonly property color text: light ? "#16151a" : "#f5f3f8"
+    readonly property color text2: light ? "#55525e" : "#a7a3b0"
+    readonly property color text3: light ? "#6b6875" : "#8a8694"
+    readonly property color danger: light ? "#b3261e" : "#ffb3a8"
+    readonly property color recording: light ? "#c62828" : "#ff5e5e"
 
     // brand accent, used when no zone tints the screen. The rider picks it in You (Make it yours);
-    // each one is a light tone that reads on bg and cards, with its own dark ink for text on it.
+    // each one is a light tone that reads on bg and cards, with its own dark ink for text on it,
+    // and a deeper tone with white ink for the light palette.
     readonly property var accents: [
-        { id: "lavender", name: qsTr("Lavender"), color: "#c9b8ff", ink: "#1e1240" },
-        { id: "sky", name: qsTr("Sky"), color: "#a9c7ff", ink: "#0b1d3d" },
-        { id: "mint", name: qsTr("Mint"), color: "#8fe3cc", ink: "#062a20" },
-        { id: "peach", name: qsTr("Peach"), color: "#ffc29e", ink: "#3d1a06" },
-        { id: "rose", name: qsTr("Rose"), color: "#ffb0c8", ink: "#3e0f22" },
-        { id: "silver", name: qsTr("Silver"), color: "#d8d5de", ink: "#1c1b21" }
+        { id: "lavender", name: qsTr("Lavender"), color: "#c9b8ff", ink: "#1e1240", lightColor: "#6a4fd1" },
+        { id: "sky", name: qsTr("Sky"), color: "#a9c7ff", ink: "#0b1d3d", lightColor: "#2f63c4" },
+        { id: "mint", name: qsTr("Mint"), color: "#8fe3cc", ink: "#062a20", lightColor: "#0d7a63" },
+        { id: "peach", name: qsTr("Peach"), color: "#ffc29e", ink: "#3d1a06", lightColor: "#ad4f14" },
+        { id: "rose", name: qsTr("Rose"), color: "#ffb0c8", ink: "#3e0f22", lightColor: "#b02f64" },
+        { id: "silver", name: qsTr("Silver"), color: "#d8d5de", ink: "#1c1b21", lightColor: "#5d5a66" }
     ]
     // the saved choice (ui2/accentChoice), read once at start; You sets accentChoice when it changes
     readonly property Settings savedLook: Settings {
         category: "ui2"
         property string accentChoice: "lavender"
+        property string appearance: "system"
         property int weekStart: 1
         property bool heartZonesSet: false
         property bool ftpConfirmed: false
@@ -67,14 +79,17 @@ QtObject {
         property real heart_rate_zone4: 100.0
     }
     property string accentChoice: savedLook.accentChoice
+    // ui2/appearance: "system" follows the phone's dark theme, "dark" or "light" keep one; main2
+    // turns it into light. You sets appearance when it changes.
+    property string appearance: savedLook.appearance === "dark" || savedLook.appearance === "light" ? savedLook.appearance : "system"
     readonly property var accentEntry: {
         for (var i = 0; i < accents.length; i++)
             if (accents[i].id === accentChoice)
                 return accents[i]
         return accents[0]
     }
-    readonly property color accent: accentEntry.color
-    readonly property color accentInk: accentEntry.ink
+    readonly property color accent: light ? accentEntry.lightColor : accentEntry.color
+    readonly property color accentInk: light ? "#ffffff" : accentEntry.ink
     // the accent as a faint wash, e.g. accentWash(0.08) behind a picked row
     function accentWash(alpha) {
         return Qt.rgba(accent.r, accent.g, accent.b, alpha)
@@ -102,9 +117,15 @@ QtObject {
         }
     }
 
-    // zones: fill color and the lighter color of the hero numeral
-    readonly property var zoneColors: ["#8ab4ff", "#5fd8c6", "#b9e66e", "#ffcb52", "#ff8f52", "#ff5e7e", "#c487ff"]
-    readonly property var zoneLight: ["#dde8ff", "#d2f6f0", "#e9f7d2", "#fff1cc", "#ffdfcc", "#ffd3dc", "#eedcff"]
+    // zones: fill color and the lighter color of the hero numeral (on the light palette deeper
+    // tones, for both: the numeral sits on a light page), and the ink of text on a zone fill
+    readonly property var zoneColors: light ? ["#2f6fdf", "#0b8576", "#57850f", "#9a6c00", "#bf5316", "#cc2649", "#8547d1"]
+                                            : ["#8ab4ff", "#5fd8c6", "#b9e66e", "#ffcb52", "#ff8f52", "#ff5e7e", "#c487ff"]
+    readonly property var zoneLight: light ? zoneColors
+                                           : ["#dde8ff", "#d2f6f0", "#e9f7d2", "#fff1cc", "#ffdfcc", "#ffd3dc", "#eedcff"]
+    readonly property color zoneInk: light ? "#ffffff" : "#141011"
+    // text on a pill of Theme.text (the undo toast of the ride screen)
+    readonly property color inverseText: light ? "#f5f3f8" : "#141318"
     readonly property var powerZoneNames: [qsTr("Recovery"), qsTr("Endurance"), qsTr("Tempo"), qsTr("Threshold"), qsTr("VO2 max"), qsTr("Anaerobic"), qsTr("Sprint")]
     readonly property var heartZoneNames: [qsTr("Easy"), qsTr("Endurance"), qsTr("Tempo"), qsTr("Threshold"), qsTr("Max")]
     // where each zone starts, as a share of FTP (power) or of max heart rate
@@ -213,8 +234,8 @@ QtObject {
     readonly property int capSize: fs(11)
     readonly property real capSpacing: 1.5
     readonly property int heroRadius: 32
-    readonly property color raisedBorder: Qt.rgba(1, 1, 1, 0.05)
-    readonly property color rest: "#2a2a30"
+    readonly property color raisedBorder: overlay(light ? 0.08 : 0.05)
+    readonly property color rest: light ? "#dcd9e2" : "#2a2a30"
 
     function powerZone(watts, ftp) {
         var zone = 1

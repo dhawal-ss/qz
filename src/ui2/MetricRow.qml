@@ -232,7 +232,7 @@ PulseButton {
         anchors.rightMargin: row.selected ? 12 : 0
         height: 4
         radius: 2
-        color: Qt.rgba(1, 1, 1, 0.08)
+        color: Theme.overlay(0.08)
         Rectangle {
             height: parent.height
             radius: 2

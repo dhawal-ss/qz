@@ -29,7 +29,7 @@ Column {
     readonly property real pitch: (width + gapSize) / blockWeeks
     readonly property int gapSize: blockWeeks === weekCount ? 2 : 3
     readonly property real cellSize: Math.min(16, pitch - gapSize)
-    readonly property var shades: [Qt.rgba(1, 1, 1, 0.06), Theme.accentWash(0.28), Theme.accentWash(0.52),
+    readonly property var shades: [Theme.overlay(0.06), Theme.accentWash(0.28), Theme.accentWash(0.52),
                                    Theme.accentWash(0.78), Theme.accent]
 
     function refresh() {

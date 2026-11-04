@@ -133,7 +133,7 @@ LearnTap {
                         height: modelData.seconds > 0 ? Math.max(width / 2, monthColumn.plotHeight * modelData.seconds / year.scaleMax * year.grown) : 4
                         y: monthColumn.plotTop + monthColumn.plotHeight - height
                         radius: Math.min(7, width / 2)
-                        color: monthColumn.lit ? Theme.accent : (modelData.seconds > 0 ? Qt.rgba(1, 1, 1, 0.16) : Theme.rest)
+                        color: monthColumn.lit ? Theme.accent : (modelData.seconds > 0 ? Theme.overlay(0.16) : Theme.rest)
                     }
                     // the hours of the biggest month, over its bar
                     Text {

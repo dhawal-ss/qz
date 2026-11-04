@@ -94,7 +94,7 @@ YouPage {
                     name: "check"
                     size: 34
                     weight: 3.4
-                    color: "#0d2420"
+                    color: Theme.light ? Theme.zoneInk : "#0d2420"
                 }
             }
         }

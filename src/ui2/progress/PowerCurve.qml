@@ -263,7 +263,7 @@ Column {
                         x: Math.round(curve.xOf(modelData))
                         width: 1
                         height: plot.height
-                        color: Qt.rgba(1, 1, 1, 0.05)
+                        color: Theme.overlay(0.05)
                     }
                 }
                 Hairline {
@@ -334,7 +334,7 @@ Column {
                         x: Math.round(marker.cx)
                         width: 1
                         height: plot.height
-                        color: Qt.rgba(1, 1, 1, 0.5)
+                        color: Theme.overlay(0.5)
                     }
                     Rectangle {
                         visible: curve.shownBefore > 0 && curve.cursor >= 0

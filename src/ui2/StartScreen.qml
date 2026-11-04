@@ -159,7 +159,7 @@ Item {
                         name: "check"
                         size: Math.round(pulseHolder.size * 0.34)
                         weight: 3.6
-                        color: "#0d2420"
+                        color: Theme.light ? Theme.zoneInk : "#0d2420"
                         opacity: start.connected ? 1 : 0
                         scale: start.connected ? 1 : 0.6
                         Behavior on opacity {

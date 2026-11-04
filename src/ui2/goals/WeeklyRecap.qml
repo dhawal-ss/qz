@@ -223,7 +223,7 @@ Item {
                     width: (segments.width - segments.spacing * (recap.pages.length - 1)) / Math.max(1, recap.pages.length)
                     height: 4
                     radius: 2
-                    color: index <= list.currentIndex ? Theme.text : Qt.rgba(1, 1, 1, 0.18)
+                    color: index <= list.currentIndex ? Theme.text : Theme.overlay(0.18)
                 }
             }
         }

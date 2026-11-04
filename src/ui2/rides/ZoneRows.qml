@@ -117,7 +117,7 @@ Item {
                     width: Math.max(zoneRow.none ? 0 : 3, room * zoneRow.secs / zones.total * zones.grow / Math.max(0.01, zones.seconds[zones.topZone] / zones.total))
                     height: 4
                     radius: 2
-                    color: zoneRow.lead ? Theme.zoneColors[index] : Qt.rgba(1, 1, 1, 0.16)
+                    color: zoneRow.lead ? Theme.zoneColors[index] : Theme.overlay(0.16)
                 }
                 Text {
                     id: minutes

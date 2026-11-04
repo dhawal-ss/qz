@@ -453,7 +453,7 @@ Item {
             height: plot.height
             Rectangle {
                 anchors.fill: parent
-                color: Qt.rgba(1, 1, 1, 0.045)
+                color: Theme.overlay(0.045)
             }
             Rectangle {
                 y: -5
@@ -486,7 +486,7 @@ Item {
                 x: Math.round(lapX)
                 width: 1
                 height: plot.height
-                color: Qt.rgba(1, 1, 1, 0.13)
+                color: Theme.overlay(0.13)
             }
         }
 
@@ -591,7 +591,7 @@ Item {
             width: plot.width
             height: 1
             y: Math.round(chart.yOf(chart.shownAverage))
-            color: Qt.rgba(1, 1, 1, 0.3)
+            color: Theme.overlay(0.3)
         }
 
         Text {
@@ -619,7 +619,7 @@ Item {
                 x: Math.round(crosshair.cx)
                 width: 1
                 height: plot.height
-                color: Qt.rgba(1, 1, 1, 0.6)
+                color: Theme.overlay(0.6)
             }
             Rectangle {
                 visible: !crosshair.gap
@@ -743,7 +743,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: -6
                 radius: 18
-                color: Qt.rgba(1, 1, 1, 0.05)
+                color: Theme.overlay(0.05)
                 opacity: chart.learnable && touch.pressed && touch.mode === "" ? 1 : 0
                 Behavior on opacity {
                     enabled: !Theme.reduceMotion

@@ -6,7 +6,7 @@ Item {
     id: icon
 
     property string name: "plus"
-    property color color: "white"
+    property color color: Theme.light ? Theme.text : "white"
     property real size: 24
     property real weight: size >= 24 ? 2.6 : 2.0
 

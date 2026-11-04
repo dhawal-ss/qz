@@ -53,7 +53,7 @@ YouPage {
                 width: 2
                 height: parent.height - confidence.height - 16 + 16
                 radius: 1
-                color: Qt.rgba(1, 1, 1, 0.1)
+                color: Theme.overlay(0.1)
             }
 
             // the confidence, as the Pulse

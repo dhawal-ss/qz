@@ -2329,6 +2329,15 @@ bool homeform::systemAnimationsOff() {
 #endif
 }
 
+bool homeform::systemNightMode() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoSystem", "nightMode",
+                                                         "(Landroid/content/Context;)Z", QtAndroid::androidContext().object());
+#else
+    return true;
+#endif
+}
+
 void homeform::updateWidgetBody(const QString &words) {
 #ifdef Q_OS_ANDROID
     QAndroidJniObject jWords = QAndroidJniObject::fromString(words);

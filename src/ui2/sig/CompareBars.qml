@@ -88,13 +88,13 @@ Column {
                 Rectangle {
                     anchors.fill: parent
                     radius: height / 2
-                    color: Qt.rgba(1, 1, 1, 0.06)
+                    color: Theme.overlay(0.06)
                 }
                 Rectangle {
                     width: Math.max(height, track.width * barRow.share * Math.max(0, bars.grown))
                     height: parent.height
                     radius: height / 2
-                    color: bars.sample ? Qt.rgba(1, 1, 1, 0.16) : (barRow.over ? bars.tint : Qt.darker(bars.tint, 1.5))
+                    color: bars.sample ? Theme.overlay(0.16) : (barRow.over ? bars.tint : Qt.darker(bars.tint, 1.5))
                     Behavior on color {
                         enabled: !Theme.reduceMotion
                         ColorAnimation { duration: Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }

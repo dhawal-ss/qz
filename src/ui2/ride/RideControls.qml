@@ -95,7 +95,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         name: controls.mainState === "pause" ? "pause" : (controls.mainState === "cancel" ? "close" : "play")
                         size: 30
-                        color: controls.mainState === "pause" ? "#141011"
+                        color: controls.mainState === "pause" ? Theme.zoneInk
                                : (controls.mainState === "cancel" ? Theme.text : Theme.accentInk)
                     }
                     Text {
@@ -103,7 +103,7 @@ Item {
                         text: controls.mainState === "cancel" ? qsTr("Cancel")
                               : (controls.mainState === "start" ? qsTr("Start")
                                  : (controls.mainState === "resume" ? qsTr("Resume") : qsTr("Pause")))
-                        color: controls.mainState === "pause" ? "#141011"
+                        color: controls.mainState === "pause" ? Theme.zoneInk
                                : (controls.mainState === "cancel" ? Theme.text : Theme.accentInk)
                         font.family: Theme.bodySemibold
                         font.pixelSize: Theme.fs(15)

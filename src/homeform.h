@@ -300,6 +300,8 @@ class homeform : public QObject {
     // the phone's font size (1 is the default) and whether its animations are off, for Theme
     Q_INVOKABLE double systemFontScale();
     Q_INVOKABLE bool systemAnimationsOff();
+    // the phone's dark theme, for Bikemodo's Look: Phone (main2.qml)
+    Q_INVOKABLE bool systemNightMode();
     // the Bluetooth bike other apps (Zwift) see: whether it is up, and whether an app is on it
     Q_INVOKABLE bool virtualBikeRunning();
     Q_INVOKABLE bool virtualBikeInUse();

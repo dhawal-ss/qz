@@ -191,6 +191,8 @@ ApplicationWindow {
         systemReduceMotion = core.systemAnimationsOff()
         var scale = uiSettings.textScaleOverride > 0 ? uiSettings.textScaleOverride : core.systemFontScale()
         Theme.textScale = Math.min(1.25, Math.max(1, scale))
+        systemDark = core.systemNightMode()
+        applyLook()
     }
     Connections {
         target: Qt.application
@@ -198,6 +200,25 @@ ApplicationWindow {
             if (Qt.application.state === Qt.ApplicationActive)
                 window.readSystemDisplay()
         }
+    }
+    // the light or dark palette: You's choice (Theme.appearance), or the phone's dark theme. Not in
+    // the middle of a ride (the phone turning dark at sunset): it changes when the ride screen goes.
+    property bool systemDark: true
+    function applyLook() {
+        var light = Theme.appearance === "light" || (Theme.appearance === "system" && !systemDark)
+        if (light === Theme.light && lookApplied)
+            return
+        if (mode === "ride" && lookApplied)
+            return
+        // the system bars stay black with white icons in both: the Qt window stops at them
+        Theme.light = light
+        lookApplied = true
+    }
+    property bool lookApplied: false
+    onModeChanged: applyLook()
+    Connections {
+        target: Theme
+        function onAppearanceChanged() { window.applyLook() }
     }
     Binding {
         target: Theme

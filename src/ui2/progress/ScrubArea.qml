@@ -62,7 +62,7 @@ MouseArea {
         anchors.fill: parent
         anchors.margins: -6
         radius: 18
-        color: Qt.rgba(1, 1, 1, 0.05)
+        color: Theme.overlay(0.05)
         opacity: touch.learnable && touch.pressed && !touch.scrubbing ? 1 : 0
         Behavior on opacity {
             enabled: !Theme.reduceMotion

@@ -108,7 +108,7 @@ Item {
             width: plot.width
             height: 1
             y: Math.round(chart.yOf(chart.average))
-            color: Qt.rgba(1, 1, 1, 0.35)
+            color: Theme.overlay(0.35)
         }
 
         Text {

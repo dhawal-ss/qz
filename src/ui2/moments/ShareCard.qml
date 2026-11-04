@@ -70,7 +70,7 @@ Rectangle {
         radius: 32 * share.k
         color: Theme.surface
         border.width: 3
-        border.color: Qt.rgba(1, 1, 1, 0.06)
+        border.color: Theme.overlay(0.06)
         clip: true
 
         Glow {

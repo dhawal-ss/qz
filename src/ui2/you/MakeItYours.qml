@@ -68,6 +68,16 @@ Column {
         onPicked: prefs.you.setLook("detailLevel", value)
     }
 
+    YouChoice {
+        title: qsTr("Look")
+        detail: prefs.look.appearance === "light" ? qsTr("Light, for bright rooms. Changes after a ride, never during one.")
+                : prefs.look.appearance === "dark" ? qsTr("Dark, whatever the phone uses.")
+                : qsTr("Follows the phone's dark theme. Changes after a ride, never during one.")
+        options: [["system", qsTr("Phone")], ["dark", qsTr("Dark")], ["light", qsTr("Light")]]
+        current: prefs.look.appearance
+        onPicked: prefs.you.setLook("appearance", value)
+    }
+
     // the accent: a row of swatches, the picked one ringed with a check
     Column {
         width: parent.width
@@ -118,7 +128,7 @@ Column {
                             radius: width / 2
                             color: "transparent"
                             border.width: 2
-                            border.color: modelData.color
+                            border.color: Theme.light ? modelData.lightColor : modelData.color
                             opacity: swatch.on ? 1 : 0
                             Behavior on opacity {
                                 enabled: !Theme.reduceMotion
@@ -130,7 +140,7 @@ Column {
                             width: swatch.on ? parent.width - 10 : parent.width - 4
                             height: width
                             radius: width / 2
-                            color: modelData.color
+                            color: Theme.light ? modelData.lightColor : modelData.color
                             Behavior on width {
                                 enabled: !Theme.reduceMotion
                                 Spring { token: "fast" }
@@ -141,7 +151,7 @@ Column {
                                 name: "check"
                                 size: 16
                                 weight: 2.6
-                                color: modelData.ink
+                                color: Theme.light ? "#ffffff" : modelData.ink
                             }
                         }
                     }

@@ -100,7 +100,7 @@ LearnTap {
                         height: Math.max(width / 2, dayColumn.plotHeight * dayColumn.info.all / whenCard.columnTop * whenCard.grown)
                         y: dayColumn.plotHeight - height
                         radius: Math.min(8, width / 2)
-                        color: Qt.rgba(1, 1, 1, 0.07)
+                        color: Theme.overlay(0.07)
                     }
                     // the strongest of them
                     Rectangle {
@@ -110,8 +110,8 @@ LearnTap {
                         height: Math.max(width / 2, dayColumn.plotHeight * dayColumn.info.strong / whenCard.columnTop * whenCard.grown)
                         y: dayColumn.plotHeight - height
                         radius: Math.min(8, width / 2)
-                        color: whenCard.sample ? (dayColumn.best ? Qt.rgba(1, 1, 1, 0.3) : Qt.rgba(1, 1, 1, 0.16))
-                                               : (dayColumn.best ? whenCard.tint : Qt.rgba(1, 1, 1, 0.28))
+                        color: whenCard.sample ? (dayColumn.best ? Theme.overlay(0.3) : Theme.overlay(0.16))
+                                               : (dayColumn.best ? whenCard.tint : Theme.overlay(0.28))
                     }
                     // no ride on this weekday
                     Rectangle {
@@ -151,8 +151,8 @@ LearnTap {
                         width: parent.width
                         height: 8
                         radius: 4
-                        color: whenCard.sample ? (slotCell.best ? Qt.rgba(1, 1, 1, 0.3) : Qt.rgba(1, 1, 1, 0.1))
-                               : (slotCell.best ? whenCard.tint : Qt.rgba(1, 1, 1, 0.07 + 0.22 * slotCell.info.strong / whenCard.slotTop))
+                        color: whenCard.sample ? (slotCell.best ? Theme.overlay(0.3) : Theme.overlay(0.1))
+                               : (slotCell.best ? whenCard.tint : Theme.overlay(0.07 + 0.22 * slotCell.info.strong / whenCard.slotTop))
                     }
                     Text {
                         width: parent.width

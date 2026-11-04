@@ -6,7 +6,7 @@ Item {
     id: glyph
 
     property string name: "spark"
-    property color color: "white"
+    property color color: Theme.light ? Theme.text : "white"
     property real size: 24
     property real weight: 2.2
 

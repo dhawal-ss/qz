@@ -19,9 +19,9 @@ LearnTap {
     property real sweep: 1
 
     readonly property var parts: [
-        { name: qsTr("Easy"), seconds: mix.easy, color: sample ? Qt.rgba(1, 1, 1, 0.34) : Theme.zoneColors[1] },
-        { name: qsTr("Moderate"), seconds: mix.moderate, color: sample ? Qt.rgba(1, 1, 1, 0.2) : Theme.zoneColors[2] },
-        { name: qsTr("Hard"), seconds: mix.hard, color: sample ? Qt.rgba(1, 1, 1, 0.12) : Theme.zoneColors[4] }
+        { name: qsTr("Easy"), seconds: mix.easy, color: sample ? Theme.overlay(0.34) : Theme.zoneColors[1] },
+        { name: qsTr("Moderate"), seconds: mix.moderate, color: sample ? Theme.overlay(0.2) : Theme.zoneColors[2] },
+        { name: qsTr("Hard"), seconds: mix.hard, color: sample ? Theme.overlay(0.12) : Theme.zoneColors[4] }
     ]
     readonly property real total: Math.max(1, mix.easy + mix.moderate + mix.hard)
     readonly property int lead: {
@@ -96,7 +96,7 @@ LearnTap {
                     layer.enabled: true
                     layer.samples: 4
                     ShapePath {
-                        strokeColor: Qt.rgba(1, 1, 1, 0.06)
+                        strokeColor: Theme.overlay(0.06)
                         strokeWidth: ring.thickness
                         fillColor: "transparent"
                         PathAngleArc {

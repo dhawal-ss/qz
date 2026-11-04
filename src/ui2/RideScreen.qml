@@ -1096,7 +1096,7 @@ Item {
                                     width: zoneLine.segmentWidth
                                     height: 5
                                     radius: 2.5
-                                    color: index + 1 === screen.zone ? screen.shownTint : (index + 1 < screen.zone ? Qt.rgba(1, 1, 1, 0.18) : Qt.rgba(1, 1, 1, 0.07))
+                                    color: index + 1 === screen.zone ? screen.shownTint : (index + 1 < screen.zone ? Theme.overlay(0.18) : Theme.overlay(0.07))
                                     Behavior on color {
                                         enabled: !Theme.reduceMotion
                                         ColorAnimation { duration: Theme.colorTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }
@@ -1228,7 +1228,7 @@ Item {
                     fill: screen.shownTint
                     Accessible.name: qsTr("Harder, level up")
                     onClicked: screen.pressLevel(true)
-                    contentItem: Item { Icon { anchors.centerIn: parent; name: "plus"; color: "#141011"; size: 28 } }
+                    contentItem: Item { Icon { anchors.centerIn: parent; name: "plus"; color: Theme.zoneInk; size: 28 } }
                 }
                 Column {
                     width: 64
@@ -1368,7 +1368,7 @@ Item {
                 width: parent.width - undoButton.width - 30
                 anchors.verticalCenter: parent.verticalCenter
                 text: screen.undoState ? screen.undoState.message : ""
-                color: "#141318"
+                color: Theme.inverseText
                 font.family: Theme.bodySemibold
                 font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
