@@ -1027,7 +1027,7 @@ void echelonconnectsport::controllerStateChanged(QLowEnergyController::Controlle
         qDebug() << QStringLiteral("trying to connect back again...");
         initDone = false;
         if(!useNativeIOS)
-            m_control->connectToDevice();
+            connectBackLater();
 
     }
 }

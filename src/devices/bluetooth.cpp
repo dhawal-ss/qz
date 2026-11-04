@@ -162,6 +162,14 @@ bluetooth::bluetooth(bool logs, const QString &deviceName, bool noWriteResistanc
 #if !defined(WIN32) && !defined(Q_OS_IOS)
     if (QBluetoothLocalDevice::allDevices().isEmpty()) {
         debug(QStringLiteral("no bluetooth dongle found!"));
+        // Fake and network devices come up in finished(), and without an adapter no scan ever calls it:
+        // on Android emulators and Waydroid without Bluetooth the fake device never appeared.
+        // No Bluetooth accessory can be found either, so finished() does not wait for one.
+        // Queued, as for the scan error below: finished() must run once the app has connected to our signals
+        if (reliesOnFakeOrVirtualDevice) {
+            forceHeartBeltOffForTimeout = true;
+            QMetaObject::invokeMethod(this, &bluetooth::finished, Qt::QueuedConnection);
+        }
     } else
 
 #endif
@@ -440,7 +448,8 @@ int bluetooth::searchNow() {
 
 void bluetooth::startDiscovery() {
 
-    if (!this->useDiscovery)
+    // no discoveryAgent without a Bluetooth adapter: nothing to scan with
+    if (!this->useDiscovery || !this->discoveryAgent)
         return;
 
     // Android 7.0 and later ignore the scan starts after the 5th one in 30 s: searchNow() checks this list.
@@ -777,6 +786,8 @@ void bluetooth::deviceDiscovered(const QBluetoothDeviceInfo &device) {
         settings.value(QZSettings::computrainer_serialport, QZSettings::default_computrainer_serialport).toString();
     QString kettlerUsbSerialPort =
         settings.value(QZSettings::kettler_usb_serialport, QZSettings::default_kettler_usb_serialport).toString();
+    QString daumSerialPort =
+        settings.value(QZSettings::daum_serialport, QZSettings::default_daum_serialport).toString();
     QString freebeatSerialPort =
         settings.value(QZSettings::freebeat_serialport, QZSettings::default_freebeat_serialport).toString();
     QString csaferowerSerialPort = settings.value(QZSettings::csafe_rower, QZSettings::default_csafe_rower).toString();
@@ -1124,6 +1135,18 @@ void bluetooth::deviceDiscovered(const QBluetoothDeviceInfo &device) {
                     emit searchingStop();
                 }
                 this->signalBluetoothDeviceConnected(kettlerUsbBike);
+            } else if (!daumSerialPort.isEmpty() && !daumBike) {
+                this->stopDiscovery();
+                daumBike = new daumbike(noWriteResistance, noHeartService, bikeResistanceOffset, bikeResistanceGain);
+                emit deviceConnected(b);
+                connect(daumBike, &bluetoothdevice::connectedAndDiscovered, this,
+                        &bluetooth::connectedAndDiscovered);
+                connect(daumBike, &daumbike::debug, this, &bluetooth::debug);
+                daumBike->deviceDiscovered(b);
+                if (this->discoveryAgent && !this->discoveryAgent->isActive()) {
+                    emit searchingStop();
+                }
+                this->signalBluetoothDeviceConnected(daumBike);
             } else if (!freebeatSerialPort.isEmpty() && !freebeatBike) {
                 this->stopDiscovery();
                 freebeatBike =
@@ -2227,6 +2250,7 @@ void bluetooth::deviceDiscovered(const QBluetoothDeviceInfo &device) {
                         (b.name().toUpper().startsWith("SPORT01-") && deviceHasService(b, QBluetoothUuid((quint16)0x1826))) || // Labgrey Magnetic Exercise Bike https://www.amazon.co.uk/dp/B0CXMF1NPY?_encoding=UTF8&psc=1&ref=cm_sw_r_cp_ud_dp_PE420HA7RD7WJBZPN075&ref_=cm_sw_r_cp_ud_dp_PE420HA7RD7WJBZPN075&social_share=cm_sw_r_cp_ud_dp_PE420HA7RD7WJBZPN075&skipTwisterOG=1
                         (b.name().toUpper().startsWith("DFIT-L-B-")) || // DFIT FTMS bike (e.g. DFIT-L-B-02066)
                         (b.name().toUpper().startsWith("GB3.0-")) || // Gymstick GB3.0 FTMS bike
+                        (b.name().toUpper().startsWith(QStringLiteral("ZV-")) && b.name().length() == 9) || // Sportstech SX600 FTMS (e.g. ZV-C47306)
                         (b.name().toUpper().startsWith("FS-YK-")) ||
 						(b.name().toUpper().startsWith("T600E_")) ||
                         (b.name().toUpper().startsWith("SPEEDBIKE S2")) || // Maxxus Speedbike S2
@@ -2445,6 +2469,7 @@ void bluetooth::deviceDiscovered(const QBluetoothDeviceInfo &device) {
                         b.name().toUpper().startsWith(QStringLiteral("S4 COMMS")) ||
                         b.name().toUpper().startsWith(QStringLiteral("KS-WLT")) || // KS-WLT-W1
                         b.name().toUpper().startsWith(QStringLiteral("I-ROWER")) ||
+                        b.name().toUpper().startsWith(QStringLiteral("FIT-RW-")) || // Sportstech PROwer (e.g. FIT-RW-5500)
                         b.name().toUpper().startsWith(QStringLiteral("MRK-CRYDN-")) ||
                         b.name().toUpper().startsWith(QStringLiteral("MRK-R06-")) ||
 						b.name().toUpper().startsWith(QStringLiteral("MRK-R15-")) ||
@@ -4831,6 +4856,10 @@ void bluetooth::restart() {
         delete kettlerUsbBike;
         kettlerUsbBike = nullptr;
     }
+    if (daumBike) {
+        delete daumBike;
+        daumBike = nullptr;
+    }
     if (freebeatBike) {
 
         delete freebeatBike;
@@ -5235,6 +5264,8 @@ bluetoothdevice *bluetooth::device() {
         return kettlerC12Bike;		
     } else if (kettlerUsbBike) {
         return kettlerUsbBike;
+    } else if (daumBike) {
+        return daumBike;
     } else if (freebeatBike) {
         return freebeatBike;
     } else if (csafeRower) {
