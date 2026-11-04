@@ -25,6 +25,9 @@ Item {
     property string chosen: "Disabled"
     // the bike of the last connection, for tips about its brand
     property string lastDevice: ""
+    // step 2 of the first run: Next once the bike is there, Skip for now in place of the demo,
+    // and the back arrow
+    property bool setup: false
 
     signal openRide()
     signal openDemo()
@@ -180,11 +183,20 @@ Item {
         width: 44
         height: 44
         fill: Theme.control
-        Accessible.name: qsTr("Close")
+        Accessible.name: start.setup ? qsTr("Back") : qsTr("Close")
         onClicked: start.closeRequested()
         contentItem: Item {
-            Icon { anchors.centerIn: parent; name: "close"; size: 20; color: Theme.text }
+            Icon { anchors.centerIn: parent; name: start.setup ? "back" : "close"; size: 20; color: Theme.text }
         }
+    }
+    Text {
+        visible: start.setup
+        x: start.margin + 8 + 44 + 14
+        y: 16 + (44 - height) / 2
+        text: qsTr("2 of 4")
+        color: Theme.text
+        font.family: Theme.bodyMedium
+        font.pixelSize: 14
     }
 
     Flickable {
@@ -211,7 +223,7 @@ Item {
                 Text {
                     id: titleText
                     width: parent.width
-                    text: start.connected ? (start.rideInProgress ? qsTr("Your ride is waiting") : qsTr("Ready to ride"))
+                    text: start.connected ? (start.setup ? qsTr("Found your bike") : start.rideInProgress ? qsTr("Your ride is waiting") : qsTr("Ready to ride"))
                         : start.problem === "bluetooth" ? qsTr("Bluetooth is off")
                         : start.problem === "permission" ? qsTr("Allow Bikemodo to find your bike")
                         : start.problem === "location" ? qsTr("Location is off")
@@ -387,7 +399,7 @@ Item {
                             anchors.centerIn: parent
                             spacing: 10
                             Icon {
-                                visible: start.connected
+                                visible: start.connected && !start.setup
                                 anchors.verticalCenter: parent.verticalCenter
                                 name: "play"
                                 size: 18
@@ -396,7 +408,7 @@ Item {
                             Text {
                                 id: primaryLabel
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: start.connected ? (start.rideInProgress ? qsTr("Back to the ride") : qsTr("Start ride"))
+                                text: start.connected ? (start.setup ? qsTr("Next") : start.rideInProgress ? qsTr("Back to the ride") : qsTr("Start ride"))
                                     : start.problem === "bluetooth" ? qsTr("Turn on Bluetooth")
                                     : start.problem === "permission" ? qsTr("Allow Nearby devices")
                                     : start.problem === "location" ? qsTr("Turn on Location")
@@ -413,7 +425,7 @@ Item {
                     width: demoRow.implicitWidth + 32
                     height: 48
                     fill: pressed ? Theme.pressed : "transparent"
-                    Accessible.name: qsTr("Try a demo ride, no bike needed")
+                    Accessible.name: start.setup ? qsTr("Skip for now") : qsTr("Try a demo ride, no bike needed")
                     onClicked: start.openDemo()
                     contentItem: Item {
                         Row {
@@ -421,12 +433,13 @@ Item {
                             anchors.centerIn: parent
                             spacing: 8
                             Text {
-                                text: qsTr("Try a demo ride")
+                                text: start.setup ? qsTr("Skip for now") : qsTr("Try a demo ride")
                                 color: Theme.accent
                                 font.family: Theme.bodySemibold
                                 font.pixelSize: 14
                             }
                             Text {
+                                visible: !start.setup
                                 text: qsTr("no bike needed")
                                 color: Theme.text3
                                 font.family: Theme.bodyMedium

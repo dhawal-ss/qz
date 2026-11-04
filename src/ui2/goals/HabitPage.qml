@@ -83,7 +83,9 @@ Item {
             Text {
                 visible: page.topLabel !== ""
                 anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - 60
+                // after the back arrow, or on its own with the close cross on the right
+                x: page.closeButton ? 0 : 58
+                width: parent.width - 60 - x
                 text: page.topLabel
                 color: Theme.text
                 font.family: Theme.bodyMedium

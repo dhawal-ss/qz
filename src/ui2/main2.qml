@@ -6,6 +6,8 @@ import Qt.labs.settings 1.0
 import AndroidStatusBar 1.0
 import "."
 import "rides"
+import "onboarding"
+import "goals/Streak.js" as Streak
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
@@ -56,8 +58,10 @@ ApplicationWindow {
     property var metricsObject: null
     property var libraryObject: null
 
-    // home (the app), launcher (finding the bike before a ride), ride, demo or summary
+    // home (the app), setup (the first run), launcher (finding the bike before a ride), ride, demo or summary
     property string mode: "home"
+    // the step of the first run: 0 name and units, 1 the bike, 2 power and heart, 3 the weekly goal
+    property int setupStep: 0
     property var finishedRide: ({})
     property bool finishedDemo: false
 
@@ -87,6 +91,8 @@ ApplicationWindow {
         property bool pause_on_start: false
         // QZ saves the ride when the app closes only with this on
         property bool fit_file_saved_on_quit: false
+        // the first run asks for it, for the estimated max heart rate
+        property int age: 35
     }
 
     // once, on the first start of Bikemodo: rides begin when the rider presses Start ride, so
@@ -98,8 +104,41 @@ ApplicationWindow {
         category: "ui2"
         property bool pauseOnStartSet: false
         property bool saveOnQuitSet: false
+        // the first run setup: done (or skipped), and begun (it comes back if the app closed during it)
+        property bool onboarded: false
+        property bool onboardingStarted: false
     }
+
+    // the first run of a new install shows the setup; an install that has been opened before
+    // (app_opening counts the starts, main.cpp adds this one before the window loads) skips it
+    function startSetupIfNew() {
+        if (firstRun.onboarded)
+            return
+        var opens = Number(qzSettings.value("app_opening", 0)) || 0
+        if (opens > 1 && !firstRun.onboardingStarted) {
+            firstRun.onboarded = true
+            return
+        }
+        firstRun.onboardingStarted = true
+        setupStep = 0
+        mode = "setup"
+    }
+
+    // the setup is over: to the bike and Start ride when it is there, else to Today
+    function finishSetup() {
+        firstRun.onboarded = true
+        mode = live.connected ? "launcher" : "home"
+    }
+
+    function setupNext() {
+        if (setupStep >= 3)
+            finishSetup()
+        else
+            setupStep++
+    }
+
     Component.onCompleted: {
+        startSetupIfNew()
         if (!firstRun.pauseOnStartSet) {
             qzSettings.pause_on_start = true
             qzSettings.sync()
@@ -192,6 +231,10 @@ ApplicationWindow {
         if (askingToClose || askingImport) {
             askingToClose = false
             askingImport = false
+            close.accepted = false
+        } else if (mode === "setup") {
+            if (setupStep > 0)
+                setupStep--
             close.accepted = false
         } else if (mode === "launcher" || mode === "summary") {
             mode = "home"
@@ -432,7 +475,7 @@ ApplicationWindow {
         Timer {
             interval: 1000
             repeat: true
-            running: window.core !== null && (window.mode === "home" || window.mode === "launcher")
+            running: window.core !== null && (window.mode === "home" || window.mode === "launcher" || window.mode === "setup")
             triggeredOnStart: true
             onTriggered: {
                 home.searchStatus = window.core.bluetoothSearchStatus()
@@ -481,9 +524,30 @@ ApplicationWindow {
             width: parent.width - insets.insetLeft - insets.insetRight
             height: parent.height - insets.insetTop - insets.insetBottom
 
+            Onboarding {
+                anchors.fill: parent
+                visible: window.mode === "setup" && window.setupStep !== 1
+                step: window.setupStep
+                nickname: qzSettings.user_nickname
+                miles: qzSettings.miles_unit
+                age: qzSettings.age
+                onNameChosen: qzSettings.user_nickname = name
+                onMilesChosen: qzSettings.miles_unit = miles
+                onAgeChosen: qzSettings.age = age
+                onGoalChosen: {
+                    firstRun.setValue("goalKind", goalKind)
+                    firstRun.setValue(Streak.settingKeys[goalKind], goalValue)
+                    window.finishSetup()
+                }
+                onNext: window.setupNext()
+                onPrevious: if (window.setupStep > 0) window.setupStep--
+                onSkipAll: window.finishSetup()
+            }
+
             StartScreen {
                 anchors.fill: parent
-                visible: window.mode === "launcher"
+                visible: window.mode === "launcher" || (window.mode === "setup" && window.setupStep === 1)
+                setup: window.mode === "setup"
                 connected: live.connected
                 deviceName: live.deviceName
                 searchStatus: home.searchStatus
@@ -492,8 +556,18 @@ ApplicationWindow {
                 devices: home.nearbyDevices
                 chosen: home.chosenBike
                 lastDevice: home.lastBike
-                onOpenRide: window.mode = "ride"
-                onOpenDemo: window.openDemo()
+                onOpenRide: {
+                    if (setup)
+                        window.setupNext()
+                    else
+                        window.mode = "ride"
+                }
+                onOpenDemo: {
+                    if (setup)
+                        window.setupNext()
+                    else
+                        window.openDemo()
+                }
                 onSearchAgain: if (window.core !== null) window.core.bluetoothSearchNow()
                 onFixProblem: if (window.core !== null) window.core.fixConnectionProblem()
                 onChooseBike: {
@@ -504,7 +578,12 @@ ApplicationWindow {
                     if (!window.core.switchBike(name))
                         window.restart()
                 }
-                onCloseRequested: window.mode = "home"
+                onCloseRequested: {
+                    if (setup)
+                        window.setupStep = 0
+                    else
+                        window.mode = "home"
+                }
             }
 
             Loader {
