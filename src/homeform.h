@@ -1228,6 +1228,10 @@ public:
     QString lastFitFileSaved = QLatin1String("");
     // set by discardRide() while it stops the ride: fit_save_clicked() saves nothing
     bool m_discardRide = false;
+    // the app's quit has saved the ride (or found nothing ridden): ~homeform does not save again
+    bool m_savedOnQuit = false;
+    // the session holds a ride: a minute at least, with pedaling or watts (homeform.cpp)
+    bool sessionRidden() const;
     QString lastTrainProgramFileSaved = QLatin1String("");
 
     // Perceived exertion (RPE, 0-10) and feel (0-100) entered in the post-workout popup; -1 means not set

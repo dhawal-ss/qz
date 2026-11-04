@@ -2432,7 +2432,21 @@ homeform::~homeform() {
     }
     
     gpx_save_clicked();
-    fit_save_clicked();
+    // the quit already saved it (or found nothing ridden): not a second file 4 s later
+    if (!m_savedOnQuit && sessionRidden())
+        fit_save_clicked();
+}
+
+// The engine records every second from the start, pedaling or not: a session that is only the app
+// left open (a heart rate, no pedaling, or under a minute) is not a ride to save on its own.
+bool homeform::sessionRidden() const {
+    if (Session.count() < 60)
+        return false;
+    for (const SessionLine &line : qAsConst(Session)) {
+        if (line.cadence > 0 || line.watt > 0)
+            return true;
+    }
+    return false;
 }
 
 void homeform::aboutToQuit() {
@@ -2454,8 +2468,14 @@ void homeform::aboutToQuit() {
 
     QSettings settings;
     if (settings.value(QZSettings::fit_file_saved_on_quit, QZSettings::default_fit_file_saved_on_quit).toBool()) {
-        qDebug() << "fit_file_saved_on_quit true";
-        fit_save_clicked();
+        if (sessionRidden()) {
+            qDebug() << "fit_file_saved_on_quit true";
+            fit_save_clicked();
+        } else {
+            qDebug() << "fit_file_saved_on_quit: nothing ridden, not saved" << Session.count();
+        }
+        // ~homeform saves again otherwise: a second file of the same ride
+        m_savedOnQuit = true;
     }
 
     if (bluetoothManager->device())

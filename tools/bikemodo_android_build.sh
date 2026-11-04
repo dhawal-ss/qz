@@ -32,8 +32,10 @@ cd "$WORK"
 
 # the same placeholders CI writes when it has no secrets
 if [ ! -f src/secret.h ]; then
-  printf '#define STRAVA_SECRET_KEY\n#define PELOTON_SECRET_KEY\n#define SMTP_USERNAME\n#define SMTP_PASSWORD\n#define SMTP_SERVER\n#define INTERVALSICU_CLIENT_ID\n#define INTERVALSICU_CLIENT_SECRET\n#define LICENSE\n' > src/secret.h
+  printf '#define STRAVA_SECRET_KEY\n#define PELOTON_SECRET_KEY\n#define SMTP_USERNAME\n#define SMTP_PASSWORD\n#define SMTP_SERVER\n#define INTERVALSICU_CLIENT_ID\n#define INTERVALSICU_CLIENT_SECRET\n' > src/secret.h
 fi
+# never QZ's supporter-licence check: it sends the rider's e-mail address to QZ's server
+sed -i '/define LICENSE/d' src/secret.h
 
 echo "== qthttpserver (first build only)"
 if [ ! -f "$WORK/.qthttpserver-built" ]; then

@@ -240,8 +240,10 @@ Item {
     function offer() {
         if (covering)
             return
-        if (!goalChosen && !setupOffered) {
+        // offered once, ever (ui2/goalSetupOffered): Change goal opens it again any time
+        if (!goalChosen && !setupOffered && String(uiStore.value("goalSetupOffered", "")) !== "true") {
             setupOffered = true
+            uiStore.setValue("goalSetupOffered", "true")
             setupOpen = true
             return
         }

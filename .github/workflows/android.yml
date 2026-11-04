@@ -208,7 +208,7 @@ jobs:
           echo "#define INTERVALSICU_CLIENT_ID ${{ secrets.intervalsicu_client_id }}" >> secret.h
           echo "#define INTERVALSICU_CLIENT_SECRET ${{ secrets.intervalsicu_client_secret }}" >> secret.h
           echo "${{ secrets.cesiumkey }}" >> inner_templates/googlemaps/cesium-key.js
-          echo "#define LICENSE" >> secret.h
+          # no LICENSE: QZ's supporter-licence check would send the rider's e-mail to QZ's server
 
       - name: Prepare Android signing key
         env:

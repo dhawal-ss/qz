@@ -170,7 +170,9 @@ Item {
             var day = Format.day(r.start) + ", " + Format.time(r.start)
             rideModel.append({
                 rideId: r.id, start: r.start, month: Format.month(r.start), title: Format.title(r),
-                day: r.counted === false ? qsTr("%1 · Not counted").arg(day) : day, length: Analysis.shortDuration(r.duration),
+                // without the time, so "Not counted" is not cut off next to the spark line
+                day: r.counted === false ? qsTr("%1 · Not counted").arg(Format.day(r.start)) : day,
+                length: Analysis.shortDuration(r.duration),
                 zone: Analysis.rideZone(r.intensity), spark: JSON.stringify(r.spark || []),
                 records: (r.records || []).length
             })

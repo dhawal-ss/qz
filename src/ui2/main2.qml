@@ -414,9 +414,14 @@ ApplicationWindow {
             askingDiscard = false
             close.accepted = false
         } else if (mode === "setup") {
-            if (setupStep > 0)
+            // a step back; on the first step, as on Today, a second press within 2 s closes the app
+            if (setupStep > 0) {
                 setupStep--
-            close.accepted = false
+                close.accepted = false
+            } else if (!backToExit.running) {
+                close.accepted = false
+                backToExit.start()
+            }
         } else if (mode === "launcher" || mode === "summary") {
             mode = "home"
             close.accepted = false
