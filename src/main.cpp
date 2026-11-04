@@ -1223,8 +1223,12 @@ int main(int argc, char *argv[]) {
             settings.value(QZSettings::app_language, QZSettings::default_app_language).toString());
 
         QQmlApplicationEngine engine;
-        // Bikemodo opens its own interface (src/ui2); the classic main.qml is no longer shown
+#ifdef BIKEMODO
+        // Bikemodo opens its own interface (src/ui2, bikemodo.pri); the classic main.qml is not shown
         const QUrl url(QStringLiteral("qrc:/ui2/main2.qml"));
+#else
+        const QUrl url(QStringLiteral("qrc:/main.qml"));
+#endif
         QObject::connect(
             &engine, &QQmlApplicationEngine::objectCreated, qobject_cast<QGuiApplication *>(app.data()),
             [url](QObject *obj, const QUrl &objUrl) {

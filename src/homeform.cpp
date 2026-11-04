@@ -1,6 +1,8 @@
 #include "homeform.h"
+#ifdef BIKEMODO
 #include "ridemetrics.h"
 #include "ridelibrary.h"
+#endif
 #include <QTranslator>
 #include "devices/lifefitnesstreadmill/lifefitnessworkout.h"
 #include "devices/echelonconnectsport/echelonconnectsport.h"
@@ -941,11 +943,14 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
     connect(this->innerTemplateManager, &TemplateInfoSenderBuilder::activityDescriptionChanged, this,
             &homeform::setActivityDescription);
     engine->rootContext()->setContextProperty(QStringLiteral("rootItem"), (QObject *)this);
+#ifdef BIKEMODO
+    // Bikemodo's live numbers and its ride library, for src/ui2 (bikemodo.pri)
     RideMetrics *metrics = new RideMetrics(bl, this);
     engine->rootContext()->setContextProperty(QStringLiteral("rideMetrics"), metrics);
     rideLibrary = new RideLibrary(getWritableAppDir(), this);
     rideLibrary->setMetrics(metrics);
     engine->rootContext()->setContextProperty(QStringLiteral("rideLibrary"), rideLibrary);
+#endif
     connect(this, &homeform::restoreDefaultWheelDiameter, this, &homeform::handleRestoreDefaultWheelDiameter);
 
     this->trainProgram = new trainprogram(QList<trainrow>(), bl);
@@ -9957,10 +9962,12 @@ void homeform::importFitFilesToHistory(const QStringList &files) {
     }
     setFitImportRunning(true);
     QMetaObject::invokeMethod(fitProcessor, "importFiles", Qt::QueuedConnection, Q_ARG(QStringList, files));
+#ifdef BIKEMODO
     // the files are in the fit folder now: the ride library reads them too
     if (rideLibrary) {
         rideLibrary->rescan();
     }
+#endif
 }
 
 bool homeform::deleteTrainingProgramFile(const QString &fileUrl) {
@@ -10425,9 +10432,11 @@ void homeform::fit_save_clicked() {
             fitProcessor->processFile(filename);
             workoutModel->refresh();
         }
+#ifdef BIKEMODO
         if (rideLibrary) {
             rideLibrary->importFile(filename);
         }
+#endif
 
 #ifdef Q_OS_ANDROID
         healthConnectWriteWorkout(Session, dev, workoutName);

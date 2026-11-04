@@ -46,7 +46,7 @@ fi
 
 echo "== QZ for arm64-v8a"
 lrelease src/qdomyos-zwift.pri > /dev/null
-qmake -spec android-clang 'ANDROID_ABIS=arm64-v8a' "ANDROID_NDK_ROOT=$NDK" 'CONFIG+=debug'
+qmake -spec android-clang 'ANDROID_ABIS=arm64-v8a' "ANDROID_NDK_ROOT=$NDK" 'CONFIG+=debug' 'CONFIG+=bikemodo'
 make qmake_all > /dev/null
 make -j"$JOBS" -C src -f Makefile.qdomyos-zwift arm64-v8a-all
 make -j"$JOBS"
