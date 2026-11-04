@@ -18,7 +18,9 @@ PulseButton {
     property bool picked: false
     property bool line: true
 
-    readonly property color tint: Theme.zoneColors[Math.max(1, Math.min(7, zone)) - 1]
+    // the zone a ride counts in comes from FTP: the accent and one shape until it is set (Theme.ftpSet)
+    readonly property color tint: Theme.ftpSet ? Theme.zoneColors[Math.max(1, Math.min(7, zone)) - 1] : Theme.accent
+    readonly property int shownZone: Theme.ftpSet ? zone : 1
 
     implicitHeight: 76
     radius: 20
@@ -33,7 +35,7 @@ PulseButton {
             anchors.verticalCenter: parent.verticalCenter
             width: 30
             height: 30
-            zone: rideRow.zone
+            zone: rideRow.shownZone
             color: rideRow.tint
         }
         Column {

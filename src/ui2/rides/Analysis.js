@@ -374,7 +374,9 @@ function headline(input) {
                      qsTr("A solid tempo ride."), qsTr("Right at threshold. Hard work."),
                      qsTr("You went deep today."), qsTr("You went deep today."), qsTr("All out. Well done.")]
         var useNp = ride.np > 0
-        return { sentence: words[zone - 1], value: String(Math.round(useNp ? ride.np : ride.avgPower)), unit: "W",
+        // how hard it was comes from FTP: with no FTP of the rider's own (input.ftpSet false) no
+        // effort is named
+        return { sentence: input.ftpSet === false ? qsTr("Watts in the bank.") : words[zone - 1], value: String(Math.round(useNp ? ride.np : ride.avgPower)), unit: "W",
                  label: useNp ? qsTr("Normalized power") : qsTr("Average power"),
                  sub: useNp && ride.avgPower > 0 ? qsTr("Average %1 W").arg(Math.round(ride.avgPower)) : "",
                  zone: 0, seconds: 0, power: true }

@@ -333,8 +333,9 @@ Item {
             return usual.weeks > 0
         if (cardId === "whenbest")
             return whenData.enough
+        // easy, moderate and hard come from FTP: no mix until it is the rider's own
         if (cardId === "mix")
-            return mixData.total > 0
+            return Theme.ftpSet && mixData.total > 0
         return true
     }
 
@@ -417,7 +418,8 @@ Item {
             latestBest: latest ? (library.ride(latest.id).best || []) : [],
             lifetime: lifetime,
             goalStreak: goalStreak,
-            miles: miles
+            miles: miles,
+            ftpSet: Theme.ftpSet
         }, now)
         ready = Coach.readiness(allDays, latest ? latest.start : 0, now, Theme.ftpSet)
         coachWords = Coach.words(ready)

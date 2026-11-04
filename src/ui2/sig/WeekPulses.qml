@@ -45,11 +45,13 @@ Item {
                     height: week.shapeSize
                     anchors.horizontalCenter: parent.horizontalCenter
 
+                    // a day's zone comes from FTP (Coach.weekDays): one shape in the accent until it
+                    // is set (Theme.ftpSet)
                     Pulse {
                         visible: dayCell.info.zone > 0
                         anchors.fill: parent
-                        zone: Math.max(1, dayCell.info.zone)
-                        color: Theme.zoneColors[Math.max(1, dayCell.info.zone) - 1]
+                        zone: Theme.ftpSet ? Math.max(1, dayCell.info.zone) : 1
+                        color: Theme.ftpSet ? Theme.zoneColors[Math.max(1, dayCell.info.zone) - 1] : Theme.accent
                     }
                     // a day without a ride
                     Rectangle {

@@ -107,7 +107,8 @@ Item {
                     for (var q = 0; q < hz.length && q < 5; q++) { heart[q] += Number(hz[q]) || 0; heartSum += Number(hz[q]) || 0 }
                 }
             }
-            var usePower = powerSum > 0
+            // power zones need the rider's own FTP (Theme.ftpSet): heart zones, or none, until then
+            var usePower = powerSum > 0 && Theme.ftpSet
             var zones = usePower ? power : heart
             var total = usePower ? powerSum : heartSum
             if (total > 0) {

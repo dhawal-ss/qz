@@ -75,8 +75,9 @@ Item {
         return Theme.powerZone(lap.avgPower, ftp)
     }
 
+    // the zone of a lap comes from FTP: the accent for every lap until it is set (Theme.ftpSet)
     function zoneColor(lap) {
-        return Theme.zoneColors[zoneOf(lap) - 1]
+        return Theme.ftpSet ? Theme.zoneColors[zoneOf(lap) - 1] : Theme.accent
     }
 
     // x and width of every lap in a row of the given width: each lap gets a minimum, the rest is
@@ -116,8 +117,11 @@ Item {
 
     function lapLine(i) {
         var lap = lapList[i]
-        return lapName(i) + "  ·  " + Format.duration(lap.duration) + "  ·  " + Math.round(lap.avgPower) + " W  ·  Z"
-                + zoneOf(lap) + " " + Theme.powerZoneNames[zoneOf(lap) - 1]
+        var line = lapName(i) + "  ·  " + Format.duration(lap.duration) + "  ·  " + Math.round(lap.avgPower) + " W"
+        // the zone needs the rider's own FTP (Theme.ftpSet)
+        if (Theme.ftpSet)
+            line += "  ·  Z" + zoneOf(lap) + " " + Theme.powerZoneNames[zoneOf(lap) - 1]
+        return line
     }
 
     // round the top of the scale up to a value that reads well, as AreaChart does

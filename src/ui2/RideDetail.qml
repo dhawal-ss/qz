@@ -90,7 +90,8 @@ Item {
 
     readonly property int rideZone: Analysis.rideZone(ride.intensity)
     readonly property int tintZone: story.zone > 0 ? story.zone : rideZone
-    readonly property color tint: Theme.zoneColors[Math.max(1, Math.min(7, tintZone)) - 1]
+    // power zones come from FTP: the accent, one shape and no zone bands until it is set (Theme.ftpSet)
+    readonly property color tint: Theme.ftpSet ? Theme.zoneColors[Math.max(1, Math.min(7, tintZone)) - 1] : Theme.accent
     readonly property bool estimated: powerEstimated || ride.powerEstimated === true
 
     signal back()
@@ -141,7 +142,7 @@ Item {
         history = list
         learnOpen = false
         story = Analysis.headline({
-            ride: r, before: curveBefore, prior90: curve90,
+            ride: r, before: curveBefore, prior90: curve90, ftpSet: Theme.ftpSet,
             month: Analysis.sameMonth(list, r), spread: spread, similarSpread: similarSpread, ftp: r.ftp || 0, now: Date.now()
         })
         var length = story.seconds > 0 ? story.seconds : ((r.duration || 0) >= 1200 ? 300 : 60)
@@ -371,7 +372,7 @@ Item {
         if (power.length < 2)
             power = ride.spark || []
         var ftp = ride.ftp || 0
-        shareBars = power.map(function (w) { return { watts: w, zone: ftp > 0 ? Theme.powerZone(w, ftp) : 0 } })
+        shareBars = power.map(function (w) { return { watts: w, zone: ftp > 0 && Theme.ftpSet ? Theme.powerZone(w, ftp) : 0 } })
         savedImage = ""
         saveFailed = false
         sharing = true
@@ -728,7 +729,7 @@ Item {
                             anchors.bottom: parent.bottom
                             value: detail.story.value
                             color: detail.tint
-                            font.family: Theme.heroFamily(detail.tintZone)
+                            font.family: Theme.heroFamily(Theme.ftpSet ? detail.tintZone : 1)
                             font.pixelSize: Math.round(Math.min(100, Math.max(64, (heroRow.width - 190) / Math.max(2.4, detail.story.value.length * 0.62))))
                             token: "slow"
                             Accessible.ignored: true
@@ -814,7 +815,7 @@ Item {
                         unit: power ? "W" : "bpm"
                         color: power ? detail.tint : Theme.zoneColors[5]
                         fromLowest: !power
-                        zoneColored: power
+                        zoneColored: power && Theme.ftpSet
                         filled: power
                         showAverage: false
                         ftp: detail.ride.ftp || 0
@@ -949,7 +950,7 @@ Item {
                 cue: detail
                 order: 3
                 width: parent.width
-                visible: (detail.ride.powerZones || []).length === 7 && detail.zoneTotal > 1
+                visible: Theme.ftpSet && (detail.ride.powerZones || []).length === 7 && detail.zoneTotal > 1
                 LearnTap {
                   width: parent.width
                   name: qsTr("Time in zones")

@@ -52,8 +52,13 @@ Item {
     readonly property bool heartDriven: preset === "heart" && source.heartRate > 0
     readonly property int zone: heartDriven ? Theme.heartZone(source.heartRate, source.maxHeartRate)
                                             : Theme.powerZone(source.power, source.ftp)
-    readonly property color tint: Theme.zoneColors[zone - 1]
-    readonly property int pulseZone: heartDriven ? Math.min(7, Math.round(1 + (zone - 1) * 1.5)) : zone
+    // power zones need the rider's own FTP: until it is set (Theme.ftpSet) the screen keeps the
+    // accent and one numeral cut whatever the watts, and the zone line says so. shownZone is the
+    // zone the colors, the numeral and the Pulse follow.
+    readonly property bool zonesNeutral: !heartDriven && !Theme.ftpSet
+    readonly property int shownZone: zonesNeutral ? 1 : zone
+    readonly property color tint: zonesNeutral ? Theme.accent : Theme.zoneColors[zone - 1]
+    readonly property int pulseZone: heartDriven ? Math.min(7, Math.round(1 + (zone - 1) * 1.5)) : shownZone
     readonly property var hero: Metrics.info(slots[0].m, source)
 
     // the tint as it shows: it crosses to the color of a new zone on the effects curve
@@ -110,7 +115,7 @@ Item {
         fromZone = Math.max(1, Math.min(7, previousZone))
         fromValue = value
         fromUnit = unit
-        fromName = zoneName(previousZone)
+        fromName = zonesNeutral ? qsTr("Set your FTP for power zones") : zoneName(previousZone)
         crossAnimation.restart()
     }
 
@@ -188,7 +193,7 @@ Item {
         }
         preset = saved.ridePreset
         slots = Metrics.parseLayout(saved.rideLayout, preset === "custom" ? "power" : preset)
-        lastZone = zone
+        lastZone = shownZone
         Qt.callLater(function () { screen.settled = true })
     }
 
@@ -382,7 +387,7 @@ Item {
         var after = labelOf(id)
         // a new main number crosses in like a new zone
         if (editing === 0)
-            cross(zone, hero.value, hero.unit)
+            cross(shownZone, hero.value, hero.unit)
         var next = Metrics.copySlots(slots)
         var where = -1
         for (var k = 0; k < next.length; k++) {
@@ -634,7 +639,7 @@ Item {
                         Numeral {
                             id: heroOut
                             text: screen.fromValue
-                            color: Theme.zoneLight[screen.fromZone - 1]
+                            color: screen.zonesNeutral ? Theme.text : Theme.zoneLight[screen.fromZone - 1]
                             font.family: Theme.heroFamily(screen.fromZone)
                             font.pixelSize: heroNumber.font.pixelSize
                             font.letterSpacing: -4
@@ -654,8 +659,8 @@ Item {
                         Numeral {
                             id: heroNumber
                             text: screen.hero.value
-                            color: Theme.zoneLight[screen.zone - 1]
-                            font.family: Theme.heroFamily(screen.zone)
+                            color: screen.zonesNeutral ? Theme.text : Theme.zoneLight[screen.zone - 1]
+                            font.family: Theme.heroFamily(screen.shownZone)
                             font.pixelSize: screen.hero.value.length > 4 ? (screen.portrait ? 104 : 118) : (screen.portrait ? 140 : 156)
                             font.letterSpacing: -4
                             Behavior on color {
@@ -710,13 +715,14 @@ Item {
                             }
                             Text {
                                 id: zoneLabel
-                                text: screen.zoneName(screen.zone)
+                                text: screen.zonesNeutral ? qsTr("Set your FTP for power zones") : screen.zoneName(screen.zone)
                                 color: screen.shownTint
                                 font.family: Theme.bodySemibold
                                 font.pixelSize: 15
                             }
                         }
                         Text {
+                            visible: !screen.zonesNeutral
                             text: screen.heartDriven ? Theme.heartZoneRange(screen.zone, screen.source.maxHeartRate) : Theme.powerZoneRange(screen.zone, screen.source.ftp)
                             color: Theme.text3
                             font.family: Theme.bodyMedium
@@ -726,6 +732,7 @@ Item {
                     }
                     Item {
                         id: zoneLine
+                        visible: !screen.zonesNeutral
                         readonly property int segments: screen.heartDriven ? 5 : 7
                         readonly property real segmentWidth: (width - 4 * (segments - 1)) / segments
                         width: 300
@@ -913,8 +920,9 @@ Item {
                     width: (ribbon.width - (ribbon.bars - 1) * ribbon.spacing) / ribbon.bars
                     height: ribbon.height
                     radius: 2
-                    color: index < ribbon.history.length ? Theme.zoneColors[ribbon.history[index] - 1]
-                           : (index === ribbon.history.length ? Theme.zoneColors[Theme.powerZone(screen.source.power, screen.source.ftp) - 1] : Theme.floating)
+                    // one accent wash for every ridden half minute while power zones need an FTP
+                    color: index < ribbon.history.length ? (screen.zonesNeutral ? Theme.accentWash(0.45) : Theme.zoneColors[ribbon.history[index] - 1])
+                           : (index === ribbon.history.length ? (screen.zonesNeutral ? Theme.accent : Theme.zoneColors[Theme.powerZone(screen.source.power, screen.source.ftp) - 1]) : Theme.floating)
                 }
             }
             Accessible.ignored: true
@@ -1253,9 +1261,10 @@ Item {
         }
     }
 
-    onZoneChanged: {
-        if (lastZone > 0 && lastZone !== zone)
+    // only a zone the screen shows crosses: none while power zones need an FTP
+    onShownZoneChanged: {
+        if (lastZone > 0 && lastZone !== shownZone)
             cross(lastZone, hero.value, hero.unit)
-        lastZone = zone
+        lastZone = shownZone
     }
 }

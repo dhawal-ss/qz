@@ -237,6 +237,8 @@ ApplicationWindow {
         category: "ui2"
         property bool lastPowerEstimated: false
         property bool unknownPowerAssigned: false
+        // the FTP the library was last worked out with (rebuildLater)
+        property real builtWithFtp: 0
     }
     Connections {
         target: live
@@ -265,13 +267,25 @@ ApplicationWindow {
     // a new FTP: the training load, zones and form of every ride are worked out again with it
     Connections {
         target: Theme
-        // after Theme.setFtp has saved it, so the library reads the new one
-        function onFtpChanged() {
-            Qt.callLater(function () {
-                if (window.libraryObject !== null)
-                    window.libraryObject.rebuild()
-            })
+        function onFtpChanged() { rebuildLater.restart() }
+    }
+    // Qt.labs.settings writes a changed value to QSettings only after its write delay (half a
+    // second), and sync() does not hurry it: the library, which reads QSettings, waits for it
+    Timer {
+        id: rebuildLater
+        interval: 1500
+        onTriggered: {
+            if (window.libraryObject === null)
+                return
+            window.libraryObject.rebuild()
+            powerMemory.builtWithFtp = Theme.ftp
         }
+    }
+    // a rebuild cut short (the app closed) or read too early: the library is worked out again at
+    // start when the FTP it was last worked out with is not the rider's
+    onLibraryObjectChanged: {
+        if (libraryObject !== null && Theme.ftpSet && Math.round(powerMemory.builtWithFtp) !== Math.round(Theme.ftp))
+            rebuildLater.restart()
     }
 
     // power curves and records are this bike's kind: estimated watts with estimated ones only

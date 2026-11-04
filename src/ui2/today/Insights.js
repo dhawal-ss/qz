@@ -275,7 +275,8 @@ function build(data, now) {
     for (var t = 1; t < 7; t++)
         if (zoneSeconds[t] > zoneSeconds[topZone])
             topZone = t
-    if (zoneRides >= 3 && zoneSeconds[topZone] >= zoneTotal * 0.5)
+    // the zones come from FTP: not named while it is still a guess (data.ftpSet false)
+    if (data.ftpSet !== false && zoneRides >= 3 && zoneSeconds[topZone] >= zoneTotal * 0.5)
         list.push(insight("zone", 24, topZone + 1, qsTr("Most of your riding is %1").arg(zoneWords[topZone]),
                           qsTr("%1% of your time in the last 30 days, over %2 rides.")
                             .arg(Math.round(zoneSeconds[topZone] / zoneTotal * 100)).arg(zoneRides),
