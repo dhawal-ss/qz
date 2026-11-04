@@ -39,6 +39,8 @@ LearnTap {
         }
         CompareBars {
             id: compare
+            // with no usual week yet there is nothing to set the bars against
+            visible: usualCard.sample || usualCard.usual.usualSeconds > 0
             width: parent.width
             rows: Patterns.usualRows(usualCard.usual, Theme.ftpSet)
             tint: usualCard.tint

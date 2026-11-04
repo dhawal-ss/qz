@@ -2329,6 +2329,39 @@ bool homeform::systemAnimationsOff() {
 #endif
 }
 
+void homeform::updateWidgetBody(const QString &words) {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject jWords = QAndroidJniObject::fromString(words);
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoWidget", "updateBody",
+                                              "(Landroid/content/Context;Ljava/lang/String;)V",
+                                              QtAndroid::androidContext().object(), jWords.object<jstring>());
+#else
+    Q_UNUSED(words);
+#endif
+}
+
+QStringList homeform::powerMeterNames() {
+    QStringList names;
+    if (!bluetoothManager)
+        return names;
+    const QBluetoothUuid cyclingPower(QBluetoothUuid::CyclingPower);
+    for (const QBluetoothDeviceInfo &b : qAsConst(bluetoothManager->devices)) {
+        if (!b.name().isEmpty() && b.serviceUuids().contains(cyclingPower) && !names.contains(b.name()))
+            names.append(b.name());
+    }
+    return names;
+}
+
+bool homeform::virtualBikeRunning() {
+    return bluetoothManager && bluetoothManager->device() && bluetoothManager->device()->VirtualDevice() != nullptr;
+}
+
+bool homeform::virtualBikeInUse() {
+    if (!virtualBikeRunning())
+        return false;
+    return bluetoothManager->device()->VirtualDevice()->connected();
+}
+
 bool homeform::healthAvailable() {
 #ifdef Q_OS_ANDROID
     return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoHealth", "available",

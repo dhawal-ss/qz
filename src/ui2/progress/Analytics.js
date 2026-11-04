@@ -7,7 +7,9 @@
 // of 3 to 20 minutes (curve: [{ seconds, watts }] of the last 90 days, library.powerCurve).
 // null when there are fewer than three of those, or the fit makes no sense (a curve of easy
 // rides gives a flat line, not a model).
-function criticalPower(curve) {
+// rough: fitted to easy riding (under 1.5 W/kg, as for VO2 max no all-out effort of an adult is
+// that low), so likely well under what the rider can hold; weightKg 0 when not known
+function criticalPower(curve, weightKg) {
     var pts = []
     for (var i = 0; i < curve.length; i++) {
         var s = curve[i].seconds
@@ -30,7 +32,7 @@ function criticalPower(curve) {
     var wprime = (sw - cp * st) / n
     if (cp <= 0 || wprime < 2000 || wprime > 60000)
         return null
-    return { cp: Math.round(cp), wprime: Math.round(wprime) }
+    return { cp: Math.round(cp), wprime: Math.round(wprime), rough: weightKg > 0 && cp / weightKg < 1.5 }
 }
 
 // W′ balance through a ride (Skiba's differential form, 1 Hz): the joules of W′ left, from full at

@@ -159,14 +159,18 @@ Item {
             monthTotals = {}
             return
         }
-        var list = library.rides(0, 5000)
-        allRides = list
-        monthTotals = Analysis.monthTotals(list)
+        // every ride is listed; one that does not count (no pedaling, under a minute) says so and
+        // stays out of the month's totals and of what a ride is compared with
+        var list = library.rides(0, 5000, true)
+        var counted = list.filter(function (r) { return r.counted !== false })
+        allRides = counted
+        monthTotals = Analysis.monthTotals(counted)
         for (var i = 0; i < list.length; i++) {
             var r = list[i]
+            var day = Format.day(r.start) + ", " + Format.time(r.start)
             rideModel.append({
                 rideId: r.id, start: r.start, month: Format.month(r.start), title: Format.title(r),
-                day: Format.day(r.start) + ", " + Format.time(r.start), length: Analysis.shortDuration(r.duration),
+                day: r.counted === false ? qsTr("%1 · Not counted").arg(day) : day, length: Analysis.shortDuration(r.duration),
                 zone: Analysis.rideZone(r.intensity), spark: JSON.stringify(r.spark || []),
                 records: (r.records || []).length
             })

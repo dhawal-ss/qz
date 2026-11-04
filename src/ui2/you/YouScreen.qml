@@ -113,6 +113,8 @@ Item {
         property int heart_rate_resting: 60
         property string filter_device: "Disabled"
         property string echelon_watttable: "Echelon"
+        property string power_sensor_name: "Disabled"
+        property bool virtual_device_enabled: true
     }
 
     // what only Bikemodo uses, read and written by key (readLook, setLook)
@@ -246,6 +248,8 @@ Item {
         }
         if (id === "heart")
             return qzStore.heart_rate_belt_name === "Disabled" ? qsTr("From the bike") : qzStore.heart_rate_belt_name
+        if (id === "power" && qzStore.power_sensor_name !== "Disabled")
+            return qsTr("From %1").arg(qzStore.power_sensor_name)
         if (id === "power")
             return powerEstimated ? qsTr("Estimated from level and cadence") : qsTr("Measured by the bike")
         if (id === "body")

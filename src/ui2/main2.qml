@@ -211,8 +211,10 @@ ApplicationWindow {
     QtObject {
         id: insets
         readonly property bool active: Qt.platform.os === "android" && AndroidStatusBar.apiLevel >= 31
-        readonly property bool landscape: Screen.orientation === Qt.LandscapeOrientation
-                                          || Screen.orientation === Qt.InvertedLandscapeOrientation
+        // from the window's shape: Screen.orientation only follows the rotation with an
+        // orientationUpdateMask, which QZ sets in Home.qml and Bikemodo never loads, so it stayed
+        // portrait and the navigation bar on the side covered the right edge in landscape
+        readonly property bool landscape: window.width > window.height
         readonly property int insetTop: active ? AndroidStatusBar.height : 0
         readonly property int insetBottom: active ? AndroidStatusBar.navigationBarHeight : 0
         readonly property int insetLeft: active && landscape ? AndroidStatusBar.leftInset : 0

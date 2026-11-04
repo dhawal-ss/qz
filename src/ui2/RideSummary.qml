@@ -188,7 +188,7 @@ Item {
             return
         }
         // the library may have read the ride already: then everything before it is what came before
-        var newest = library.rides(0, 3)
+        var newest = library.rides(0, 3, true)
         knownId = newest.length > 0 ? newest[0].id : 0
         var saved = Moments.match(newest, endedAt, ride.elapsed, null)
         known = saved === null && newest.length > 0 ? { id: newest[0].id, end: newest[0].end || 0 } : null
@@ -386,7 +386,7 @@ Item {
         enabled: summary.awaitingImport
         ignoreUnknownSignals: true
         function onChanged() {
-            var newest = summary.library.rides(0, 3)
+            var newest = summary.library.rides(0, 3, true)
             var saved = Moments.match(newest, summary.endedAt, summary.ride.elapsed, summary.known)
             if (saved !== null)
                 summary.takeSaved(saved)

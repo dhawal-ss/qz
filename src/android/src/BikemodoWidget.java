@@ -30,9 +30,31 @@ public class BikemodoWidget extends AppWidgetProvider {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.bikemodo_widget);
             views.setTextViewText(R.id.bikemodo_widget_value, prefs.getString("value", "Open Bikemodo"));
             views.setTextViewText(R.id.bikemodo_widget_detail, prefs.getString("detail", ""));
-            views.setTextViewText(R.id.bikemodo_widget_streak, prefs.getString("streak", ""));
+            // the body line of Today, only on the day Health Connect was read
+            String streak = prefs.getString("streak", "");
+            String body = today().equals(prefs.getString("bodyDay", "")) ? prefs.getString("body", "") : "";
+            String line = streak.isEmpty() ? body : (body.isEmpty() ? streak : streak + " · " + body);
+            views.setTextViewText(R.id.bikemodo_widget_streak, line);
             views.setOnClickPendingIntent(R.id.bikemodo_widget_root, tap);
             manager.updateAppWidget(id, views);
+        }
+    }
+
+    static String today() {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(new java.util.Date());
+    }
+
+    // from Today: how the body is this morning (Health Connect), "" when there is nothing to say
+    public static void updateBody(Context context, String words) {
+        try {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                    .putString("body", words).putString("bodyDay", today()).apply();
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int[] ids = manager.getAppWidgetIds(new ComponentName(context, BikemodoWidget.class));
+            if (ids.length > 0)
+                render(context, manager, ids);
+        } catch (Exception e) {
+            QLog.e("BikemodoWidget", "Cannot update the widget's body line", e);
         }
     }
 

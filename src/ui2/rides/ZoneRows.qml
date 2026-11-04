@@ -125,10 +125,12 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     width: 56
                     horizontalAlignment: Text.AlignRight
-                    text: qsTr("%1 min").arg(Math.round(zoneRow.secs / 60))
+                    // seconds under a minute, so a short ride does not read 0 min in every zone
+                    text: zoneRow.secs > 0 && zoneRow.secs < 60 ? qsTr("%1 s").arg(Math.round(zoneRow.secs))
+                                                                 : qsTr("%1 min").arg(Math.round(zoneRow.secs / 60))
                     color: zoneRow.lead ? Theme.zoneColors[index] : (zoneRow.none ? Theme.text3 : Theme.text)
                     font.family: Theme.display
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.fs(15)
                 }
             }
         }

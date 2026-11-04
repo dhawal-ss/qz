@@ -153,9 +153,11 @@ Item {
     }
 
     function zoneName(z) {
-        if (heartDriven)
-            return qsTr("Heart %1").arg(Theme.heartZoneNames[Math.max(1, Math.min(5, z)) - 1])
-        return Theme.powerZoneNames[Math.max(1, Math.min(7, z)) - 1]
+        var name = heartDriven ? qsTr("Heart %1").arg(Theme.heartZoneNames[Math.max(1, Math.min(5, z)) - 1])
+                               : Theme.powerZoneNames[Math.max(1, Math.min(7, z)) - 1]
+        // the zone follows the watts (or the heart rate) of this second: under another big number,
+        // such as Live NP, it says so
+        return slots[0].m === (heartDriven ? "heart" : "power") ? name : qsTr("Now: %1").arg(name)
     }
 
     // the hero numeral moves up and fades out, the next one rises in (slow spatial spring)

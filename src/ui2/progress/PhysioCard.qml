@@ -29,7 +29,7 @@ Column {
             return
         }
         var curve = library.powerCurve(Date.now() - 90 * 86400000, 0)
-        model = Pro.criticalPower(curve)
+        model = Pro.criticalPower(curve, weight)
         var best5 = 0
         for (var i = 0; i < curve.length; i++)
             if (curve[i].seconds === 300)
@@ -84,7 +84,9 @@ Column {
     }
     Text {
         width: parent.width
-        text: physio.model ? qsTr("Critical power is about what you can hold for 30 to 60 minutes; W′ is the reserve above it, for efforts and sprints.")
+        text: physio.model && physio.model.rough
+              ? qsTr("Rough, from easy rides: likely well under what you can hold. A ramp test or a few hard blocks of 3 to 20 minutes make it real.")
+              : physio.model ? qsTr("Critical power is about what you can hold for 30 to 60 minutes; W′ is the reserve above it, for efforts and sprints.")
                            : qsTr("Critical power needs hard efforts of 3 to 20 minutes in the last 90 days. A ramp test or a few hard blocks bring it.")
         color: Theme.text2
         font.family: Theme.bodyMedium

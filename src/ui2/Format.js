@@ -174,7 +174,8 @@ function weekDayNames(day) {
 
 // 5 s, 1 min, 20 min, 1 h
 function effort(seconds) {
-    if (seconds < 60)
+    // under 2 minutes in seconds: 90 s would round to 2 min
+    if (seconds < 120)
         return seconds + " s"
     if (seconds < 3600)
         return Math.round(seconds / 60) + " min"

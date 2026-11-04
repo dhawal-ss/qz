@@ -241,6 +241,71 @@ YouPage {
         }
     }
 
+    // a power meter (pedals, a crank or a hub) paired as QZ's power sensor: its watts take the
+    // place of the bike's, read once QZ starts again
+    readonly property string meter: qz.power_sensor_name
+    readonly property var meterNames: {
+        // only what advertises the Cycling Power service, not every device nearby
+        var list = you.ask("powerMeterNames", []).slice()
+        var skip = [you.deviceName, qz.heart_rate_belt_name]
+        for (var i = 0; i < skip.length; i++) {
+            if (list.indexOf(skip[i]) >= 0)
+                list.splice(list.indexOf(skip[i]), 1)
+        }
+        if (meter !== "Disabled" && list.indexOf(meter) < 0)
+            list.unshift(meter)
+        return list
+    }
+    function chooseMeter(name) {
+        if (name === meter)
+            return
+        qz.power_sensor_name = name
+        qz.setValue("power_sensor_name", name)
+        you.needRestart()
+    }
+
+    YouText {
+        kind: "heading"
+        text: qsTr("Power meter")
+    }
+    YouText {
+        topPadding: 0
+        text: meter === "Disabled"
+              ? qsTr("Have power pedals or a power meter? Pick it and Bikemodo uses its watts in place of the estimate, for zones, records and FTP.")
+              : qsTr("Bikemodo takes the watts from %1. Records from now on count as measured.").arg(meter)
+    }
+    YouRow {
+        title: qsTr("None, watts from the bike")
+        trailing: "check"
+        selected: page.meter === "Disabled"
+        onClicked: page.chooseMeter("Disabled")
+    }
+    Repeater {
+        model: page.meterNames
+        delegate: YouRow {
+            title: modelData
+            trailing: "check"
+            selected: page.meter === modelData
+            hairline: index < page.meterNames.length - 1
+            onClicked: page.chooseMeter(modelData)
+        }
+    }
+    YouText {
+        visible: page.meterNames.length === 0
+        text: qsTr("No power meter seen yet. Pedal a few turns to wake it, then look again.")
+    }
+    Item {
+        width: parent.width
+        height: meterLook.height + 20
+        YouButton {
+            id: meterLook
+            x: 12
+            y: 12
+            text: qsTr("Look for nearby devices")
+            onClicked: you.refreshDevicesRequested()
+        }
+    }
+
     YouText {
         kind: "heading"
         text: qsTr("Echelon watts")

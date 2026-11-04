@@ -53,7 +53,8 @@ class RideLibrary : public QObject {
     void importFile(const QString &path);
 
     // times are ms since epoch, durations seconds; 0 for fromMs or toMs means no bound
-    Q_INVOKABLE QVariantList rides(int offset, int limit);
+    // all: also the rides that do not count (ridelibrary.cpp, countedRides), for the list of rides
+    Q_INVOKABLE QVariantList rides(int offset, int limit, bool all = false);
     Q_INVOKABLE QVariantMap ride(int id);
     Q_INVOKABLE QVariantMap samples(int id, int maxPoints);
     // group as powerGroup, -2 for powerGroup itself

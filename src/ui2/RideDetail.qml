@@ -157,7 +157,7 @@ Item {
         segment = stretch
         // decoupling says something on a steady ride only
         durable = has.power && has.heart && Pro.steady(r) ? Analysis.durability(all) : null
-        var model = has.power ? Pro.criticalPower(curve90) : null
+        var model = has.power ? Pro.criticalPower(curve90, Number(riderStore.value("weight", 0)) || 0) : null
         var balance = model ? Pro.wbal(all.power || [], model.cp, model.wprime) : null
         if (balance)
             balance.model = model
@@ -513,6 +513,10 @@ Item {
     Settings {
         id: uiStore
         category: "ui2"
+    }
+    // QZ's own settings, read by key: the weight, for how far to trust critical power
+    Settings {
+        id: riderStore
     }
 
     NumberAnimation {
@@ -1229,6 +1233,7 @@ Item {
                                 .arg(Math.round(detail.wbalInfo.lowest / detail.wbalInfo.model.wprime * 100))
                                 .arg(Format.duration(detail.wbalInfo.lowestAt)).arg(detail.wbalInfo.model.cp)
                                 .arg((detail.wbalInfo.model.wprime / 1000).toFixed(1))
+                                + (detail.wbalInfo.model.rough ? " " + qsTr("Rough, from easy rides: the reserve is likely bigger than this.") : "")
                                 + (detail.estimated ? " " + qsTr("Estimated, like the watts of this bike.") : "")
                         color: Theme.text2
                         font.family: Theme.bodyMedium

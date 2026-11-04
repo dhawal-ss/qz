@@ -179,4 +179,27 @@ YouPage {
             }
         }
     }
+
+    // QZ's virtual bike (virtual_device_enabled): the bike shows up again as a Bluetooth bike for
+    // Zwift, MyWhoosh and other apps, on this phone or a tablet nearby. Read when QZ starts.
+    YouText {
+        kind: "heading"
+        text: qsTr("Other apps")
+    }
+    YouSwitch {
+        readonly property bool running: you.ask("virtualBikeRunning", false)
+        readonly property bool inUse: you.ask("virtualBikeInUse", false)
+        title: qsTr("Share the bike with other apps")
+        detail: !you.qz.virtual_device_enabled ? qsTr("Off. Other apps cannot see the bike through Bikemodo.")
+                : inUse ? qsTr("An app is connected now and gets your watts, cadence and heart rate.")
+                : running ? qsTr("On. In Zwift or another app, pick the Bluetooth bike called QZ.")
+                : qsTr("On. It shows up once your bike is connected.")
+        isOn: you.qz.virtual_device_enabled
+        hairline: false
+        onSwitched: {
+            you.qz.virtual_device_enabled = value
+            you.qz.setValue("virtual_device_enabled", value)
+            you.needRestart()
+        }
+    }
 }

@@ -348,6 +348,7 @@ Item {
                 stop()
                 var o = Body.parse(text)
                 todayPage.bodyNow = o && o.granted ? Body.today(o.days || [], Date.now()) : (o ? { state: "none", words: "", inputs: [], need: 0 } : null)
+                todayPage.pushBody()
                 refreshLater.restart()
             } else if (--todayPage.healthWait <= 0) {
                 stop()
@@ -358,6 +359,16 @@ Item {
         id: healthAgain
         interval: 8000
         onTriggered: todayPage.readBody()
+    }
+
+    // the widget's short line about the body today, or none while there is nothing to say
+    function pushBody() {
+        if (core === null || bodyNow === null)
+            return
+        var words = bodyNow.state === "good" ? qsTr("Well recovered")
+                  : bodyNow.state === "normal" ? qsTr("Body as usual")
+                  : bodyNow.state === "easy" ? qsTr("Take it easy today") : ""
+        core.updateWidgetBody(words)
     }
 
     // the body says take it easy: a recovery spin in place of a harder idea (a plan keeps its ride)
@@ -609,6 +620,15 @@ Item {
         readSettings()
         refresh()
     }
+    // Today is on screen at launch, before the app's core is there: read the body, and refresh
+    // for the home screen widget, once it is
+    onCoreChanged: {
+        if (core === null)
+            return
+        if (healthAsked)
+            readBody()
+        refreshLater.restart()
+    }
 
     // the library tells about every ride it reads in: one refresh for a burst of them
     Timer {
@@ -620,15 +640,6 @@ Item {
         target: todayPage.library
         ignoreUnknownSignals: true
         function onChanged() { refreshLater.restart() }
-    }
-    // Today is on screen at launch, before the app's core is there: read the body, and refresh
-    // for the home screen widget, once it is
-    onCoreChanged: {
-        if (core === null)
-            return
-        if (healthAsked)
-            readBody()
-        refreshLater.restart()
     }
 
     Settings {

@@ -42,7 +42,8 @@ function effortWords(seconds) {
 
 // "5 minute best", "30 second best", "1 hour best"
 function effortLabel(seconds) {
-    if (seconds < 60)
+    // under 2 minutes in seconds: 90 would round to "2 minute", against "ninety seconds" above it
+    if (seconds < 120)
         return qsTr("%1 second best").arg(seconds)
     if (seconds < 3600)
         return qsTr("%1 minute best").arg(Math.round(seconds / 60))

@@ -39,6 +39,15 @@ const QString rideColumns = QStringLiteral("id, start_ms, duration_s, distance_k
                                            "tss, kj, kcal, avg_hr, max_hr, avg_cadence, title, sport, spark, records, "
                                            "parts, part_ids, gap_s, end_ms, prev_gap_s, power_estimated");
 
+// A ride that counts: a minute at least, with the pedals turning or watts. A heart rate alone, or
+// a few seconds of a test, is not a ride: it stays in the list, marked, and counts toward no goal,
+// streak, total, curve or record. rideMap() tells the same with ridesCounts().
+const QString countedRides = QStringLiteral(" AND duration_s >= 60 AND (COALESCE(avg_cadence, 0) > 0 "
+                                            "OR COALESCE(avg_power, 0) > 0 OR COALESCE(max_power, 0) > 0)");
+bool rideCounts(int seconds, double avgPower, double maxPower, double avgCadence) {
+    return seconds >= 60 && (avgCadence > 0 || avgPower > 0 || maxPower > 0);
+}
+
 // PRAGMA user_version of the tables below. 0 is the first library, with one ride per .fit file;
 // 3 adds the power source of every part and ride and keeps other sports out.
 const int schemaVersion = 3;
@@ -273,6 +282,9 @@ QVariantMap rideMap(const QSqlQuery &query) {
     // true when the watts were worked out, false when measured or not known
     ride[QStringLiteral("powerEstimated")] = query.value(23).toInt() == 1;
     ride[QStringLiteral("powerKnown")] = !query.value(23).isNull();
+    // see countedRides
+    ride[QStringLiteral("counted")] = rideCounts(query.value(2).toInt(), query.value(4).toDouble(),
+                                                 query.value(5).toDouble(), query.value(13).toDouble());
     return ride;
 }
 
@@ -788,11 +800,12 @@ void RideLibrary::setLinks(const QStringList &paths, int mode) {
                               Qt::QueuedConnection);
 }
 
-QVariantList RideLibrary::rides(int offset, int limit) {
+QVariantList RideLibrary::rides(int offset, int limit, bool all) {
     QVariantList out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
-    query.prepare(QStringLiteral("SELECT ") + rideColumns +
-                  QStringLiteral(" FROM rides ORDER BY start_ms DESC, id DESC LIMIT :limit OFFSET :offset"));
+    query.prepare(QStringLiteral("SELECT ") + rideColumns + QStringLiteral(" FROM rides WHERE 1") +
+                  (all ? QString() : countedRides) +
+                  QStringLiteral(" ORDER BY start_ms DESC, id DESC LIMIT :limit OFFSET :offset"));
     query.bindValue(QStringLiteral(":limit"), limit);
     query.bindValue(QStringLiteral(":offset"), offset);
     if (!query.exec())
@@ -932,7 +945,7 @@ QVariantList RideLibrary::powerCurve(qint64 fromMs, qint64 toMs, int group) {
 
     QSqlQuery query(QSqlDatabase::database(uiConnection));
     query.prepare(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE start_ms >= :from AND start_ms < :to") +
-                  powerGroupClause(group == -2 ? m_powerGroup : group));
+                  countedRides + powerGroupClause(group == -2 ? m_powerGroup : group));
     bindRange(query, fromMs, toMs);
     if (query.exec()) {
         while (query.next()) {
@@ -966,7 +979,7 @@ QVariantMap RideLibrary::totals(qint64 fromMs, qint64 toMs) {
     QVariantMap out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
     query.prepare(QStringLiteral("SELECT COUNT(*), SUM(duration_s), SUM(distance_km), SUM(kj), SUM(kcal), SUM(tss) "
-                                 "FROM rides WHERE start_ms >= :from AND start_ms < :to"));
+                                 "FROM rides WHERE start_ms >= :from AND start_ms < :to") + countedRides);
     bindRange(query, fromMs, toMs);
     bool ok = query.exec() && query.next();
     out[QStringLiteral("rides")] = ok ? query.value(0).toInt() : 0;
@@ -982,7 +995,8 @@ QVariantList RideLibrary::days(qint64 fromMs, qint64 toMs) {
     QVariantList out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
     query.prepare(QStringLiteral("SELECT start_ms, duration_s, distance_km, kj, tss FROM rides "
-                                 "WHERE start_ms >= :from AND start_ms < :to ORDER BY start_ms"));
+                                 "WHERE start_ms >= :from AND start_ms < :to") + countedRides +
+                  QStringLiteral(" ORDER BY start_ms"));
     bindRange(query, fromMs, toMs);
     if (!query.exec())
         return out;
@@ -1018,7 +1032,7 @@ QVariantList RideLibrary::recordHistory(int seconds, int group) {
     QVariantList out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
     const QString where = powerGroupClause(group == -2 ? m_powerGroup : group);
-    if (!query.exec(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE 1") + where +
+    if (!query.exec(QStringLiteral("SELECT id, start_ms, best FROM rides WHERE 1") + countedRides + where +
                     QStringLiteral(" ORDER BY start_ms, id")))
         return out;
     const QString key = QString::number(seconds);
@@ -1043,7 +1057,8 @@ QVariantList RideLibrary::recordHistory(int seconds, int group) {
 QVariantList RideLibrary::rideRecords() {
     QVariantList out;
     QSqlQuery query(QSqlDatabase::database(uiConnection));
-    if (!query.exec(QStringLiteral("SELECT id, start_ms, duration_s, kj, distance_km FROM rides ORDER BY start_ms, id")))
+    if (!query.exec(QStringLiteral("SELECT id, start_ms, duration_s, kj, distance_km FROM rides WHERE 1") + countedRides +
+                    QStringLiteral(" ORDER BY start_ms, id")))
         return out;
     QVector<int> ids;
     QVector<qint64> starts;
@@ -1572,13 +1587,16 @@ bool RideLibraryWorker::regroup() {
 void RideLibraryWorker::updateRecords() {
     QSqlDatabase db = QSqlDatabase::database(workerConnection);
     QSqlQuery query(db);
-    if (!query.exec(QStringLiteral("SELECT id, best, records, COALESCE(power_estimated, 0) FROM rides "
-                                   "ORDER BY start_ms, id")))
+    if (!query.exec(QStringLiteral("SELECT id, best, records, COALESCE(power_estimated, 0), duration_s, avg_power, "
+                                   "max_power, avg_cadence FROM rides ORDER BY start_ms, id")))
         return;
     QHash<int, double> bestSoFar[2];
     QList<QPair<int, QString>> updates;
     while (query.next()) {
-        const QJsonObject best = jsonObject(query.value(1).toString());
+        // a ride that does not count sets no record (and loses one it had)
+        const bool counts = rideCounts(query.value(4).toInt(), query.value(5).toDouble(), query.value(6).toDouble(),
+                                       query.value(7).toDouble());
+        const QJsonObject best = counts ? jsonObject(query.value(1).toString()) : QJsonObject();
         QHash<int, double> &groupBest = bestSoFar[query.value(3).toInt() == 1 ? 1 : 0];
         QList<int> records;
         for (const QString &key : best.keys()) {
@@ -1619,7 +1637,8 @@ QString RideLibrary::exportCsv(const QString &folder) {
     QTextStream out(&file);
     out << "date,start,duration_min,distance_km,avg_power_w,np_w,max_power_w,power_estimated,avg_hr_bpm,max_hr_bpm,"
            "avg_cadence_rpm,kj,kcal,tss,intensity,title\n";
-    const QVariantList list = rides(0, qMax(1, m_rideCount));
+    // every ride in the file, the ones that do not count too
+    const QVariantList list = rides(0, qMax(1, m_rideCount), true);
     auto number = [](const QVariant &v, int decimals) {
         const double d = v.toDouble();
         return d > 0 ? QString::number(d, 'f', decimals) : QString();
