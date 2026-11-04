@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later. The settings file (.config, QSettings) holds the Strava, Peloton and
+     intervals.icu sign-ins, and app_webview the cookies of those sign-in pages: neither goes to
+     Google's cloud backup. A phone-to-phone transfer, encrypted end to end, still brings them
+     over. The rides are FIT files in Documents/Bikemodo, which backups do not cover. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path=".config" />
+        <exclude domain="root" path="app_webview" />
+    </cloud-backup>
+    <device-transfer />
+</data-extraction-rules>

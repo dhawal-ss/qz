@@ -134,6 +134,8 @@ android {
         }
         release {
             java.srcDirs += ["$buildDir/generated/aidl_source_output_dir/release/out"]
+            // Bikemodo's release leaves out QZ's iFit, OCR and floating-window pieces
+            manifest.srcFile 'release/AndroidManifest.xml'
         }
         test {
             java.srcDirs = ['tests']
@@ -197,6 +199,19 @@ android {
 
     if (!qtAndroidDir) {
         throw new GradleException("qt5AndroidDir is not set. Install Qt for Android and set qt5AndroidDir in gradle.properties or via the QT_ANDROID_DIR environment variable.")
+    }
+}
+
+// Bikemodo's release on Google Play: its own app ID and version, whatever the build machine
+// passes. The ID can never change once published. Raise the version code by one for every
+// upload (Play refuses a code it has seen); the debug build keeps app.bikemodo and QZ's version.
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.applicationId.set("org.dhawal.bikemodo")
+        variant.outputs.each { output ->
+            output.versionCode.set(1)
+            output.versionName.set("0.1.0")
+        }
     }
 }
 

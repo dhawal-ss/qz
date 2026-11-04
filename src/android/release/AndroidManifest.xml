@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged over AndroidManifest.xml for Bikemodo's release only (build.gradle, sourceSets.release).
+     It takes out the QZ pieces Bikemodo does not use and Google Play reviews closely: the ADB
+     shell service for iFit consoles, OCR with screen capture, the floating window, and the
+     usage-stats and task permissions. The code stays; those features just cannot start. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:node="remove" />
+    <uses-permission android:name="android.permission.GET_TASKS" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove" />
+
+    <application>
+        <service android:name="com.cgutman.androidremotedebugger.service.ShellService" tools:node="remove" />
+        <service android:name="org.cagnulen.qdomyoszwift.ScreenCaptureService" tools:node="remove" />
+        <service android:name="org.cagnulen.qdomyoszwift.FloatingWindowGFG" tools:node="remove" />
+        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" tools:node="remove" />
+    </application>
+</manifest>

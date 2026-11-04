@@ -26,6 +26,8 @@ if [ ! -x "$QT_DIR/bin/qmake" ]; then
   rm -rf "$TOOLS/qt-aqt"
   # the 16K-page-aligned target libraries over the stock install, keeping the Linux host tools
   curl -fsSL -o /tmp/qt-page16.zip https://github.com/cagnulein/qt-5.15.0-android-page16k/releases/download/1.0.1/qt5.15.0-android-page16-1.0.1.zip
+  # the SHA-256 GitHub records for that release file
+  echo "cf4953fd4024bcae908b0beff8cd0a3eb9bd58d67c600186700a3e1415b0966b  /tmp/qt-page16.zip" | sha256sum -c -
   rm -rf /tmp/qt-page16k && unzip -q /tmp/qt-page16.zip -d /tmp/qt-page16k
   rsync -a --exclude='bin/' /tmp/qt-page16k/qt5.15.0-android-page16/usr/local/Qt-5.15.0/ "$QT_DIR/"
   sed -i 's/darwin-x86_64/linux-x86_64/' "$QT_DIR/mkspecs/qdevice.pri"
@@ -37,6 +39,8 @@ echo "== Android SDK and NDK"
 if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
   mkdir -p "$SDK/cmdline-tools"
   curl -fsSL -o /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+  # Google lists only a SHA-1 for it (dl.google.com/android/repository/repository2-3.xml)
+  echo "d313adb7aedccf6cf0cfca51ec180f0059f5f8f8  /tmp/cmdline-tools.zip" | sha1sum -c -
   rm -rf /tmp/cmdline-tools && unzip -q /tmp/cmdline-tools.zip -d /tmp
   mv /tmp/cmdline-tools "$SDK/cmdline-tools/latest"
   rm -f /tmp/cmdline-tools.zip
@@ -63,6 +67,8 @@ CCACHE_DIR=$TOOLS/ccache ccache --set-config=sloppiness=pch_defines,time_macros,
 echo "== Gradle 9.3.1"
 if [ ! -x "$TOOLS/gradle-9.3.1/bin/gradle" ]; then
   curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+  # services.gradle.org/distributions/gradle-9.3.1-bin.zip.sha256
+  echo "b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06  /tmp/gradle.zip" | sha256sum -c -
   unzip -q /tmp/gradle.zip -d "$TOOLS"
   rm -f /tmp/gradle.zip
 fi

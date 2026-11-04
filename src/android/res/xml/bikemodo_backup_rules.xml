@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier cannot tell a cloud backup from a phone-to-phone transfer, so the
+     settings file and the sign-in cookies stay out of both (see bikemodo_data_extraction.xml). -->
+<full-backup-content>
+    <exclude domain="file" path=".config" />
+    <exclude domain="root" path="app_webview" />
+</full-backup-content>

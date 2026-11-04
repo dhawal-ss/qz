@@ -12,6 +12,7 @@ on:
       - 'src/**'
       - '.github/workflows/android.yml'
       - '.github/scripts/android_*'
+      - 'tools/bikemodo_check_16kb.py'
 
 concurrency:
   group: android-${{ github.ref }}
@@ -101,6 +102,8 @@ jobs:
         run: |
           QT_DIR="${{ github.workspace }}/output/android/Qt/5.15.0/android"
           curl -fsSL -o /tmp/qt5.15.0-android-page16.zip https://github.com/cagnulein/qt-5.15.0-android-page16k/releases/download/1.0.1/qt5.15.0-android-page16-1.0.1.zip
+          # the SHA-256 GitHub records for that release file
+          echo "cf4953fd4024bcae908b0beff8cd0a3eb9bd58d67c600186700a3e1415b0966b  /tmp/qt5.15.0-android-page16.zip" | sha256sum -c -
           unzip -q /tmp/qt5.15.0-android-page16.zip -d /tmp/qt-page16k
           # Overlay the 16K-page-aligned target libs/plugins/qml/mkspecs/jar/include onto the
           # stock Qt install; keep the stock Linux host tools (bin/) since the custom Qt's
@@ -278,9 +281,15 @@ jobs:
           find ${{ github.workspace }}/output/android -name gradle.properties -print -exec cat {} \;
           if [ ! -x "$GRADLE_DIST_DIR/bin/gradle" ]; then
             curl -fsSL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o /tmp/gradle-9.3.1-bin.zip
+            # services.gradle.org/distributions/gradle-9.3.1-bin.zip.sha256
+            echo "b266d5ff6b90eada6dc3b20cb090e3731302e553a27c5d3e4df1f0d76beaff06  /tmp/gradle-9.3.1-bin.zip" | sha256sum -c -
             unzip -q /tmp/gradle-9.3.1-bin.zip -d ${{ github.workspace }}
           fi
           "$GRADLE_DIST_DIR/bin/gradle" -g "$GRADLE_USER_HOME" --no-daemon -p ${{ github.workspace }}/output/android assembleDebug bundleDebug
+
+      # Google Play takes only apps whose 64-bit libraries load on 16 KB page phones
+      - name: Check 16 KB page alignment
+        run: python3 tools/bikemodo_check_16kb.py "${{ github.workspace }}/output/android/build/outputs/apk/debug/android-debug.apk"
 
       # One debug key for every test build, so each APK installs over the last one and keeps the
       # rider's data. With the BIKEMODO_DEBUG_KEYSTORE_B64 repository secret (the local key of
