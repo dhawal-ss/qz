@@ -12,6 +12,9 @@ on:
       - 'src/**'
       - '.github/workflows/android.yml'
       - '.github/scripts/android_*'
+      - 'tests/ui2/**'
+      - 'tests/ridelibrary/**'
+      - 'tools/bikemodo_tests.sh'
       - 'tools/bikemodo_check_16kb.py'
 
 concurrency:
@@ -19,7 +22,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Bikemodo's tests: the ride library against desktop Qt 5, and the logic of the screens in Node.
+  # The APK is built only when they pass.
+  tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install desktop Qt 5
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends qtbase5-dev qtpositioning5-dev qtconnectivity5-dev libqt5sql5-sqlite
+      - name: Run the tests
+        run: bash tools/bikemodo_tests.sh
+
   android-build:
+    needs: tests
     # The type of runner that the job will run on
     runs-on: ubuntu-22.04
 
