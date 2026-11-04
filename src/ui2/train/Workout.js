@@ -25,7 +25,9 @@ function round5(w) {
     return Math.round(w / 5) * 5
 }
 
-// [{ start, seconds, zone, low, high, words }]; low and high 0 without an FTP of the rider's own
+// [{ start, seconds, zone, low, high, words }]; low and high 0 without an FTP of the rider's own.
+// A block may carry its own target and words ([minutes, zone, watts, words], train/Ftp.js): an FTP
+// test steps by watts it sets itself, and its all-out block has words and no band.
 function steps(plan, ftp, ftpSet, starts) {
     var out = []
     if (!plan || !plan.blocks)
@@ -36,11 +38,16 @@ function steps(plan, ftp, ftpSet, starts) {
         var zone = Math.max(1, Math.min(7, plan.blocks[i][1]))
         var low = 0
         var high = 0
-        if (ftpSet && ftp > 0) {
+        var own = plan.blocks[i].length > 2 ? plan.blocks[i][2] : -1
+        if (own > 0) {
+            low = own - 5
+            high = own + 5
+        } else if (own < 0 && ftpSet && ftp > 0) {
             low = round5(ftp * (zone <= 1 ? 0.45 : starts[zone - 2]))
             high = round5(ftp * (zone >= 7 ? starts[5] * 1.2 : starts[zone - 1]) - 1)
         }
-        out.push({ start: t, seconds: seconds, zone: zone, low: low, high: high, words: feel(zone) })
+        var words = plan.blocks[i].length > 3 ? plan.blocks[i][3] : feel(zone)
+        out.push({ start: t, seconds: seconds, zone: zone, low: low, high: high, words: words })
         t += seconds
     }
     return out
@@ -66,6 +73,8 @@ function at(list, t) {
 function target(step) {
     if (!step)
         return ""
+    if (step.high > 0 && step.high - step.low <= 10)
+        return (step.low + 5) + " W"
     return step.high > 0 ? step.low + "–" + step.high + " W" : step.words
 }
 

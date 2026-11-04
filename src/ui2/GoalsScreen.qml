@@ -12,6 +12,8 @@ import "goals/Journeys.js" as Journeys
 import "goals/Badges.js" as Badges
 import "goals/Challenge.js" as Challenge
 import "Format.js" as Format
+import "train/Plans.js" as Plans
+import "train/Levels.js" as Levels
 
 // Goals, in the Signature language: the streak is the hero (the breathing Pulse, what a coach
 // would say, the last weeks as a row, and the one raised card with this week against the goal),
@@ -43,11 +45,14 @@ Item {
     signal openYou()
     // Start on Welcome back: an easy ride
     signal rideRequested()
+    // a ride of the training plan or an FTP test (Coach.plan, train/Ftp.js): to the ride screen
+    signal workoutRequested(var workout)
     // each time the screen shows: the blocks rise in again
     signal entered()
 
-    readonly property var cardIds: ["recap", "challenge", "journey", "badges", "ladders"]
+    readonly property var cardIds: ["training", "recap", "challenge", "journey", "badges", "ladders"]
     readonly property var cardTitles: ({
+        training: qsTr("Training"),
         recap: qsTr("Your week in review"),
         challenge: qsTr("Monthly challenge"),
         journey: qsTr("Journey"),
@@ -67,6 +72,10 @@ Item {
     property real journeyStartKm: 0
     property real journeyStartMs: 0
     property var journeysDone: []
+    // the training plan under way (train/Plans.js, null for none), where it stands, and the levels
+    property var trainingPlan: null
+    property var planState: null
+    property var levels: ({})
 
     // worked out from the library
     property real nowMs: Date.now()
@@ -139,8 +148,17 @@ Item {
         journeyStartKm = Number(uiStore.value("journeyStartKm", 0)) || 0
         journeyStartMs = Number(uiStore.value("journeyStartMs", 0)) || 0
         journeysDone = Streak.parseList(String(uiStore.value("journeysDone", "[]")))
-        // a new list rebuilds every section, so only when it changed
-        var saved = Progress.cardList(String(uiStore.value("goalsCards", "")), cardIds)
+        trainingPlan = Plans.parse(String(uiStore.value("trainingPlan", "")))
+        levels = Levels.levels(Levels.parse(String(uiStore.value("workoutLog", "[]"))), Date.now())
+        // a new list rebuilds every section, so only when it changed; Training comes first, also
+        // in an order saved before it was there
+        var savedText = String(uiStore.value("goalsCards", ""))
+        var saved = Progress.cardList(savedText, cardIds)
+        if (savedText.indexOf("training") < 0) {
+            for (var t = 0; t < saved.length; t++)
+                if (saved[t].id === "training")
+                    saved.unshift(saved.splice(t, 1)[0])
+        }
         if (Progress.cardJson(saved) !== Progress.cardJson(cards))
             cards = saved
     }
@@ -180,6 +198,7 @@ Item {
                 found[curve[i].seconds] = library.recordHistory(curve[i].seconds)
         }
         histories = found
+        planState = trainingPlan ? Plans.now(trainingPlan, library ? library.rides(0, 60) : [], nowMs, levels) : null
         challengeHistory = Challenge.history(days, nowMs)
         var week = weeks[Streak.weekKey(Streak.addWeeks(nowMs, -1))]
         lastWeek = week ? { rides: week.rides, seconds: week.seconds } : { rides: 0, seconds: 0 }
@@ -242,6 +261,18 @@ Item {
     }
 
     // the goal from the setup: what it counts and how much, at once
+    function startPlan(id, weeks) {
+        uiStore.setValue("trainingPlan", JSON.stringify({ id: id, startMs: Date.now(), weeks: weeks }))
+        readSettings()
+        refresh()
+    }
+
+    function endPlan() {
+        uiStore.setValue("trainingPlan", "")
+        readSettings()
+        refresh()
+    }
+
     function chooseGoal(kind, value) {
         uiStore.setValue("goalKind", kind)
         uiStore.setValue(Streak.settingKeys[kind], value)
@@ -320,6 +351,8 @@ Item {
     }
 
     function componentFor(cardId) {
+        if (cardId === "training")
+            return trainingComponent
         if (cardId === "recap")
             return recapComponent
         if (cardId === "challenge")
@@ -539,6 +572,17 @@ Item {
                 miles: goals.miles
                 onStartJourney: goals.startJourney(id)
             }
+        }
+    }
+    Component {
+        id: trainingComponent
+        TrainingCard {
+            plan: goals.trainingPlan
+            planState: goals.planState
+            levels: goals.levels
+            onStartPlan: goals.startPlan(id, weeks)
+            onEndPlan: goals.endPlan()
+            onWorkoutRequested: goals.workoutRequested(workout)
         }
     }
     Component {

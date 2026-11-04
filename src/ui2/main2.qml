@@ -9,6 +9,9 @@ import "rides"
 import "onboarding"
 import "goals/Streak.js" as Streak
 import "Metrics.js" as Metrics
+import "train/Workout.js" as Workout
+import "train/Levels.js" as Levels
+import "train/Ftp.js" as Ftp
 
 // The root of Bikemodo, loaded by main.cpp instead of QZ's main.qml.
 // homeform connects to the signals of this window and of the object named "home" by name,
@@ -217,6 +220,23 @@ ApplicationWindow {
     // the ride, or from now when a ride is already open. It ends with the ride.
     property var workoutPlan: null
     property int workoutStart: 0
+    // A ride with a workout ends: the workout goes in the log the training levels come from
+    // (train/Levels.js, ui2/workoutLog), finished when 90% of it was ridden. elapsed: the ride's
+    // seconds at its end.
+    function logWorkout(elapsed) {
+        if (workoutPlan === null || mode === "demo")
+            return
+        var steps = Workout.steps(workoutPlan, Theme.ftp, Theme.ftpSet, Theme.powerZoneStarts)
+        var total = Workout.total(steps)
+        if (total <= 0)
+            return
+        var ridden = Math.max(0, elapsed - workoutStart)
+        var log = Levels.parse(String(firstRun.value("workoutLog", "[]")))
+        firstRun.setValue("workoutLog", JSON.stringify(Levels.add(log, {
+            ms: Date.now(), id: workoutPlan.id, zone: workoutPlan.zone, test: Ftp.isTest(workoutPlan),
+            finished: ridden >= total * 0.9 })))
+    }
+
     function startWorkout(plan) {
         workoutPlan = plan
         workoutStart = rideOpen ? live.elapsed : 0
@@ -423,6 +443,7 @@ ApplicationWindow {
         askingDiscard = false
         finishedDemo = false
         finishedRide = copyRide(live)
+        logWorkout(live.elapsed)
         finishing = true
         live.end()
         finishing = false
@@ -499,9 +520,12 @@ ApplicationWindow {
     Connections {
         target: live
         function onStoppedChanged() {
-            // the workout ends with the ride
-            if (live.stopped && window.mode !== "demo")
+            // the workout ends with the ride (in the log when the engine ended it: End logs its own)
+            if (live.stopped && window.mode !== "demo") {
+                if (!window.finishing && window.metricsObject !== null)
+                    window.logWorkout(window.metricsObject.elapsed)
                 window.workoutPlan = null
+            }
             if (!live.stopped || window.finishing || window.mode === "demo" || window.metricsObject === null
                     || window.metricsObject.elapsed <= 0)
                 return

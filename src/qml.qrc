@@ -258,6 +258,10 @@
         <file>ui2/onboarding/Onboarding.qml</file>
         <file>ui2/train/Workout.js</file>
         <file>ui2/train/WorkoutPanel.qml</file>
+        <file>ui2/train/Ftp.js</file>
+        <file>ui2/train/Levels.js</file>
+        <file>ui2/train/Plans.js</file>
+        <file>ui2/goals/TrainingCard.qml</file>
         <file>ui2/goals/WelcomeBack.qml</file>
         <file>ui2/moments/PrMoment.qml</file>
         <file>ui2/moments/WeekClosed.qml</file>

@@ -10,6 +10,9 @@ import "progress/Progress.js" as Progress
 import "goals/Streak.js" as Streak
 import "today/Insights.js" as Insights
 import "today/Coach.js" as Coach
+import "train/Levels.js" as Levels
+import "train/Plans.js" as Plans
+import "train/Ftp.js" as Ftp
 import "today/Patterns.js" as Patterns
 import "progress/Fitness.js" as Fitness
 import "learn/Learn.js" as Learn
@@ -102,6 +105,14 @@ Item {
     property var coachWords: Coach.words(ready)
     property var suggestion: Coach.suggest(ready, null, "")
     property bool swapped: false
+    // the training levels (train/Levels.js), the plan under way (train/Plans.js, null for none) and
+    // where it stands, and an FTP test result waiting for the rider (null for none)
+    property var levels: ({})
+    property var trainingPlan: null
+    property var planState: null
+    property var ftpTest: null
+    // above the idea: the week and ride of the plan, else nothing ("Idea for today")
+    property string kicker: ""
     property var weekDays: Coach.weekDays([], Date.now())
     // Patterns.usual(), Patterns.whenBest(), Patterns.mix(); samples for a rider with no rides
     property var usual: Patterns.usualSample()
@@ -282,11 +293,48 @@ Item {
 
     // Goals and Customize write these through their own Settings objects, and Qt.labs.settings
     // does not tell the others: read them again each time the screen shows
+    // a plan under way puts its next ride in place of the coach's idea, and says where it is
+    function applyPlan(recent, now) {
+        kicker = ""
+        planState = trainingPlan ? Plans.now(trainingPlan, recent, now, levels) : null
+        if (planState === null)
+            return
+        if (planState.over) {
+            kicker = qsTr("Plan done. Start another on Goals")
+            return
+        }
+        if (planState.workout === null) {
+            kicker = qsTr("This week of the plan is done")
+            return
+        }
+        kicker = qsTr("Week %1 of %2 · ride %3 of %4").arg(planState.week + 1).arg(planState.weeks)
+                 .arg(planState.done + 1).arg(planState.rides.length) + (planState.easy ? " · " + qsTr("easier week") : "")
+        suggestion = { main: planState.workout, other: Coach.easySpin(), otherLabel: qsTr("Swap for an easy spin") }
+    }
+
+    // the FTP test result: used, or let go
+    function settleFtpTest(use) {
+        if (use && ftpTest !== null) {
+            Theme.setFtp(ftpTest.watts)
+            uiStore.setValue("ftpTestedMs", Date.now())
+        }
+        uiStore.setValue("ftpTestResult", "")
+        ftpTest = null
+    }
+
     function readSettings() {
         var kind = String(uiStore.value("goalKind", "minutes"))
         goalKind = Streak.kinds.indexOf(kind) >= 0 ? kind : "minutes"
         goalValue = Number(uiStore.value(Streak.settingKeys[goalKind], Streak.defaults[goalKind])) || Streak.defaults[goalKind]
         restWeeks = Streak.parseList(String(uiStore.value("restWeeks", "[]")))
+        levels = Levels.levels(Levels.parse(String(uiStore.value("workoutLog", "[]"))), Date.now())
+        trainingPlan = Plans.parse(String(uiStore.value("trainingPlan", "")))
+        try {
+            var test = JSON.parse(String(uiStore.value("ftpTestResult", "")) || "null")
+            ftpTest = test && test.watts > 0 ? test : null
+        } catch (e) {
+            ftpTest = null
+        }
         var saved = Progress.cardList(String(uiStore.value("todayCards", "")), cardIds)
         if (Progress.cardJson(saved) !== Progress.cardJson(cards))
             cards = saved
@@ -398,7 +446,8 @@ Item {
             found = Insights.build({}, now)
             ready = Coach.readiness([], 0, now)
             coachWords = Coach.words(ready)
-            suggestion = Coach.suggest(ready, null, "")
+            suggestion = Coach.suggest(ready, null, "", levels)
+            applyPlan([], now)
             weekDays = Coach.weekDays([], now)
             usual = Patterns.usualSample()
             whenData = Patterns.whenSample()
@@ -447,7 +496,8 @@ Item {
                     best20 = lately[b].watts
         }
         ftpOffer = best20 > 0 ? Math.round(best20 * 0.95) : 0
-        suggestion = Coach.suggest(ready, found.reach, found.reach ? Format.effort(found.reach.seconds) : "")
+        suggestion = Coach.suggest(ready, found.reach, found.reach ? Format.effort(found.reach.seconds) : "", levels)
+        applyPlan(recent, now)
         weekDays = Coach.weekDays(recent, now)
         usual = Patterns.usual(recent, now)
         whenData = Patterns.whenBest(recent, now)
@@ -1012,6 +1062,92 @@ Item {
                 }
                 Item { width: 1; height: 14 }
                 // FTP still QZ's guess: offer one from the rides, or the place to set it
+                // an FTP test result, waiting for the rider to use it or not
+                Rectangle {
+                    objectName: "ftpTestResult"
+                    visible: todayPage.ftpTest !== null
+                    width: parent.width
+                    height: visible ? testColumn.height + 32 : 0
+                    radius: 24
+                    color: Theme.accentWash(0.10)
+                    Column {
+                        id: testColumn
+                        x: 16
+                        y: 16
+                        width: parent.width - 32
+                        spacing: 12
+                        Column {
+                            width: parent.width
+                            spacing: 3
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: testTitle.text + ". " + testWords.text
+                            Text {
+                                id: testTitle
+                                width: parent.width
+                                text: todayPage.ftpTest ? (todayPage.ftpTest.kind === "ramp" ? qsTr("Ramp test: FTP %1 W") : qsTr("20 minute test: FTP %1 W"))
+                                                          .arg(todayPage.ftpTest.watts) : ""
+                                color: Theme.text
+                                font.family: Theme.bodySemibold
+                                font.pixelSize: 15
+                                Accessible.ignored: true
+                            }
+                            Text {
+                                id: testWords
+                                width: parent.width
+                                text: !todayPage.ftpTest ? ""
+                                      : (todayPage.ftpTest.kind === "ramp" ? qsTr("75% of your best minute, %1 W.") : qsTr("95% of your 20 minutes, %1 W."))
+                                        .arg(todayPage.ftpTest.measured)
+                                        + (todayPage.ftpTest.estimated ? " " + qsTr("Estimated by this bike, like its watts.") : "")
+                                        + " " + qsTr("Your power zones, load and workouts start from FTP.")
+                                color: Theme.text2
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: 13
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: 18
+                                wrapMode: Text.WordWrap
+                                Accessible.ignored: true
+                            }
+                        }
+                        Row {
+                            spacing: 8
+                            PulseButton {
+                                width: useTestText.implicitWidth + 32
+                                height: 48
+                                pressedRadius: 14
+                                fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
+                                Accessible.name: useTestText.text
+                                onClicked: todayPage.settleFtpTest(true)
+                                contentItem: Text {
+                                    id: useTestText
+                                    text: todayPage.ftpTest ? qsTr("Use %1 W").arg(todayPage.ftpTest.watts) : ""
+                                    color: Theme.accentInk
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 14
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                            PulseButton {
+                                width: keepText.implicitWidth + 32
+                                height: 48
+                                pressedRadius: 14
+                                fill: pressed ? Theme.chip : Theme.control
+                                Accessible.name: keepText.text
+                                onClicked: todayPage.settleFtpTest(false)
+                                contentItem: Text {
+                                    id: keepText
+                                    text: Theme.ftpSet ? qsTr("Keep %1 W").arg(Math.round(Theme.ftp)) : qsTr("Not now")
+                                    color: Theme.text
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 14
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                        }
+                    }
+                }
+                Item { width: 1; height: todayPage.ftpTest !== null ? 14 : 0 }
                 Rectangle {
                     objectName: "ftpAsk"
                     visible: todayPage.askFtp
@@ -1075,6 +1211,23 @@ Item {
                                 }
                             }
                             PulseButton {
+                                width: rampText.implicitWidth + 32
+                                height: 48
+                                pressedRadius: 14
+                                fill: pressed ? Theme.chip : Theme.control
+                                Accessible.name: qsTr("Take a ramp test, about 20 minutes")
+                                onClicked: todayPage.workoutRequested(Ftp.rampPlan(Theme.ftp))
+                                contentItem: Text {
+                                    id: rampText
+                                    text: qsTr("Ramp test")
+                                    color: Theme.text
+                                    font.family: Theme.bodySemibold
+                                    font.pixelSize: 14
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                            }
+                            PulseButton {
                                 width: ownText.implicitWidth + 32
                                 height: 48
                                 pressedRadius: 14
@@ -1102,6 +1255,7 @@ Item {
                     SuggestionCard {
                         width: parent.width
                         plan: todayPage.plan
+                        kicker: todayPage.kicker
                         showLoad: Theme.ftpSet
                         swapLabel: todayPage.swapped ? qsTr("Back to %1").arg(todayPage.suggestion.main.name) : todayPage.suggestion.otherLabel
                         firstRide: todayPage.rideCount === 0

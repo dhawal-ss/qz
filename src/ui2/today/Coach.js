@@ -180,9 +180,50 @@ function easySpin() {
     return plan("easy", qsTr("Easy spin"), qsTr("Light pedaling, all endurance"), [[5, 1], [20, 2], [5, 1]])
 }
 
+// The workouts of each kind by training level (train/Levels.js, 1 to 10): more or longer blocks
+// as the level rises. level undefined counts as 1.
+function threshold(level) {
+    var l = level || 1
+    if (l < 2.5)
+        return plan("threshold", qsTr("Threshold 3x8"), qsTr("3 blocks at threshold"), [[12, 2]].concat(repeats(3, 8, 4, 4)).concat([[10, 2]]))
+    if (l < 4)
+        return plan("threshold", qsTr("Threshold 3x10"), qsTr("3 blocks at threshold"), [[12, 2]].concat(repeats(3, 10, 4, 5)).concat([[10, 2]]))
+    if (l < 6)
+        return plan("threshold", qsTr("Threshold 2x15"), qsTr("2 long blocks at threshold"), [[12, 2]].concat(repeats(2, 15, 4, 5)).concat([[10, 2]]))
+    return plan("threshold", qsTr("Threshold 2x20"), qsTr("2 long blocks at threshold"), [[12, 2]].concat(repeats(2, 20, 4, 5)).concat([[10, 2]]))
+}
+
+function vo2(level) {
+    var l = level || 1
+    if (l < 2.5)
+        return plan("vo2", qsTr("VO2 builder 4x3"), qsTr("4 short blocks at VO2 max"), [[12, 2]].concat(repeats(4, 3, 5, 3)).concat([[10, 2]]))
+    if (l < 4)
+        return plan("vo2", qsTr("VO2 builder 4x4"), qsTr("4 blocks at VO2 max"), [[12, 2]].concat(repeats(4, 4, 5, 4)).concat([[10, 2]]))
+    if (l < 6)
+        return plan("vo2", qsTr("VO2 builder 5x4"), qsTr("5 blocks at VO2 max"), [[12, 2]].concat(repeats(5, 4, 5, 4)).concat([[10, 2]]))
+    return plan("vo2", qsTr("VO2 builder 5x5"), qsTr("5 long blocks at VO2 max"), [[12, 2]].concat(repeats(5, 5, 5, 5)).concat([[10, 2]]))
+}
+
+function tempo(level) {
+    var l = level || 1
+    if (l < 2.5)
+        return plan("tempo", qsTr("Tempo 2x12"), qsTr("2 blocks at tempo"), [[10, 2]].concat(repeats(2, 12, 3, 4)).concat([[10, 2]]))
+    if (l < 4)
+        return plan("tempo", qsTr("Tempo 2x15"), qsTr("2 blocks at tempo"), [[10, 2]].concat(repeats(2, 15, 3, 5)).concat([[10, 2]]))
+    if (l < 6)
+        return plan("tempo", qsTr("Tempo 2x20"), qsTr("2 long blocks at tempo"), [[10, 2]].concat(repeats(2, 20, 3, 5)).concat([[10, 2]]))
+    return plan("tempo", qsTr("Tempo 3x15"), qsTr("3 blocks at tempo"), [[10, 2]].concat(repeats(3, 15, 3, 5)).concat([[10, 2]]))
+}
+
+function endurance(level, minutes) {
+    var m = minutes || ((level || 1) < 2.5 ? 45 : ((level || 1) < 4 ? 50 : ((level || 1) < 6 ? 60 : 75)))
+    return plan("endurance", qsTr("Endurance %1").arg(m), qsTr("Steady endurance, easy to hold"), [[5, 1], [Math.max(5, m - 10), 2], [5, 1]])
+}
+
 // A free ride to suggest from the readiness, and the one to swap it for. reach is
 // Insights.reach() (a record the latest ride came close to) or null; effortName names its length.
-function suggest(r, reach, effortName) {
+function suggest(r, reach, effortName, levels) {
+    var lv = levels || {}
     var main
     // with no FTP of their own, no hard ride is set from a guess
     if (r.state === "new" || r.state === "start" || r.state === "noFtp")
@@ -194,13 +235,13 @@ function suggest(r, reach, effortName) {
                     qsTr("%1 at %2 W beats it").arg(effortName).arg(reach.target),
                     [[12, 2], [3, 3], [4, 1], [Math.max(1, reach.seconds / 60), Moments.recordTone(reach.seconds)], [8, 1], [10, 2]])
     else if (r.state === "veryFresh")
-        main = plan("vo2", qsTr("VO2 builder 4x4"), qsTr("4 blocks at VO2 max"), [[12, 2]].concat(repeats(4, 4, 5, 4)).concat([[10, 2]]))
+        main = vo2(lv.vo2)
     else if (r.state === "fresh")
-        main = plan("threshold", qsTr("Threshold 3x8"), qsTr("3 blocks at threshold"), [[12, 2]].concat(repeats(3, 8, 4, 4)).concat([[10, 2]]))
+        main = threshold(lv.threshold)
     else if (r.state === "steady")
-        main = plan("tempo", qsTr("Tempo 2x15"), qsTr("2 blocks at tempo"), [[10, 2]].concat(repeats(2, 15, 3, 5)).concat([[10, 2]]))
+        main = tempo(lv.tempo)
     else
-        main = plan("endurance", qsTr("Endurance 45"), qsTr("Steady endurance, easy to hold"), [[5, 1], [35, 2], [5, 1]])
+        main = endurance(lv.endurance)
     var other
     if (main.zone <= 2)
         other = plan("longer", qsTr("Endurance 60"), qsTr("A longer steady ride"), [[5, 1], [50, 2], [5, 1]])

@@ -6,6 +6,7 @@ import "ride"
 import "Metrics.js" as Metrics
 import "train"
 import "train/Workout.js" as Workout
+import "train/Ftp.js" as Ftp
 
 // The live ride. One big number, four quiet rows, the level dock and the ride ribbon.
 // The screen takes one color, from the current zone. Every number can be swapped, restyled
@@ -404,7 +405,8 @@ Item {
     property int cuedIndex: -1
     property int cuedSecond: -1
     onWorkoutTChanged: {
-        if (!inWorkout || stopped || source.paused)
+        // a test that is over has no more steps to count down
+        if (!inWorkout || stopped || source.paused || testOver)
             return
         var p = workoutPos
         if (p.index !== cuedIndex) {
@@ -426,6 +428,84 @@ Item {
     }
     onWorkoutStepsChanged: { cuedIndex = -1; cuedSecond = -1 }
 
+    // An FTP test (train/Ftp.js) measures while its test steps run: every second of the ramp for the
+    // best minute, the 20 minutes for their average. A ramp is over once the last 20 s are well
+    // under the step (after its first 2 minutes). The result waits on Today (ui2/ftpTestResult) for
+    // the rider to use it or not; a demo only says it.
+    readonly property bool testing: Ftp.isTest(workoutPlan)
+    property var testSeconds: []
+    property real testBest: 0
+    property real testSum: 0
+    property int testCount: 0
+    property bool testOver: false
+    property bool testSaved: false
+    property int testWatts: 0
+    onWorkoutPlanChanged: {
+        testSeconds = []
+        testBest = 0
+        testSum = 0
+        testCount = 0
+        testOver = false
+        testSaved = false
+        testWatts = 0
+    }
+    function measureTest() {
+        if (!testing || testOver || source.paused || stopped)
+            return
+        var p = workoutPos
+        if (p.index < workoutPlan.testFrom)
+            return
+        if (p.index > workoutPlan.testTo) {
+            endTest()
+            return
+        }
+        var w = source.power
+        var list = testSeconds.slice()
+        list.push(w)
+        if (list.length > 60)
+            list.shift()
+        testSeconds = list
+        testSum += w
+        testCount++
+        if (list.length >= 60) {
+            var sum = 0
+            for (var i = 0; i < list.length; i++)
+                sum += list[i]
+            testBest = Math.max(testBest, sum / list.length)
+        }
+        if (workoutPlan.kind === "ramp" && p.index >= workoutPlan.testFrom + 2 && list.length >= 20) {
+            var recent = 0
+            for (var j = list.length - 20; j < list.length; j++)
+                recent += list[j]
+            var s = workoutSteps[p.index]
+            if (recent / 20 < (s.low + 5) * 0.85)
+                endTest()
+        }
+    }
+    // the test is over: its FTP, said, and kept for Today unless it is a demo
+    function endTest() {
+        if (testOver)
+            return
+        testOver = true
+        var average = testCount > 0 ? testSum / testCount : 0
+        // a 20 minute test cut short says nothing
+        if (workoutPlan.kind === "twenty" && testCount < 18 * 60)
+            average = 0
+        testWatts = Ftp.result(workoutPlan.kind, testBest, average)
+        if (testWatts <= 0) {
+            toast(qsTr("Too short for an FTP. Spin easy, then hold End."), 5000)
+            return
+        }
+        cue(2, qsTr("Test over. FTP %1 watts").arg(testWatts))
+        toast(qsTr("Test over: FTP %1 W. Spin easy, then hold End.").arg(testWatts), 6000)
+        if (testSaved || typeof source.core === "undefined" || source.core === null)
+            return
+        testSaved = true
+        saved.setValue("ftpTestResult", JSON.stringify({ watts: testWatts, kind: workoutPlan.kind,
+                                                         measured: Math.round(workoutPlan.kind === "ramp" ? testBest : average),
+                                                         estimated: source.powerEstimated === true, ms: Date.now() }))
+    }
+
     // watts over the last seconds and the level for the middle of the band (an Echelon's own table),
     // for what the workout panel says to do
     property real wattsHeld: 0
@@ -435,6 +515,7 @@ Item {
         repeat: true
         running: screen.inWorkout && !screen.stopped
         onTriggered: {
+            screen.measureTest()
             screen.wattsHeld = screen.wattsHeld * 0.6 + screen.source.power * 0.4
             var p = screen.workoutPos
             var s = p.index >= 0 && p.index < screen.workoutSteps.length ? screen.workoutSteps[p.index] : null
@@ -472,6 +553,9 @@ Item {
         confirmingEnd = false
         if (lockedOut() || stopped)
             return
+        // a test ended by the rider: what it measured counts
+        if (testing && !testOver && workoutPos.index >= workoutPlan.testFrom)
+            endTest()
         finishRequested()
     }
 
@@ -1037,6 +1121,8 @@ Item {
             level: screen.source.level
             levelTarget: screen.levelTarget
             estimated: screen.source.powerEstimated === true
+            overText: screen.testOver ? (screen.testWatts > 0 ? qsTr("Test over: FTP %1 W. Spin easy, then hold End.").arg(screen.testWatts)
+                                                              : qsTr("Too short for an FTP. Spin easy, then hold End.")) : ""
         }
 
         // the dock: harder, the level, easier and pause for a bike the app can set; the ride

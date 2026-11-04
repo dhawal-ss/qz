@@ -275,6 +275,7 @@ Item {
             height: parent.height
             bottomClearance: shell.navClearance + shell.insetBottom
             onRideRequested: shell.rideRequested()
+            onWorkoutRequested: shell.workoutRequested(workout)
             visible: shell.pageShown("goals")
             opacity: shell.pageOpacity("goals")
             scale: shell.pageScale("goals")

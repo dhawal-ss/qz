@@ -21,6 +21,9 @@ Rectangle {
     property int levelTarget: -1
     // the watts are worked out from the level (est.)
     property bool estimated: false
+    // said in place of the step once an FTP test is over ("" while it runs)
+    property string overText: ""
+    readonly property bool finished: pos.done || overText !== ""
 
     readonly property var pos: Workout.at(steps, t)
     readonly property var step: pos.index >= 0 && pos.index < steps.length ? steps[pos.index] : null
@@ -47,7 +50,7 @@ Rectangle {
     radius: 22
     color: Theme.control
     Accessible.role: Accessible.StaticText
-    Accessible.name: pos.done ? doneText.text
+    Accessible.name: finished ? doneText.text
                               : (stepLine.text + ", " + qsTr("%1 left").arg(clock.text) + ", " + targetText.text
                                  + (advice !== "" ? ", " + advice : ""))
 
@@ -60,7 +63,7 @@ Rectangle {
 
         // 2 of 7, Threshold, and the time left in the step
         Item {
-            visible: !panel.pos.done
+            visible: !panel.finished
             width: parent.width
             height: clock.height
             Text {
@@ -86,7 +89,7 @@ Rectangle {
 
         // what to aim for, and what to do about it
         Item {
-            visible: !panel.pos.done
+            visible: !panel.finished
             width: parent.width
             height: Math.max(targetText.height, adviceText.height)
             Text {
@@ -113,7 +116,7 @@ Rectangle {
 
         Text {
             id: nextText
-            visible: !panel.pos.done
+            visible: !panel.finished
             width: parent.width
             text: panel.next ? qsTr("Next: %1 · %2").arg(Metrics.clock(panel.next.seconds)).arg(Workout.target(panel.next))
                              : qsTr("Last block")
@@ -125,9 +128,9 @@ Rectangle {
 
         Text {
             id: doneText
-            visible: panel.pos.done
+            visible: panel.finished
             width: parent.width
-            text: qsTr("Workout done. Keep riding, or hold End to finish.")
+            text: panel.overText !== "" ? panel.overText : qsTr("Workout done. Keep riding, or hold End to finish.")
             color: Theme.text
             font.family: Theme.bodySemibold
             font.pixelSize: 15
@@ -136,7 +139,7 @@ Rectangle {
 
         // no FTP of the rider's own: by feel, and where to get watt targets
         Text {
-            visible: !panel.pos.done && panel.steps.length > 0 && panel.steps[0].high <= 0
+            visible: !panel.finished && panel.steps.length > 0 && panel.steps[0].high <= 0
             width: parent.width
             text: qsTr("Riding by feel. Set your FTP in You for watt targets.")
             color: Theme.text3

@@ -10,6 +10,8 @@ Rectangle {
     id: suggestion
 
     property var plan: null              // Coach.plan()
+    // where a training plan is ("Week 3 of 8 · ride 2 of 3"), in place of "Idea for today"
+    property string kicker: ""
     property string swapLabel: ""
     property bool firstRide: false
     // the training load of the idea, which needs the rider's own FTP (Theme.ftpSet)
@@ -42,8 +44,7 @@ Rectangle {
                 width: parent.width - length.width - 12
                 spacing: 6
                 CapLabel {
-                    // an idea, not a workout: Start ride does not load its blocks yet
-                    text: suggestion.firstRide ? qsTr("Your first ride") : qsTr("Idea for today")
+                    text: suggestion.kicker !== "" ? suggestion.kicker : (suggestion.firstRide ? qsTr("Your first ride") : qsTr("Idea for today"))
                 }
                 Text {
                     id: planName
