@@ -202,6 +202,35 @@ void WorkoutModel::refreshTrainingLoad() {
     }
     m_trainingLoad = load;
     emit trainingLoadChanged();
+    refreshPowerRecords();
+}
+
+void WorkoutModel::refreshPowerRecords() {
+    QVariantMap result;
+    QVariantList records;
+    bool any = false;
+    for (int seconds : FitDatabaseProcessor::PEAK_SECONDS) {
+        QVariantMap record;
+        record[QStringLiteral("seconds")] = seconds;
+        record[QStringLiteral("watts")] = 0;
+        record[QStringLiteral("date")] = QString();
+        QSqlQuery query(m_db);
+        // fails until the processor has added the columns, on the first launch after the update
+        if (m_db.isOpen() &&
+            query.exec(QStringLiteral("SELECT %1, start_time FROM workouts WHERE %1 > 0 ORDER BY %1 DESC LIMIT 1")
+                           .arg(FitDatabaseProcessor::peakColumn(seconds))) &&
+            query.next()) {
+            record[QStringLiteral("watts")] = qRound(query.value(0).toDouble());
+            record[QStringLiteral("date")] =
+                QLocale().toString(query.value(1).toDateTime().toLocalTime().date(), QLocale::ShortFormat);
+            any = true;
+        }
+        records.append(record);
+    }
+    result[QStringLiteral("available")] = any;
+    result[QStringLiteral("records")] = records;
+    m_powerRecords = result;
+    emit powerRecordsChanged();
 }
 
 bool WorkoutModel::isLoading() const {

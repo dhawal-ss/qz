@@ -75,6 +75,11 @@ Dashboard v1
   time-in-zone tiles carry a zone band, a "Z" pill and the zone colour on their value; the hero
   cells are tinted by zone; screen readers say "zone 4".
 
+Records
+- Power records on the history page: the best 5 s, 1 min, 5 min and 20 min of every bike ride and
+  the day of each, saved with each ride and filled once for older ones (without touching their
+  TSS). A ride that beats one says so when it is saved ("New power record: 5 min 312 W").
+
 Never lose a ride
 - A ride QZ did not save (closed or crashed before Stop) is offered at the next launch from its
   FIT backup: Recover puts it in the workout history, Discard deletes the backup, Not now asks
@@ -103,7 +108,8 @@ Your numbers
    segment laps, Peloton timing).
 7. **Interval coaching**: current interval, countdown, target in range, next interval.
 8. **Post-ride summary** built from the workout summary, scrubbable charts, one chart page.
-9. **Progress and records**: power curve and PRs, weekly totals and goals.
+9. **Progress and records, part 2**: the full power curve, records per period, weekly totals and
+   goals.
 10. **Share and celebrate**: a share card with the ride's numbers and PRs.
 11. **Insights**: aerobic efficiency and decoupling, qualified VO2max, filtered HRV.
 12. **Settings that get out of the way**: devices page, equipment filtering, grouped navigation,

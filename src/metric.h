@@ -107,6 +107,10 @@ class metric {
     // and of several records in the same second the last one is kept. Power of 3000 W or more (FIT
     // "no value", a broken sample) counts as 0. Then NP and TSS as above.
     static double rideTrainingStress(const QList<SessionLine> &records, double ftp);
+    // The power of a recorded ride, one value per second, by the rules of rideTrainingStress
+    static QVector<double> ridePowerPerSecond(const QList<SessionLine> &records);
+    // The best average of `seconds` consecutive values of 1 Hz power; -1 when there are fewer
+    static double bestAveragePower(const QVector<double> &watts, int seconds);
     // TSS per local day of the rides, sorted by start. A ride that starts before the end of the
     // previous counted ride is the same ride recorded twice (QZ and a watch): the higher TSS is kept.
     static QMap<QDate, double> dailyTrainingStress(const QList<TrainingLoadRide> &ridesByStart);

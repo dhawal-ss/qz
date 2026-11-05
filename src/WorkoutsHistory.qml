@@ -377,9 +377,12 @@ Page {
                                               (load.available === true || load.updating === true)
                 readonly property bool updating: load.updating === true
                 readonly property bool wide: width >= 600
+                // the power records card under it, also when there is no training load yet
+                readonly property var records: workoutModel ? workoutModel.powerRecords : ({})
+                readonly property bool recordsShown: !!workoutModel && !workoutModel.isDateFiltered && records.available === true
                 width: workoutListView.width
-                height: shown ? trainingLoadCard.height + 8 : 0
-                visible: shown
+                height: (shown ? trainingLoadCard.height + 8 : 0) + (recordsShown ? powerRecordsCard.height + 8 : 0)
+                visible: shown || recordsShown
                 // A taller header is laid out upwards from the first workout and the view keeps its
                 // place, which left the card above the top (after a date filter is cleared, or when
                 // the fill ends): keep the view at the beginning when it was there
@@ -392,6 +395,7 @@ Page {
 
                 Rectangle {
                     id: trainingLoadCard
+                    visible: trainingLoadHeader.shown
                     y: 8
                     x: window.contentSideMargin
                     width: parent.width - 2 * window.contentSideMargin
@@ -685,6 +689,87 @@ Page {
                             font.pixelSize: window.fontPx(11)
                             color: "#9e9e9e"
                             Accessible.ignored: true
+                        }
+                    }
+                }
+
+                // The best power of the history over 5 s, 1, 5 and 20 min, and the day of each
+                Rectangle {
+                    id: powerRecordsCard
+                    readonly property var items: trainingLoadHeader.records.records ? trainingLoadHeader.records.records : []
+                    function durationText(seconds) {
+                        return seconds < 60 ? qsTr("%1 s").arg(seconds) : qsTr("%1 min").arg(seconds / 60)
+                    }
+                    visible: trainingLoadHeader.recordsShown
+                    y: trainingLoadHeader.shown ? trainingLoadCard.y + trainingLoadCard.height + 8 : 8
+                    x: window.contentSideMargin
+                    width: parent.width - 2 * window.contentSideMargin
+                    height: recordsColumn.height + 24
+                    radius: 10
+                    color: "white"
+                    border.color: "#e0e0e0"
+
+                    Accessible.role: Accessible.StaticText
+                    Accessible.name: {
+                        var parts = []
+                        for (var i = 0; i < items.length; i++) {
+                            if (items[i].watts > 0)
+                                parts.push(durationText(items[i].seconds) + " " + qsTr("%1 watts").arg(items[i].watts))
+                        }
+                        return qsTr("Power records") + ": " + parts.join(", ")
+                    }
+
+                    Column {
+                        id: recordsColumn
+                        x: 12
+                        y: 12
+                        width: parent.width - 24
+                        spacing: 8
+
+                        Text {
+                            width: parent.width
+                            text: qsTr("POWER RECORDS")
+                            elide: Text.ElideRight
+                            font.pixelSize: window.fontPx(12)
+                            font.bold: true
+                            font.letterSpacing: 1
+                            color: "#666666"
+                            Accessible.ignored: true
+                        }
+                        Row {
+                            width: parent.width
+                            Repeater {
+                                model: powerRecordsCard.items
+                                Column {
+                                    width: recordsColumn.width / Math.max(1, powerRecordsCard.items.length)
+                                    spacing: 2
+                                    Text {
+                                        width: parent.width
+                                        text: powerRecordsCard.durationText(modelData.seconds)
+                                        elide: Text.ElideRight
+                                        font.pixelSize: window.fontPx(12)
+                                        color: "#666666"
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.watts > 0 ? qsTr("%1 W").arg(modelData.watts) : "--"
+                                        elide: Text.ElideRight
+                                        font.pixelSize: window.fontPx(20)
+                                        font.bold: true
+                                        color: "#212121"
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.date
+                                        elide: Text.ElideRight
+                                        font.pixelSize: window.fontPx(11)
+                                        color: "#9e9e9e"
+                                        Accessible.ignored: true
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -10271,10 +10271,33 @@ void homeform::fit_save_clicked() {
                                                              << path + QStringLiteral("1") + backupFitFileName));
         }
 
+        // a power record of this ride against the history before it, said once the ride is saved (not
+        // for the first ride with power: everything would be a record)
+        QString recordText;
+        if (dev->deviceType() == BIKE && workoutModel) {
+            QStringList beaten;
+            const QVariantList before = workoutModel->powerRecords().value(QStringLiteral("records")).toList();
+            for (const QVariant &v : before) {
+                const QVariantMap record = v.toMap();
+                const int seconds = record.value(QStringLiteral("seconds")).toInt();
+                const int best = record.value(QStringLiteral("watts")).toInt();
+                const double now = metric::powerPeak(&Session, seconds);
+                if (best > 0 && qRound(now) > best)
+                    beaten.append((seconds < 60 ? tr("%1 s").arg(seconds) : tr("%1 min").arg(seconds / 60)) +
+                                  QStringLiteral(" ") + tr("%1 W").arg(qRound(now)));
+            }
+            if (!beaten.isEmpty())
+                recordText = tr("New power record: %1").arg(beaten.join(QStringLiteral(", ")));
+        }
+
         // Process the newly saved file immediately and refresh workout model
         if (fitProcessor && workoutModel) {
             fitProcessor->processFile(filename);
             workoutModel->refresh();
+        }
+        if (!recordText.isEmpty()) {
+            qDebug() << recordText;
+            setToastRequested(recordText);
         }
 
 #ifdef Q_OS_ANDROID

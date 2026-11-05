@@ -517,3 +517,26 @@ TEST(MetricFtpSuggestionTest, NoSuggestionWithoutTwentyMinutesOrFromAMisread) {
     EXPECT_EQ(metric::ftpSuggestion(0.0, 200.0), 0);
     EXPECT_EQ(metric::ftpSuggestion(800.0, 200.0), 0); // 760 W: above 700 W
 }
+
+TEST(MetricBestAveragePowerTest, BestWindowOfOneHertzPower) {
+    QVector<double> watts(10, 100.0);
+    watts += QVector<double>(5, 300.0);
+    watts += QVector<double>(10, 100.0);
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 5), 300.0);
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 10), 200.0); // 5 at 300 and 5 at 100
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 1), 300.0);
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 25), 140.0); // the whole ride
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 26), -1.0);  // longer than the ride
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(QVector<double>(), 5), -1.0);
+}
+
+TEST(MetricBestAveragePowerTest, RecordsTwoSecondsApartHoldTheirPower) {
+    // the same 1 Hz series as the TSS: a record 2 s before the next counts twice, 3000 W or more is 0
+    QList<SessionLine> records = recordsEvery(2, 10, 200);
+    records[3].watt = 65533; // a negative sample read unsigned
+    const QVector<double> watts = metric::ridePowerPerSecond(records);
+    EXPECT_EQ(watts.count(), 19); // 9 gaps of 2 s and the last record
+    EXPECT_DOUBLE_EQ(watts.at(6), 0.0);
+    EXPECT_DOUBLE_EQ(watts.at(7), 0.0);
+    EXPECT_DOUBLE_EQ(metric::bestAveragePower(watts, 5), 200.0);
+}

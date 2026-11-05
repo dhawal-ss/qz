@@ -545,3 +545,66 @@ TEST(QFitRecovery, ABackupOfASavedRideIsFoundInTheHistory) {
         EXPECT_FALSE(model.hasWorkoutStartingNear(QDateTime(), 120));
     }
 }
+
+// Power records: saved with a new ride, filled once for older ones without touching their TSS
+TEST(QFitPowerRecords, SavedWithTheRideAndFilledForOlderOnes) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+    const QString fitPath = tempDir.filePath("ride.fit");
+    QList<SessionLine> ride = steadyRide(200);
+    for (int i = 600; i < 900; i++)
+        ride[i].watt = 300; // 5 minutes at 300 W
+    qfit::save(fitPath, ride, BIKE, QFIT_PROCESS_NONE, FIT_SPORT_INVALID, QStringLiteral("Test ride"));
+
+    const QString dbPath = tempDir.filePath("history.sqlite");
+    FitDatabaseProcessor processor(dbPath);
+    processor.processFile(fitPath);
+
+    const QString connectionName = QStringLiteral("QFitPowerRecordsCheck");
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        check.setDatabaseName(dbPath);
+        ASSERT_TRUE(check.open());
+        QSqlQuery query(check);
+        ASSERT_TRUE(query.exec("SELECT peak_5s, peak_60s, peak_300s, peak_1200s FROM workouts"));
+        ASSERT_TRUE(query.next());
+        EXPECT_NEAR(query.value(0).toDouble(), 300.0, 0.5);
+        EXPECT_NEAR(query.value(1).toDouble(), 300.0, 0.5);
+        EXPECT_NEAR(query.value(2).toDouble(), 300.0, 0.5);
+        EXPECT_NEAR(query.value(3).toDouble(), (300.0 * 300 + 200.0 * 900) / 1200, 0.5); // 225
+        query.finish();
+
+        // as if the ride were saved before the records existed, with a TSS of its own, plus a run
+        ASSERT_TRUE(query.exec("UPDATE workouts SET peak_5s = NULL, peak_60s = NULL, peak_300s = NULL, "
+                               "peak_1200s = NULL, tss = 99"));
+        ASSERT_TRUE(query.exec("INSERT INTO workouts (file_hash, file_path, sport_type, start_time, tss) "
+                               "VALUES ('run', 'fit/run.fit', 1, '2026-03-02T08:00:00', 0)"));
+        query.finish();
+
+        EXPECT_EQ(processor.backfillTss(20), 1); // the ride; the run gets no records at once
+        EXPECT_EQ(processor.backfillTss(20), 0);
+
+        ASSERT_TRUE(query.exec("SELECT file_hash, tss, peak_300s FROM workouts ORDER BY id"));
+        QMap<QString, QPair<double, double>> rows;
+        while (query.next())
+            rows[query.value(0).toString()] = qMakePair(query.value(1).toDouble(), query.value(2).toDouble());
+        query.finish();
+        ASSERT_EQ(rows.count(), 2);
+        EXPECT_DOUBLE_EQ(rows.value(QStringLiteral("run")).second, -1.0);
+        rows.remove(QStringLiteral("run"));
+        EXPECT_DOUBLE_EQ(rows.first().first, 99.0); // the TSS it had stays
+        EXPECT_NEAR(rows.first().second, 300.0, 0.5);
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+
+    WorkoutModel model(dbPath);
+    model.refreshTrainingLoad();
+    const QVariantMap records = model.powerRecords();
+    EXPECT_TRUE(records.value(QStringLiteral("available")).toBool());
+    const QVariantList list = records.value(QStringLiteral("records")).toList();
+    ASSERT_EQ(list.count(), 4);
+    EXPECT_EQ(list.at(0).toMap().value(QStringLiteral("seconds")).toInt(), 5);
+    EXPECT_EQ(list.at(0).toMap().value(QStringLiteral("watts")).toInt(), 300);
+    EXPECT_EQ(list.at(3).toMap().value(QStringLiteral("watts")).toInt(), 225);
+}

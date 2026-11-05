@@ -47,6 +47,9 @@ load of their bike rides.
   unreadable file gets 0. What a stopped fill leaves is done at the next launch.
 - While rows are NULL the card says "Working out your fitness from your past rides..." instead of
   showing partial numbers.
+- The same fill works out the power records (columns `peak_5s`, `peak_60s`, `peak_300s`,
+  `peak_1200s`: NULL not worked out, -1 none) of rides saved before them, keeping the TSS a row
+  has; rows missing only records do not bring the message back.
 
 ## Model and UI
 

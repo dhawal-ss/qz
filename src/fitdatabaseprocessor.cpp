@@ -14,6 +14,19 @@
 #include <QSet>
 
 const QString FitDatabaseProcessor::DB_CONNECTION_NAME = "FitProcessor";
+const QVector<int> FitDatabaseProcessor::PEAK_SECONDS = {5, 60, 300, 1200};
+
+QString FitDatabaseProcessor::peakColumn(int seconds) {
+    return QStringLiteral("peak_%1s").arg(seconds);
+}
+
+QVector<double> FitDatabaseProcessor::workoutPeaks(const QList<SessionLine>& records, FIT_SPORT sport) {
+    QVector<double> peaks;
+    const QVector<double> watts = sport == FIT_SPORT_CYCLING ? metric::ridePowerPerSecond(records) : QVector<double>();
+    for (int seconds : PEAK_SECONDS)
+        peaks.append(sport == FIT_SPORT_CYCLING ? metric::bestAveragePower(watts, seconds) : -1.0);
+    return peaks;
+}
 
 FitDatabaseProcessor::FitDatabaseProcessor(const QString& dbPath, QObject* parent)
     : QObject(parent)
@@ -89,6 +102,8 @@ bool FitDatabaseProcessor::initializeDatabase() {
                         "peloton_url TEXT,"
                         "training_program_file TEXT,"
                         "tss REAL,"  // training load: NULL not worked out yet, 0 not counted
+                        // best power over 5 s, 1, 5 and 20 min: NULL not worked out yet, -1 none
+                        "peak_5s REAL, peak_60s REAL, peak_300s REAL, peak_1200s REAL,"
                         "processed_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                         ")")) {
             db.rollback();
@@ -110,6 +125,10 @@ bool FitDatabaseProcessor::initializeDatabase() {
         // training load of the workout: NULL not worked out yet, 0 not counted (not a bike ride with
         // power, or no FTP), else its TSS
         query.exec("ALTER TABLE workouts ADD COLUMN tss REAL");
+        // the power records of the workout: NULL not worked out yet, -1 none (not a bike ride, or
+        // shorter than the window)
+        for (int seconds : PEAK_SECONDS)
+            query.exec(QStringLiteral("ALTER TABLE workouts ADD COLUMN %1 REAL").arg(peakColumn(seconds)));
 
         if (!db.commit()) {
             emit error("Failed to commit database initialization: " + db.lastError().text());
@@ -414,6 +433,17 @@ bool FitDatabaseProcessor::processFitFile(const QString& filePath) {
             db.rollback();
             return false;
         }
+        {
+            // the power records of the ride, in the same transaction
+            const QVector<double> peaks = workoutPeaks(session, sport);
+            QSqlQuery peaksQuery(db);
+            peaksQuery.prepare(QStringLiteral("UPDATE workouts SET peak_5s = ?, peak_60s = ?, peak_300s = ?, peak_1200s = ? WHERE id = ?"));
+            for (double peak : peaks)
+                peaksQuery.addBindValue(peak);
+            peaksQuery.addBindValue(workoutId);
+            if (!peaksQuery.exec())
+                qDebug() << "power records not saved:" << peaksQuery.lastError().text();
+        }
 
         // a failed commit (the database busy) left the transaction open, and its lock kept every
         // other connection out for the rest of the session
@@ -447,6 +477,13 @@ void FitDatabaseProcessor::doWork() {
     }
     if (backfill)
         emit tssBackfillRunning(true);
+    // workouts saved before the power records existed: filled with the TSS, without the "working out"
+    // message (the training load of those rows is final)
+    {
+        QSqlQuery pending(db);
+        if (pending.exec("SELECT 1 FROM workouts WHERE peak_5s IS NULL LIMIT 1") && pending.next())
+            backfill = true;
+    }
 
     QDir dir(currentDirPath);
     QStringList fitFiles = dir.entryList(QStringList() << "*.fit" << "*.FIT", QDir::Files);
@@ -504,12 +541,14 @@ int FitDatabaseProcessor::backfillTss(int maxRows) {
             QSqlQuery query(tssDb);
             // only bike rides can be counted
             query.exec("UPDATE workouts SET tss = 0 WHERE tss IS NULL AND (sport_type IS NULL OR sport_type != 2)");
+            query.exec("UPDATE workouts SET peak_5s = -1, peak_60s = -1, peak_300s = -1, peak_1200s = -1 "
+                       "WHERE peak_5s IS NULL AND (sport_type IS NULL OR sport_type != 2)");
 
             // the rows are read first and the statement closed before any file is parsed: an open
             // SELECT holds a read lock, and the UI thread's writes (a ride just saved, a workout
             // deleted) would wait for the whole chunk
             QList<QPair<qint64, QString>> rows;
-            query.prepare("SELECT id, file_path FROM workouts WHERE tss IS NULL ORDER BY id LIMIT ?");
+            query.prepare("SELECT id, file_path FROM workouts WHERE tss IS NULL OR peak_5s IS NULL ORDER BY id LIMIT ?");
             query.addBindValue(maxRows);
             if (query.exec()) {
                 while (query.next())
@@ -518,6 +557,7 @@ int FitDatabaseProcessor::backfillTss(int maxRows) {
             query.finish();
 
             QList<QPair<qint64, double>> results;
+            QList<QVector<double>> peaksOfRows;
             if (!rows.isEmpty()) {
                 QSettings settings;
                 const double currentFtp = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
@@ -534,17 +574,23 @@ int FitDatabaseProcessor::backfillTss(int maxRows) {
                             records.clear();
                         }
                     }
-                    // a missing or unreadable file gets 0 too, so every chunk moves on
+                    // a missing or unreadable file gets 0 (and no records) too, so every chunk moves on
                     results.append(qMakePair(row.first, workoutTss(records, sport, rideFtp, currentFtp)));
+                    peaksOfRows.append(workoutPeaks(records, sport));
                 }
             }
 
             if (!results.isEmpty() && tssDb.transaction()) {
                 QSqlQuery update(tssDb);
-                update.prepare("UPDATE workouts SET tss = ? WHERE id = ?");
+                // a TSS already there stays: it was worked out with the FTP of its day
+                update.prepare("UPDATE workouts SET tss = COALESCE(tss, ?), peak_5s = ?, peak_60s = ?, peak_300s = ?, "
+                               "peak_1200s = ? WHERE id = ?");
                 bool ok = true;
-                for (const QPair<qint64, double> &result : qAsConst(results)) {
+                for (int r = 0; r < results.count(); r++) {
+                    const QPair<qint64, double> &result = results.at(r);
                     update.addBindValue(result.second);
+                    for (double peak : peaksOfRows.at(r))
+                        update.addBindValue(peak);
                     update.addBindValue(result.first);
                     if (!update.exec()) {
                         ok = false;

@@ -2,6 +2,7 @@
 #define FITDATABASEPROCESSOR_H
 
 #include <QObject>
+#include <QVector>
 #include <QThread>
 #include <QSqlDatabase>
 #include <QString>
@@ -26,6 +27,12 @@ class FitDatabaseProcessor : public QObject {
     // TSS of a workout for the training load: bike rides only, with the FTP the rider had (the one
     // in the file, if it is a real FTP), else currentFtp. 0 when it cannot be known.
     static double workoutTss(const QList<SessionLine>& records, FIT_SPORT sport, double fileFtp, double currentFtp);
+    // The windows of the power records, in seconds, and the column of each
+    static const QVector<int> PEAK_SECONDS;
+    static QString peakColumn(int seconds);
+    // The best power of a bike ride over each of PEAK_SECONDS; -1 for a window longer than the ride, and
+    // for every window of a workout that is not a bike ride
+    static QVector<double> workoutPeaks(const QList<SessionLine>& records, FIT_SPORT sport);
     // Works out the TSS of up to maxRows workouts saved before the training load existed (tss NULL),
     // from their files, on its own connection; returns how many rows it wrote
     int backfillTss(int maxRows);

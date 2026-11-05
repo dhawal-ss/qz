@@ -481,6 +481,26 @@ double metric::trainingStressScore(double seconds, double normalizedPower, doubl
 }
 
 double metric::rideTrainingStress(const QList<SessionLine> &records, double ftp) {
+    const QVector<double> watts = ridePowerPerSecond(records);
+    return trainingStressScore(watts.count(), normalizedPowerOf(watts), ftp);
+}
+
+double metric::bestAveragePower(const QVector<double> &watts, int seconds) {
+    if (seconds <= 0 || watts.count() < seconds)
+        return -1;
+    double total = 0.0; // the last `seconds` values
+    double best = 0.0;
+    for (int i = 0; i < watts.count(); i++) {
+        total += watts.at(i);
+        if (i >= seconds)
+            total -= watts.at(i - seconds);
+        if (i >= seconds - 1 && total / seconds > best)
+            best = total / seconds;
+    }
+    return best;
+}
+
+QVector<double> metric::ridePowerPerSecond(const QList<SessionLine> &records) {
     const int pauseSeconds = 30; // the pause cap qfit uses for TRIMP too
     QVector<double> watts;       // one value per second
     watts.reserve(records.count());
@@ -499,7 +519,7 @@ double metric::rideTrainingStress(const QList<SessionLine> &records, double ftp)
         for (int s = 0; s < seconds; s++)
             watts.append(watt);
     }
-    return trainingStressScore(watts.count(), normalizedPowerOf(watts), ftp);
+    return watts;
 }
 
 QMap<QDate, double> metric::dailyTrainingStress(const QList<TrainingLoadRide> &ridesByStart) {

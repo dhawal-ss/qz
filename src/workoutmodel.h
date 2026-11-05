@@ -25,6 +25,9 @@ class WorkoutModel : public QAbstractListModel {
     Q_PROPERTY(QDate filteredDate READ filteredDate NOTIFY dateFilterChanged)
     // Fitness, Fatigue and Form of the bike rides (see refreshTrainingLoad for the keys)
     Q_PROPERTY(QVariantMap trainingLoad READ trainingLoad NOTIFY trainingLoadChanged)
+    // The best power of the history over 5 s, 1, 5 and 20 min: "available", and "records", a list of
+    // {seconds, watts, date} (the date of the ride, short); refreshed with trainingLoad
+    Q_PROPERTY(QVariantMap powerRecords READ powerRecords NOTIFY powerRecordsChanged)
 
   public:
     enum WorkoutRoles {
@@ -117,6 +120,7 @@ class WorkoutModel : public QAbstractListModel {
     bool isDateFiltered() const;
     QDate filteredDate() const;
     QVariantMap trainingLoad() const;
+    QVariantMap powerRecords() const { return m_powerRecords; }
 
   public slots:
     void setDatabaseProcessing(bool processing);
@@ -130,6 +134,7 @@ class WorkoutModel : public QAbstractListModel {
     void streakChanged();
     void dateFilterChanged();
     void trainingLoadChanged();
+    void powerRecordsChanged();
 
   private slots:
     void onWorkoutsLoaded(const QList<QVariantMap>& workouts);
@@ -157,6 +162,8 @@ class WorkoutModel : public QAbstractListModel {
     bool m_isDateFiltered;
     QDate m_filteredDate;
     QVariantMap m_trainingLoad;
+    QVariantMap m_powerRecords;
+    void refreshPowerRecords();
     bool m_trainingLoadUpdating = false;
 };
 
