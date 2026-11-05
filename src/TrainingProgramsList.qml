@@ -4,6 +4,8 @@ import QtQuick.Layouts 1.3
 import QtQuick.Controls 2.15
 import QtQuick.Controls.Material 2.0
 import QtQuick.Dialogs 1.0
+// MessageDialog with Yes/No buttons is the Qt.labs.platform one; FileDialog below is the QtQuick.Dialogs one
+import Qt.labs.platform 1.1 as Platform
 import QtCharts 2.2
 import Qt.labs.settings 1.0
 
@@ -44,11 +46,11 @@ ColumnLayout {
         })
     }
 
-    MessageDialog {
+    Platform.MessageDialog {
         id: deleteDialog
         text: qsTr("Delete workout?")
         informativeText: qsTr("This cannot be undone.")
-        buttons: (MessageDialog.Yes | MessageDialog.No)
+        buttons: (Platform.MessageDialog.Yes | Platform.MessageDialog.No)
         onYesClicked: {
             if (rootItem.deleteTrainingProgramFile(selectedWorkoutUrl)) {
                 selectedWorkoutUrl = ""
