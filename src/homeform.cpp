@@ -11474,7 +11474,8 @@ void homeform::sendMail() {
         textMessage += tr("20 Minutes Power: %1W %2W/Kg")
                            .arg(QString::number(peak, 'f', 0), QString::number(peak / weightKg, 'f', 1)) +
                        QStringLiteral("\n");
-        peak = (peak * 0.95) * 0.95;
+        // Coggan's rule: FTP is 95% of the best 20 minutes (it was 0.95 * 0.95, about 90%)
+        peak = peak * 0.95;
         textMessage += tr("Estimated FTP: %1W").arg(QString::number(peak, 'f', 0)) + QStringLiteral(" ");
         if (peak > ftpSetting) {
             textMessage +=
