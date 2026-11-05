@@ -672,7 +672,11 @@ void trainprogram::scheduler() {
 
     QMutexLocker(&this->schedulerMutex);
     QSettings settings;
-    auto setErgMode = [&settings](bool enabled) { settings.setValue(QZSettings::zwift_erg, enabled); };
+    auto setErgMode = [&settings](bool enabled) {
+        // write only on change: this runs every second and each write makes QSettings re-save the whole settings file
+        if (settings.value(QZSettings::zwift_erg, QZSettings::default_zwift_erg).toBool() != enabled)
+            settings.setValue(QZSettings::zwift_erg, enabled);
+    };
     QDateTime now = QDateTime::currentDateTime();
     qint64 msecsElapsed = lastSchedulerCall.msecsTo(now);
 
@@ -1351,6 +1355,11 @@ void trainprogram::end() {
         restart();
     } else {
         started = false;
+        if (powerzoneWorkout()) {
+            // the workout drove ERG: do not leave the ERG flag on (it is persisted) once it ends.
+            // Nothing is sent to the trainer here, same as in applyCurrentStepSettings().
+            settings.setValue(QZSettings::zwift_erg, false);
+        }
         if (settings
                 .value(QZSettings::trainprogram_stop_at_end, QZSettings::default_trainprogram_stop_at_end)
                 .toBool())
@@ -1504,8 +1513,22 @@ void trainprogram::applyCurrentStepSettings() {
         return;
 
     QSettings settings;
-    auto setErgMode = [&settings](bool enabled) { settings.setValue(QZSettings::zwift_erg, enabled); };
+    auto setErgMode = [&settings](bool enabled) {
+        // write only on change, see scheduler()
+        if (settings.value(QZSettings::zwift_erg, QZSettings::default_zwift_erg).toBool() != enabled)
+            settings.setValue(QZSettings::zwift_erg, enabled);
+    };
     emit intervalTransitionApplied();
+
+    // Moving from a row with a power target to one with no power and no heart-rate target (ZWO FreeRide,
+    // Peloton gap): stop flagging ERG, so gear shifts work as gears instead of jogging the old target.
+    // Nothing is sent to the trainer here; one with built-in ERG keeps its last target until the next
+    // resistance or inclination request.
+    if (currentStep > 0 && rows.at(currentStep - 1).power != -1 && rows.at(currentStep).power == -1 &&
+        rows.at(currentStep).zoneHR == -1 && rows.at(currentStep).HRmin == -1 && rows.at(currentStep).HRmax == -1) {
+        qDebug() << QStringLiteral("trainprogram row without power target, releasing ERG");
+        setErgMode(false);
+    }
 
     if (bluetoothManager->device()->deviceType() == TREADMILL) {
         if (rows.at(currentStep).forcespeed && rows.at(currentStep).speed) {

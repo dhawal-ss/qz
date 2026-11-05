@@ -104,3 +104,46 @@ void ZwiftWorkoutTestSuite::test_xmlExtensionWorkoutFileUsesZwiftParser() {
     EXPECT_DOUBLE_EQ(program->rows.at(7).inclination, 6.0);
     delete program;
 }
+
+// What's on Zwift JSON (homeform::trainprogram_zwo_loaded) has no Incline field. Every row it produces must keep
+// the "no incline" value -200, otherwise the train program sends a random incline to the bike or treadmill.
+void ZwiftWorkoutTestSuite::test_jsonBikeWorkoutWithoutInclineKeepsNoInclineSentinel() {
+    static const char *kBikeJson = R"json({
+        "name": "QZ JSON bike",
+        "workout": [
+            {"type": "Warmup", "Duration": 60, "PowerLow": 0.4, "PowerHigh": 0.7},
+            {"type": "IntervalsT", "Repeat": 2, "OnDuration": 30, "OffDuration": 30, "OnPower": 1.1, "OffPower": 0.5},
+            {"type": "SteadyState", "Duration": 60, "Power": 0.8},
+            {"type": "FreeRide", "Duration": 60},
+            {"type": "Cooldown", "Duration": 60, "PowerLow": 0.7, "PowerHigh": 0.4}
+        ]
+    })json";
+
+    const QList<trainrow> rows = zwiftworkout::loadJSON(QString::fromUtf8(kBikeJson));
+
+    // 60 one-second warmup rows, 2 x (on + off), 1 steady state, 1 free ride, 60 one-second cooldown rows
+    ASSERT_EQ(rows.length(), 60 + 4 + 1 + 1 + 60);
+    for (int i = 0; i < rows.length(); i++) {
+        EXPECT_DOUBLE_EQ(rows.at(i).inclination, -200.0) << "row " << i;
+    }
+}
+
+void ZwiftWorkoutTestSuite::test_jsonRunWorkoutWithoutInclineKeepsNoInclineSentinel() {
+    static const char *kRunJson = R"json({
+        "name": "QZ JSON run",
+        "sportType": "run",
+        "durationType": "time",
+        "workout": [
+            {"type": "Warmup", "Duration": 120, "PowerLow": 0.6, "PowerHigh": 0.8},
+            {"type": "IntervalsT", "Repeat": 2, "OnDuration": 60, "OffDuration": 60, "OnPower": 1.0, "OffPower": 0.7},
+            {"type": "Cooldown", "Duration": 120, "PowerLow": 0.8, "PowerHigh": 0.6}
+        ]
+    })json";
+
+    const QList<trainrow> rows = zwiftworkout::loadJSON(QString::fromUtf8(kRunJson));
+
+    ASSERT_FALSE(rows.isEmpty());
+    for (int i = 0; i < rows.length(); i++) {
+        EXPECT_DOUBLE_EQ(rows.at(i).inclination, -200.0) << "row " << i;
+    }
+}

@@ -72,7 +72,7 @@ bool powerzonepack::searchWorkout(const QString &classid) {
 }
 
 void powerzonepack::search_workout_onfinish(const QString &message) {
-    disconnect(&websocket, &QWebSocket::binaryMessageReceived, this, &powerzonepack::search_workout_onfinish);
+    disconnect(&websocket, &QWebSocket::textMessageReceived, this, &powerzonepack::search_workout_onfinish);
     QByteArray payload = message.toLocal8Bit(); // JSON
 
     qDebug() << "search_workout_onfinish" << payload;
@@ -95,7 +95,7 @@ void powerzonepack::search_workout_onfinish(const QString &message) {
         double sec = power_graph.at(i).toObject()[QStringLiteral("seconds")].toDouble();
         QTime seconds(0, 0, 0, 0);
         seconds = seconds.addSecs((int)sec);
-        r.duration = QTime(0, 0, lastSeconds.msecsTo(seconds) / 1000, 0);
+        r.duration = QTime(0, 0, 0, 0).addSecs(lastSeconds.msecsTo(seconds) / 1000);
         r.power = power_graph.at(i - 1).toObject()[QStringLiteral("power_ratio")].toDouble() *
                   settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
 

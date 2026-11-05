@@ -11,6 +11,8 @@ public:
     void test_xmlWorkoutFileParsesDirectSpeed();
     void test_simpleWorkoutStepFormatParsesSpeedAndIncline();
     void test_xmlExtensionWorkoutFileUsesZwiftParser();
+    void test_jsonBikeWorkoutWithoutInclineKeepsNoInclineSentinel();
+    void test_jsonRunWorkoutWithoutInclineKeepsNoInclineSentinel();
 };
 
 TEST_F(ZwiftWorkoutTestSuite, XmlWorkoutFileParsesPercentIncline) {
@@ -31,6 +33,14 @@ TEST_F(ZwiftWorkoutTestSuite, SimpleWorkoutStepFormatParsesSpeedAndIncline) {
 
 TEST_F(ZwiftWorkoutTestSuite, XmlExtensionWorkoutFileUsesZwiftParser) {
     this->test_xmlExtensionWorkoutFileUsesZwiftParser();
+}
+
+TEST_F(ZwiftWorkoutTestSuite, JsonBikeWorkoutWithoutInclineKeepsNoInclineSentinel) {
+    this->test_jsonBikeWorkoutWithoutInclineKeepsNoInclineSentinel();
+}
+
+TEST_F(ZwiftWorkoutTestSuite, JsonRunWorkoutWithoutInclineKeepsNoInclineSentinel) {
+    this->test_jsonRunWorkoutWithoutInclineKeepsNoInclineSentinel();
 }
 
 #endif // ZWIFTWORKOUTTESTSUITE_H

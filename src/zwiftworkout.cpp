@@ -396,7 +396,7 @@ QList<trainrow> zwiftworkout::loadJSON(const QString &input, QString *descriptio
                         Cadence = element[QStringLiteral("Cadence")].toInt();
                     }
                     convertTag(0.0, sportType, durationType, list, type.toUtf8().constData(), repeat, OnDuration,
-                               OffDuration, OnPower, OffPower, Pace, Cadence);
+                               OffDuration, OnPower, OffPower, Pace, Cadence, -100.0); // no Incline in What's on Zwift JSON
                 } else if (type == QStringLiteral("FreeRide")) {
                     uint32_t Duration = 1;
                     // double FlatRoad = 1;
@@ -420,7 +420,7 @@ QList<trainrow> zwiftworkout::loadJSON(const QString &input, QString *descriptio
                         Cadence = element[QStringLiteral("Cadence")].toInt();
                     }
                     convertTag(0.0, sportType, durationType, list, type.toUtf8().constData(), Duration, PowerLow,
-                               PowerHigh, Pace, Cadence);
+                               PowerHigh, Pace, Cadence, -100.0); // no Incline in What's on Zwift JSON
                 } else if (type == QStringLiteral("SteadyState")) {
                     uint32_t Duration = 1;
                     double Power = 1;
