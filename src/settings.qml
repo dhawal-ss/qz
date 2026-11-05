@@ -1676,7 +1676,7 @@ import AndroidStatusBar 1.0
             property bool iconcept_elliptical: false
 
             // from version 2.13.37
-            property bool theme_tile_icon_enabled: true
+            property bool theme_tile_icon_enabled: false
             property string theme_tile_background_color: "#303030"
             property string theme_status_bar_background_color: "#800080"
 

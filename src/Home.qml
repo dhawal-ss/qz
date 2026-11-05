@@ -38,7 +38,7 @@ HomeForm {
         id: settings
         Component.onCompleted: window.retakeSettingsSnapshot(settings)
         property real ui_zoom: 100.0
-        property bool theme_tile_icon_enabled: true
+        property bool theme_tile_icon_enabled: false
         property string theme_tile_background_color: "#303030"
         property string theme_background_color: "#303030"
         property bool theme_tile_shadow_enabled: true
@@ -317,7 +317,10 @@ HomeForm {
         // The grid is exactly as wide as its columns and centred by the anchor above, not
         // by leftMargin: Qt 5.15 does not recount the columns when leftMargin changes, so
         // after a resize a row could come out one column short
-        readonly property real tileBaseWidth: 175 * settings.ui_zoom / 100
+        // Size classes: bigger tiles on bigger screens, so a tablet or a TV does not show many
+        // columns of phone-sized numbers
+        readonly property int sizeClass: parent.width < 600 ? 0 : (parent.width < 1024 ? 1 : (parent.width < 1600 ? 2 : 3))
+        readonly property real tileBaseWidth: [175, 190, 220, 260][sizeClass] * settings.ui_zoom / 100
         readonly property int tileColumns: Math.max(1, Math.floor(parent.width / tileBaseWidth))
         cellWidth: Math.floor(Math.min(parent.width / tileColumns, tileBaseWidth * 1.25))
         width: tileColumns * cellWidth
@@ -326,7 +329,7 @@ HomeForm {
         // are equal
         readonly property real tileGap: (parent.width >= 600 ? 12 : 8) * settings.ui_zoom / 100
         anchors.horizontalCenterOffset: tileGap / 2
-        cellHeight: 130 * settings.ui_zoom / 100
+        cellHeight: [130, 140, 156, 180][sizeClass] * settings.ui_zoom / 100
         focus: true
         model: appModel
         anchors.topMargin: (!window.lockTiles ? rootItem.topBarHeight + 30 : 0)
@@ -345,10 +348,28 @@ HomeForm {
         delegate: Item {
             id: id1
             width: gridView.cellWidth - gridView.tileGap
-            height: 125 * settings.ui_zoom / 100
+            height: gridView.cellHeight - gridView.tileGap
 
             visible: visibleItem
-            Component.onCompleted: console.log("completed " + objectName)
+
+            // Tile anatomy: a small caption on top, the value large and left-aligned with its
+            // unit after it, one secondary line. The name "Speed (km/h)" gives the caption
+            // "Speed" and the unit "km/h" (no new strings)
+            readonly property real s: settings.ui_zoom / 100
+            readonly property int unitStart: name.indexOf("(")
+            readonly property int unitEnd: name.lastIndexOf(")")
+            readonly property string caption: unitStart > 0 ? name.substring(0, unitStart).trim() : name
+            readonly property string unit: unitStart > 0 && unitEnd > unitStart ? name.substring(unitStart + 1, unitEnd) : ""
+            readonly property real pad: 12 * s
+            // +/- at least 44 px (a sweaty finger), in a column on the right, side by side when the
+            // tile is too short for two
+            readonly property real stepper: Math.max(44, 44 * s)
+            readonly property bool steppersSideBySide: height < 2 * stepper + 24
+            readonly property bool hasSteppers: writable && !largeButton
+            readonly property real contentWidth: width - 2 * pad - (hasSteppers ? (steppersSideBySide ? 2 * stepper + 12 * s : stepper + 8 * s) : 0)
+            // one value size per tile height, so "99" and "100" W look the same
+            readonly property real valueSize: Math.round(height * 0.44)
+            property bool autoIncl: false
 
             // VoiceOver accessibility support
             Accessible.role: largeButton ? Accessible.Button : (writable ? Accessible.Pane : Accessible.StaticText)
@@ -374,9 +395,8 @@ HomeForm {
 
             // a flat surface, a shade lighter than the page, with a hairline edge
             Rectangle {
-                width: id1.width - 2 * settings.ui_zoom / 100
-                height: 123 * settings.ui_zoom / 100
-                radius: window.theme.tileRadius * settings.ui_zoom / 100
+                anchors.fill: parent
+                radius: window.theme.tileRadius * id1.s
                 border.width: 1
                 border.color: legacyShadow ? settings.theme_tile_shadow_color : window.theme.stroke
                 color: tileColor
@@ -398,20 +418,23 @@ HomeForm {
                 source: rect
             }
 
+            // the inclination tile follows the app (auto inclination): a static AUTO chip instead of a
+            // blinking icon
             Timer {
                 id: toggleIconTimer
-                interval: 500; running: true; repeat: true
-                onTriggered: { if(identificator === "inclination" && rootItem.autoInclinationEnabled()) myIcon.visible = !myIcon.visible; else myIcon.visible = settings.theme_tile_icon_enabled && !largeButton; }
+                interval: 1000; repeat: true
+                running: identificator === "inclination"
+                onTriggered: id1.autoIncl = rootItem.autoInclinationEnabled()
             }
 
             Image {
                 id: myIcon
-                x: 5
-                anchors {
-                         bottom: id1.bottom
-                }
-                width: 48 * settings.ui_zoom / 100
-                height: 48 * settings.ui_zoom / 100
+                x: id1.pad
+                y: 10 * id1.s
+                width: 20 * id1.s
+                height: 20 * id1.s
+                sourceSize.width: 40
+                sourceSize.height: 40
                 source: icon
                 visible: settings.theme_tile_icon_enabled && !largeButton
 
@@ -419,85 +442,141 @@ HomeForm {
                 Accessible.ignored: true
             }
             Text {
+                id: myText
+                x: id1.pad + (myIcon.visible ? myIcon.width + 6 * id1.s : 0)
+                y: 10 * id1.s
+                height: Math.max(myIcon.height, implicitHeight)
+                width: id1.contentWidth - (myIcon.visible ? myIcon.width + 6 * id1.s : 0) - (autoChip.visible ? autoChip.width + 6 * id1.s : 0)
+                verticalAlignment: Text.AlignVCenter
+                text: id1.caption
+                font.pixelSize: Math.round(14 * id1.s)
+                font.weight: Font.Medium
+                font.capitalization: Font.AllUppercase
+                font.letterSpacing: 0.4
+                elide: Text.ElideRight
+                color: window.theme.textSecondary
+                visible: !largeButton
+
+                // Ignore for VoiceOver - parent Item handles accessibility
+                Accessible.ignored: true
+            }
+            Rectangle {
+                id: autoChip
+                visible: id1.autoIncl && !largeButton
+                x: myText.x + myText.width + 6 * id1.s
+                y: myText.y + (myText.height - height) / 2
+                height: 18 * id1.s
+                width: autoChipText.implicitWidth + 12 * id1.s
+                radius: height / 2
+                color: window.theme.infoTonal
+                Accessible.ignored: true
+                Text {
+                    id: autoChipText
+                    anchors.centerIn: parent
+                    text: qsTr("Auto")
+                    font.capitalization: Font.AllUppercase
+                    font.pixelSize: Math.round(11 * id1.s)
+                    font.bold: true
+                    color: window.theme.info
+                    Accessible.ignored: true
+                }
+            }
+            Text {
                 objectName: "value"
                 id: myValue
                 color: window.theme.valueColor(valueFontColor)
-                y: 0
-                anchors {
-                    horizontalCenter: parent.horizontalCenter
-                }
+                x: id1.pad
+                anchors.bottom: secondLineText.top
+                anchors.bottomMargin: 2 * id1.s
                 text: value
-                horizontalAlignment: Text.AlignHCenter
-                width: Math.max(50, parent.width - (writable ? 100 * settings.ui_zoom / 100 : 12 * settings.ui_zoom / 100))
-                height: 58 * settings.ui_zoom / 100
-                font.pointSize: valueFontSize * settings.ui_zoom / 100
-                fontSizeMode: Text.Fit
-                minimumPointSize: 10
+                horizontalAlignment: Text.AlignLeft
+                // room for the unit after it; a long value (a time) shrinks to fit
+                width: Math.max(20, id1.contentWidth - (unitText.text !== "" ? unitText.implicitWidth + unitText.gap : 0))
+                height: id1.valueSize * 1.15
+                verticalAlignment: Text.AlignBottom
+                font.pixelSize: id1.valueSize
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: Math.round(id1.valueSize / 2)
                 font.bold: true
                 visible: !largeButton
 
                 // Ignore for VoiceOver - parent Item handles accessibility
+                Accessible.ignored: true
+            }
+            Text {
+                id: unitText
+                readonly property real gap: id1.unit === "%" ? 0 : 4 * id1.s
+                x: myValue.x + myValue.contentWidth + gap
+                anchors.baseline: myValue.baseline
+                text: id1.unit
+                font.pixelSize: Math.round(0.36 * id1.valueSize)
+                font.weight: Font.Medium
+                color: window.theme.textSecondary
+                visible: !largeButton && text !== ""
                 Accessible.ignored: true
             }
             Text {
                 objectName: "secondLine"
                 id: secondLineText
                 color: window.theme.textSecondary
-                y: myValue.bottom
-                anchors {
-                    top: myValue.bottom
-                    horizontalCenter: parent.horizontalCenter
-                }
+                x: id1.pad
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 10 * id1.s
                 text: secondLine
-                horizontalAlignment: Text.AlignHCenter
-                width: Math.max(50, parent.width - 12 * settings.ui_zoom / 100)
-                height: 24 * settings.ui_zoom / 100
-                font.pointSize: settings.theme_tile_secondline_textsize * settings.ui_zoom / 100
-                fontSizeMode: Text.Fit
-                minimumPointSize: 7
+                horizontalAlignment: Text.AlignLeft
+                width: id1.contentWidth
+                font.pixelSize: Math.max(11, Math.round(settings.theme_tile_secondline_textsize * 1.25 * id1.s))
+                fontSizeMode: Text.HorizontalFit
+                minimumPixelSize: 11
+                elide: Text.ElideRight
                 font.bold: false
                 visible: !largeButton
 
                 // Ignore for VoiceOver - parent Item handles accessibility
                 Accessible.ignored: true
             }
-            Text {
-                id: myText
-                anchors {
-                    top: myIcon.top
-                    horizontalCenter: settings.theme_tile_icon_enabled ? undefined : parent.horizontalCenter
-                    left: settings.theme_tile_icon_enabled ? parent.left : undefined
+            RoundButton {
+                id: plusButton
+                autoRepeat: true
+                objectName: plusName
+                text: "+"
+                font.pixelSize: Math.round(0.5 * width)
+                onClicked: plus_clicked(objectName)
+                visible: id1.hasSteppers
+                width: id1.stepper
+                height: id1.stepper
+                x: id1.width - 8 * id1.s - width
+                y: id1.steppersSideBySide ? myValue.y + (myValue.height - height) / 2 : 8 * id1.s
+                // a raised disc: Material.background does not colour a RoundButton in Qt 5.15
+                background: Rectangle {
+                    radius: width / 2
+                    color: parent.pressed ? window.theme.surfacePressed : window.theme.surfaceRaised
                 }
-                font.bold: true
-                font.pointSize: labelFontSize
-                fontSizeMode: Text.Fit
-                minimumPointSize: 8
-                color: window.theme.textPrimary
-                text: name
-                horizontalAlignment: settings.theme_tile_icon_enabled ? Text.AlignLeft : Text.AlignHCenter
-                anchors.leftMargin: settings.theme_tile_icon_enabled ? 55 * settings.ui_zoom / 100 : 0
-                width: Math.max(40, parent.width - (settings.theme_tile_icon_enabled ? 61 : 12) * settings.ui_zoom / 100)
-                height: 40 * settings.ui_zoom / 100
-                anchors.topMargin: 20 * settings.ui_zoom / 100
-                visible: !largeButton
 
-                // Ignore for VoiceOver - parent Item handles accessibility
-                Accessible.ignored: true
+                // VoiceOver accessibility
+                Accessible.role: Accessible.Button
+                Accessible.name: qsTr("Increase ") + name
+                Accessible.description: qsTr("Increase the value of ") + name
+                Accessible.focusable: true
+                Accessible.onPressAction: { plus_clicked(objectName) }
             }
             RoundButton {
                 objectName: minusName
                 autoRepeat: true
                 // the minus sign, not a hyphen: as wide as the "+" and on the same line
                 text: "−"
-                // the sign is a share of the button, so it grows with Tile size
-                font.pixelSize: Math.round(height * 0.45)
+                font.pixelSize: Math.round(0.5 * width)
                 onClicked: minus_clicked(objectName)
-                visible: writable && !largeButton
-                anchors.top: myValue.top
-                anchors.left: parent.left
-                anchors.leftMargin: 2
-                width: 48 * settings.ui_zoom / 100
-                height: 48 * settings.ui_zoom / 100
+                visible: id1.hasSteppers
+                width: id1.stepper
+                height: id1.stepper
+                x: id1.steppersSideBySide ? plusButton.x - width - 4 * id1.s : plusButton.x
+                y: id1.steppersSideBySide ? plusButton.y : id1.height - 8 * id1.s - height
+                // a raised disc: Material.background does not colour a RoundButton in Qt 5.15
+                background: Rectangle {
+                    radius: width / 2
+                    color: parent.pressed ? window.theme.surfacePressed : window.theme.surfaceRaised
+                }
 
                 // VoiceOver accessibility
                 Accessible.role: Accessible.Button
@@ -508,26 +587,6 @@ HomeForm {
             }
             RoundButton {
                 autoRepeat: true
-                objectName: plusName
-                text: "+"
-                font.pixelSize: Math.round(height * 0.45)
-                onClicked: plus_clicked(objectName)
-                visible: writable && !largeButton
-                anchors.top: myValue.top
-                anchors.right: parent.right
-                anchors.rightMargin: 2
-                width: 48 * settings.ui_zoom / 100
-                height: 48 * settings.ui_zoom / 100
-
-                // VoiceOver accessibility
-                Accessible.role: Accessible.Button
-                Accessible.name: qsTr("Increase ") + name
-                Accessible.description: qsTr("Increase the value of ") + name
-                Accessible.focusable: true
-                Accessible.onPressAction: { plus_clicked(objectName) }
-            }
-            RoundButton {
-                autoRepeat: true
                 objectName: identificator
                 text: largeButtonLabel
                 onClicked: largeButton_clicked(objectName)
@@ -535,9 +594,10 @@ HomeForm {
                 anchors.fill: rect
                       background: Rectangle {
                           color: largeButtonColor
-                            radius: 20
+                            radius: window.theme.tileRadius * id1.s
                             }
-                font.pointSize: 20 * settings.ui_zoom / 100
+                font.pixelSize: Math.round(18 * id1.s)
+                font.bold: true
 
                 // VoiceOver accessibility
                 Accessible.role: Accessible.Button

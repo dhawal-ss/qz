@@ -26,7 +26,7 @@ Page {
 	     id: settings
 	     Component.onCompleted: window.retakeSettingsSnapshot(settings)
 		  property real ui_zoom: 100.0
-		  property bool theme_tile_icon_enabled: true
+		  property bool theme_tile_icon_enabled: false
 		  property string theme_background_color: "#303030"
 		}
 

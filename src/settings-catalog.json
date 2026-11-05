@@ -8122,8 +8122,8 @@
       "qmlType": "bool",
       "control": "switch",
       "visible": true,
-      "defaultValue": true,
-      "defaultExpression": "true",
+      "defaultValue": false,
+      "defaultExpression": "false",
       "options": null,
       "restartRequired": false
     },
