@@ -162,6 +162,11 @@ bluetooth::bluetooth(bool logs, const QString &deviceName, bool noWriteResistanc
 #if !defined(WIN32) && !defined(Q_OS_IOS)
     if (QBluetoothLocalDevice::allDevices().isEmpty()) {
         debug(QStringLiteral("no bluetooth dongle found!"));
+        // No scan will ever finish without an adapter, and finished() is what starts the fake, IP,
+        // USB and ANT devices: those stayed on "Connecting..." forever on a desktop without Bluetooth.
+        // Queued, so it runs once the event loop starts and homeform has connected to our signals.
+        if (reliesOnFakeOrVirtualDevice)
+            QTimer::singleShot(0, this, &bluetooth::finished);
     } else
 
 #endif
@@ -440,7 +445,8 @@ int bluetooth::searchNow() {
 
 void bluetooth::startDiscovery() {
 
-    if (!this->useDiscovery)
+    // no discovery agent without a Bluetooth adapter (finished() still ends here)
+    if (!this->useDiscovery || !discoveryAgent)
         return;
 
     // Android 7.0 and later ignore the scan starts after the 5th one in 30 s: searchNow() checks this list.
