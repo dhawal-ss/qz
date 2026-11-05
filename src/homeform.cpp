@@ -1186,6 +1186,8 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
                 setToastRequested(message);
             });
     fitProcessor->processDirectory(getWritableAppDir() + "fit");
+    // a ride QZ did not save at the last run: offered once the home page is up
+    QTimer::singleShot(4000, this, &homeform::findRecoverableRide);
 
     m_speech.setLocale(QLocale::English);
 
@@ -1848,6 +1850,9 @@ QString homeform::safeFileName(const QString &name, const QString &fallback) {
 void homeform::backup() {
 
     static uint8_t index = 0;
+    // a stopped ride is saved: its backups are removed at the save and must not come back
+    if (stopped)
+        return;
     qDebug() << QStringLiteral("scheduling fit file backup...");
 
     QString path = getWritableAppDir();
@@ -6568,6 +6573,113 @@ void homeform::handleRestoreDefaultWheelDiameter() {
     }
 }
 
+void homeform::findRecoverableRide() {
+    m_recoverableRide.clear();
+    m_recoverBackup.clear();
+    m_recoverFiles.clear();
+
+    // the two backups a run writes in turn, a minute apart: "0QZ-backup-<start>.fit" and "1QZ-..."
+    const QString prefix = QStringLiteral("QZ-backup-");
+    QDir dir(getWritableAppDir());
+    const QFileInfoList files =
+        dir.entryInfoList(QStringList() << QStringLiteral("*") + prefix + QStringLiteral("*.fit"), QDir::Files,
+                          QDir::Time); // newest first
+    QStringList runs;
+    QHash<QString, QFileInfoList> backupsOfRun;
+    for (const QFileInfo &f : files) {
+        const QString name = f.fileName();
+        if (name.length() < 2 || (name.at(0) != QLatin1Char('0') && name.at(0) != QLatin1Char('1')) ||
+            !name.mid(1).startsWith(prefix))
+            continue;
+        const QString run = name.mid(1);
+        // this run's own backups
+        if (run == backupFitFileName)
+            continue;
+        // older ones are left alone: QZ kept the backups of saved rides too before this version
+        if (f.lastModified().secsTo(QDateTime::currentDateTime()) > 2 * 86400)
+            continue;
+        if (!backupsOfRun.contains(run))
+            runs.append(run);
+        backupsOfRun[run].append(f);
+    }
+
+    for (const QString &run : runs) {
+        const QFileInfoList &backups = backupsOfRun.value(run);
+        QStringList paths;
+        for (const QFileInfo &f : backups)
+            paths.append(f.absoluteFilePath());
+        // the newer of the two holds up to a minute more
+        const QString newest = backups.first().absoluteFilePath();
+        QList<SessionLine> records;
+        FIT_SPORT sport = FIT_SPORT_INVALID;
+        qfit::open(newest, &records, &sport);
+        bool moved = false;
+        for (const SessionLine &s : qAsConst(records)) {
+            if (s.watt > 0 || s.speed > 0) {
+                moved = true;
+                break;
+            }
+        }
+        // QZ open without a ride, or a ride already in the history (saved by a Stop): nothing is lost
+        if (records.count() < 60 || !moved ||
+            (workoutModel && workoutModel->hasWorkoutStartingNear(records.first().time, 120))) {
+            qDebug() << "FIT backup of no lost ride, removed:" << paths;
+            for (const QString &p : qAsConst(paths))
+                QFile::remove(p);
+            continue;
+        }
+        m_recoverBackup = newest;
+        m_recoverFiles = paths;
+        const QDateTime start = records.first().time.toLocalTime();
+        m_recoverableRide = tr("%1 min on %2")
+                                .arg(qMax(1, qRound(records.last().elapsedTime / 60.0)))
+                                .arg(QLocale().toString(start.date(), QLocale::ShortFormat) + QStringLiteral(" ") +
+                                     QLocale().toString(start.time(), QLocale::ShortFormat));
+        qDebug() << "lost ride found:" << m_recoverableRide << newest;
+        break;
+    }
+    emit recoverableRideChanged();
+}
+
+void homeform::recoverRide() {
+    if (m_recoverBackup.isEmpty())
+        return;
+    // the name a Stop gives a FIT file is a date, the one in the backup's name ("0QZ-backup-<date>.fit")
+    const QString fitDir = getWritableAppDir() + QStringLiteral("fit/");
+    QDir().mkpath(fitDir);
+    const QString date = QFileInfo(m_recoverBackup).fileName().mid(1 + QStringLiteral("QZ-backup-").length());
+    QString target = fitDir + date;
+    if (QFile::exists(target))
+        target = fitDir + QFileInfo(date).completeBaseName() + QStringLiteral(" recovered.fit");
+    if (QFile::rename(m_recoverBackup, target)) {
+        for (const QString &p : qAsConst(m_recoverFiles))
+            QFile::remove(p);
+        if (fitProcessor && workoutModel) {
+            fitProcessor->processFile(target);
+            workoutModel->refresh();
+        }
+        setToastRequested(tr("Ride recovered: it is in your workout history"));
+        qDebug() << "lost ride recovered:" << target;
+    } else {
+        setToastRequested(tr("The ride could not be recovered"));
+        qDebug() << "lost ride not recovered:" << m_recoverBackup << "->" << target;
+        // not offered again in this run
+        m_recoverableRide.clear();
+        m_recoverBackup.clear();
+        m_recoverFiles.clear();
+        emit recoverableRideChanged();
+        return;
+    }
+    findRecoverableRide();
+}
+
+void homeform::discardRecoverableRide() {
+    for (const QString &p : qAsConst(m_recoverFiles))
+        QFile::remove(p);
+    qDebug() << "lost ride discarded:" << m_recoverFiles;
+    findRecoverableRide();
+}
+
 void homeform::acceptFtpSuggestion() {
     if (m_ftpSuggestion <= 0)
         return;
@@ -6982,7 +7094,9 @@ void homeform::update() {
             QObject::tr("AVG: ") + QString::number(averageWattKg(), 'f', 1) +
             QObject::tr(" MAX: ") + QString::number(bluetoothManager->device()->wattKg().max(), 'f', 1));
         // O(samples) once a second: a few thousand additions even on a long ride
-        if (bluetoothManager->device()->deviceType() == BIKE &&
+        // not after Stop: the tile keeps the TSS of the finished ride, which an FTP accepted afterwards
+        // would rewrite (the FIT file keeps the FTP of the ride)
+        if (bluetoothManager->device()->deviceType() == BIKE && !stopped &&
             settings.value(QZSettings::tile_tss_enabled, QZSettings::default_tile_tss_enabled).toBool()) {
             const double ftpWatt = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
             const double np = bikeNormalizedPower(Session);
@@ -10148,6 +10262,14 @@ void homeform::fit_save_clicked() {
                    workoutSource, pelotonWorkoutId, pelotonUrl, trainingProgramFile,
                    m_workoutRpe, m_workoutFeel);
         lastFitFileSaved = filename;
+
+        // the ride is saved: its backups would look like a lost ride at the next launch
+        if (QFile::exists(filename)) {
+            QMetaObject::invokeMethod(fitBackupWriter, "removeFiles", Qt::QueuedConnection,
+                                      Q_ARG(QStringList, QStringList()
+                                                             << path + QStringLiteral("0") + backupFitFileName
+                                                             << path + QStringLiteral("1") + backupFitFileName));
+        }
 
         // Process the newly saved file immediately and refresh workout model
         if (fitProcessor && workoutModel) {

@@ -53,6 +53,8 @@ class WorkoutModel : public QAbstractListModel {
     Q_INVOKABLE QString getWorkoutSource(int workoutId);
     Q_INVOKABLE QString getPelotonUrl(int workoutId);
     Q_INVOKABLE bool hasTrainingProgram(int workoutId);
+    // A workout in the history starts within toleranceSec of start (a FIT backup of a saved ride)
+    bool hasWorkoutStartingNear(const QDateTime &start, int toleranceSec);
     Q_INVOKABLE bool openPelotonUrl(int workoutId);
     Q_INVOKABLE bool loadTrainingProgram(int workoutId);
     // Works out trainingLoad again from the database (it follows the date, so the page calls it)

@@ -25,3 +25,10 @@ void FitBackupWriter::writeFitBackup(const QString &filename,
     
     qDebug() << QStringLiteral("FIT backup file written successfully: ") << filename;
 }
+
+void FitBackupWriter::removeFiles(const QStringList &filenames) {
+    for (const QString &filename : filenames) {
+        if (QFile::remove(filename))
+            qDebug() << QStringLiteral("FIT backup removed, the ride is saved: ") << filename;
+    }
+}

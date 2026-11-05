@@ -182,6 +182,9 @@ class homeform : public QObject {
     // Bikes with tile_hero_enabled: Watts, Heart, Cadence and Elapsed for the hero strip above the tiles,
     // and not in appModel. A property, not an invokable: QObjects read through a property stay C++-owned
     Q_PROPERTY(QList<QObject *> heroTiles READ heroTiles NOTIFY heroTilesChanged)
+    // A ride QZ did not save (closed or crashed before Stop), found in its FIT backups at launch: what
+    // to show ("23 min on 05/11/26 04:28"), empty when there is none
+    Q_PROPERTY(QString recoverableRide READ recoverableRide NOTIFY recoverableRideChanged)
     Q_PROPERTY(QString stopColor READ stopColor NOTIFY stopColorChanged)
     Q_PROPERTY(QStringList metrics READ metrics)
     Q_PROPERTY(QStringList bluetoothDevices READ bluetoothDevices NOTIFY bluetoothDevicesChanged)
@@ -536,6 +539,11 @@ class homeform : public QObject {
     int rideState() const { return stopped ? 0 : (paused ? 2 : 1); }
     int ftpSuggestion() const { return m_ftpSuggestion; }
     QList<QObject *> heroTiles() const { return m_heroTiles; }
+    QString recoverableRide() const { return m_recoverableRide; }
+    // Recover: the backup becomes a FIT file of the history. Discard: its backups are deleted. Either
+    // way the next lost ride, if any, is offered
+    Q_INVOKABLE void recoverRide();
+    Q_INVOKABLE void discardRecoverableRide();
     int ftpSuggestionCurrent() const { return m_ftpSuggestionCurrent; }
     // Yes: the offered FTP becomes the FTP. Not now: nothing changes
     Q_INVOKABLE void acceptFtpSuggestion();
@@ -1132,6 +1140,11 @@ public:
     bluetoothdevice *m_linkReportingDevice = nullptr;
     int m_ftpSuggestion = 0;
     QList<QObject *> m_heroTiles;
+    // the lost ride offered: its text, the backup to recover and every backup of that run
+    QString m_recoverableRide;
+    QString m_recoverBackup;
+    QStringList m_recoverFiles;
+    void findRecoverableRide();
     int m_ftpSuggestionCurrent = 0;
 
     peloton *pelotonHandler = nullptr;
@@ -1426,6 +1439,7 @@ public:
     void rideStateChanged();
     void ftpSuggestionChanged();
     void heroTilesChanged();
+    void recoverableRideChanged();
     void stopColorChanged(QString value);
     void infoChanged(QString value);
     void topBarHeightChanged(int value);

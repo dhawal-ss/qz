@@ -23,6 +23,8 @@ public slots:
                        FIT_SPORT workoutType,
                        const QString &workoutName,
                        const QString &deviceName);
+    // Removes the backups of a ride that is saved: on this thread, after any backup still queued
+    void removeFiles(const QStringList &filenames);
 };
 
 #endif // FITBACKUPWRITER_H

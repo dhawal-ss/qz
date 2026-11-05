@@ -75,6 +75,13 @@ Dashboard v1
   time-in-zone tiles carry a zone band, a "Z" pill and the zone colour on their value; the hero
   cells are tinted by zone; screen readers say "zone 4".
 
+Never lose a ride
+- A ride QZ did not save (closed or crashed before Stop) is offered at the next launch from its
+  FIT backup: Recover puts it in the workout history, Discard deletes the backup, Not now asks
+  again next time. A saved ride's backups are removed, and none are written after Stop. Backups
+  of rides already in the history, or of no ride, are cleaned up; ones older than two days are
+  left alone (earlier versions never removed the backups of saved rides).
+
 Your numbers
 - The setup wizard asks for FTP, max and resting heart rate (220 - age stays the default).
 - After a bike ride whose best 20 minutes beats the FTP by 2% and 3 W, QZ offers the new FTP
@@ -85,8 +92,7 @@ Your numbers
 ### Then
 1. **One ride, one set of numbers**: a single workout summary used by the FIT file, the history,
    the email and the tiles.
-2. **Never lose a ride**: recover the crash backups at the next launch, save or discard after a
-   ride, honest upload status with retry.
+2. **Never lose a ride, part 2**: save or discard after a ride, honest upload status with retry.
 3. **First connection that works**: a connection card per sensor role, a filtered device picker,
    pairing without a restart, live data freshness.
 4. **Zones, one definition**: one power and HR zone model and one palette for tiles, charts and

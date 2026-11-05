@@ -1,6 +1,8 @@
 #include "qfittestsuite.h"
 #include "../../src/qfit.h"
 #include "../../src/fitdatabaseprocessor.h"
+#include "../../src/workoutmodel.h"
+#include <QTemporaryDir>
 #include <QDateTime>
 #include <QFile>
 #include <QDir>
@@ -516,4 +518,30 @@ TEST(QFitTrainingLoad, NewRidesAreStoredAndOlderOnesFilledOnce) {
         check.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
+}
+
+// Crash recovery (homeform::findRecoverableRide): a backup whose ride is in the history is no lost ride
+TEST(QFitRecovery, ABackupOfASavedRideIsFoundInTheHistory) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+    const QString fitPath = tempDir.filePath("ride.fit");
+    qfit::save(fitPath, steadyRide(200), BIKE, QFIT_PROCESS_NONE, FIT_SPORT_INVALID, QStringLiteral("Test ride"));
+    const QString dbPath = tempDir.filePath("history.sqlite");
+    {
+        FitDatabaseProcessor processor(dbPath);
+        processor.processFile(fitPath);
+    }
+    // a backup of the same ride starts at the same first record
+    QList<SessionLine> records;
+    FIT_SPORT sport = FIT_SPORT_INVALID;
+    qfit::open(fitPath, &records, &sport);
+    ASSERT_FALSE(records.isEmpty());
+    const QDateTime start = records.first().time;
+    {
+        WorkoutModel model(dbPath);
+        EXPECT_TRUE(model.hasWorkoutStartingNear(start, 120));
+        EXPECT_TRUE(model.hasWorkoutStartingNear(start.addSecs(90), 120));
+        EXPECT_FALSE(model.hasWorkoutStartingNear(start.addSecs(600), 120)); // another ride
+        EXPECT_FALSE(model.hasWorkoutStartingNear(QDateTime(), 120));
+    }
 }

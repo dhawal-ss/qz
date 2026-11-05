@@ -339,8 +339,9 @@ HomeForm {
             }
             Label {
                 width: parent.width
-                text: qsTr("Your best 20 minutes in this ride says your FTP is %1 W. It is %2 W now. Your power zones, workout targets and training load follow your FTP.")
-                      .arg(ftpSuggestionPopup.watts).arg(ftpSuggestionPopup.current)
+                // a no-break space keeps "229 W" on one line
+                text: qsTr("Your best 20 minutes in this ride says your FTP is %1. It is %2 now. Your power zones, workout targets and training load follow your FTP.")
+                      .arg(ftpSuggestionPopup.watts + "\u00a0W").arg(ftpSuggestionPopup.current + "\u00a0W")
                 wrapMode: Text.WordWrap
                 color: window.theme.textOnTint
             }
@@ -361,6 +362,75 @@ HomeForm {
                 onClicked: ftpSuggestionPopup.close()
                 Accessible.name: text
                 Accessible.description: qsTr("Keep your FTP")
+            }
+        }
+    }
+
+    // A ride QZ did not save at the last run (closed or crashed before Stop): offered at launch. Not now
+    // keeps it for the next launch
+    Connections {
+        target: typeof rootItem !== "undefined" ? rootItem : null
+        function onRecoverableRideChanged() {
+            if (rootItem.recoverableRide !== "" && !recoverRidePopup.opened)
+                recoverRidePopup.open()
+        }
+    }
+
+    Popup {
+        id: recoverRidePopup
+        parent: Overlay.overlay
+        modal: true
+        focus: true
+        anchors.centerIn: parent
+        width: Math.min(420, parent.width - 32)
+        padding: 24
+        property string ride: ""
+        onAboutToShow: ride = rootItem.recoverableRide
+        background: Rectangle { radius: window.theme.cardRadius; color: window.theme.surface; border.color: window.theme.stroke }
+
+        contentItem: Column {
+            spacing: 12
+
+            Label {
+                width: parent.width
+                text: qsTr("Recover your last ride?")
+                wrapMode: Text.WordWrap
+                font.pixelSize: window.fontPx(22)
+                font.bold: true
+                color: window.theme.textPrimary
+            }
+            Label {
+                width: parent.width
+                text: qsTr("QZ closed before this ride was saved: %1. Recover it to keep it in your workout history.").arg(recoverRidePopup.ride)
+                wrapMode: Text.WordWrap
+                color: window.theme.textOnTint
+            }
+            RideButton {
+                width: parent.width
+                text: qsTr("Recover")
+                fillColor: window.theme.go
+                labelColor: "#000000"
+                onClicked: { recoverRidePopup.close(); rootItem.recoverRide() }
+                Accessible.name: text
+                Accessible.description: qsTr("Save the ride in your workout history")
+            }
+            RideButton {
+                width: parent.width
+                text: qsTr("Not now")
+                fillColor: "transparent"
+                labelColor: window.theme.textPrimary
+                onClicked: recoverRidePopup.close()
+                Accessible.name: text
+                Accessible.description: qsTr("Ask again at the next launch")
+            }
+            RideButton {
+                width: parent.width
+                text: qsTr("Discard")
+                fillColor: "transparent"
+                labelColor: window.theme.danger
+                onClicked: { recoverRidePopup.close(); rootItem.discardRecoverableRide() }
+                Accessible.name: text
+                Accessible.description: qsTr("Delete the backup of this ride")
             }
         }
     }
