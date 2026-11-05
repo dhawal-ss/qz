@@ -262,25 +262,6 @@ constexpr int AndroidDocumentPickerFitRequestCode = 4105;
 constexpr int AndroidDocumentPickerFitFolderRequestCode = 4106;
 constexpr jint AndroidActivityResultOk = -1;
 #endif
-double interpolatedHeartZone(double percentHeartRate, double zone1, double zone2, double zone3, double zone4) {
-    const double z1 = std::max(1.0, zone1);
-    const double z2 = zone2 > z1 ? zone2 : z1 + 10.0;
-    const double z3 = zone3 > z2 ? zone3 : z2 + 10.0;
-    const double z4 = zone4 > z3 ? zone4 : z3 + 10.0;
-
-    if (percentHeartRate < z1)
-        return std::max(0.0, percentHeartRate / z1);
-    if (percentHeartRate < z2)
-        return 1.0 + ((percentHeartRate - z1) / (z2 - z1));
-    if (percentHeartRate < z3)
-        return 2.0 + ((percentHeartRate - z2) / (z3 - z2));
-    if (percentHeartRate < z4)
-        return 3.0 + ((percentHeartRate - z3) / (z4 - z3));
-
-    const double top = z4 < 100.0 ? 100.0 : z4 + 10.0;
-    return 4.0 + ((percentHeartRate - z4) / (top - z4));
-}
-
 quint32 crc32ForGzip(const QByteArray &data) {
     quint32 crc = 0xffffffffU;
     for (const char byte : data) {
@@ -7944,16 +7925,6 @@ void homeform::update() {
         QString Z;
         double maxHeartRate = heartRateMax();
         double percHeartRate = (bluetoothManager->device()->currentHeart().value() * 100) / maxHeartRate;
-        double currentHRZoneDisplay =
-            interpolatedHeartZone(percHeartRate,
-                                  settings.value(QZSettings::heart_rate_zone1, QZSettings::default_heart_rate_zone1)
-                                      .toDouble(),
-                                  settings.value(QZSettings::heart_rate_zone2, QZSettings::default_heart_rate_zone2)
-                                      .toDouble(),
-                                  settings.value(QZSettings::heart_rate_zone3, QZSettings::default_heart_rate_zone3)
-                                      .toDouble(),
-                                  settings.value(QZSettings::heart_rate_zone4, QZSettings::default_heart_rate_zone4)
-                                      .toDouble());
         double hrCurrentZoneRangeMin = 0;
         double hrCurrentZoneRangeMax = maxHeartRate;
 
@@ -8067,7 +8038,11 @@ void homeform::update() {
             break;
         }
         bluetoothManager->device()->setHeartZone(currentHRZone);
-        Z = QStringLiteral("Z") + QString::number(currentHRZoneDisplay, 'f', 1);
+        // the whole part is the zone counted by setHeartZone and shown by the colour: round to tenths,
+        // but never up into the next zone (each zone is clamped at x.9999, which would read (x+1).0)
+        // no heart rate, no zone (the second is not counted either)
+        if (bluetoothManager->device()->currentHeart().value() > 0)
+            Z = QStringLiteral("Z") + QString::number(qMin(currentHRZone, (int)currentHRZone + 0.9), 'f', 1);
 
         // Heart rate second line - show as percentage if enabled
         if (settings.value(QZSettings::tile_heart_show_as_percent, QZSettings::default_tile_heart_show_as_percent).toBool()) {

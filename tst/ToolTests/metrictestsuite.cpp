@@ -439,3 +439,58 @@ TEST(MetricFormZoneTest, LearningAndBreakComeFirst) {
     EXPECT_EQ(metric::trainingStatus(60, 40, 10, 14), QStringLiteral("break"));
     EXPECT_EQ(metric::trainingStatus(60, 40, 10, 13), QStringLiteral("learning"));
 }
+
+TEST(MetricKCalFromWorkTest, KilojoulesAtTwentyFourPercentGrossEfficiency) {
+    // kcal = kJ / (4.184 * 0.24): about 1 kcal per kJ of work
+    EXPECT_NEAR(metric::calculateKCalfromWork(1004160.0), 1000.0, 1e-6);
+    EXPECT_NEAR(metric::calculateKCalfromWork(1000.0), 0.996, 0.001);
+    // one hour at 200 W is 720 kJ, 717 kcal
+    EXPECT_NEAR(metric::calculateKCalfromWork(200.0 * 3600.0), 717.0, 0.1);
+}
+
+TEST(MetricKCalFromWorkTest, NoWorkIsNoCalories) {
+    EXPECT_DOUBLE_EQ(metric::calculateKCalfromWork(0.0), 0.0);
+    EXPECT_DOUBLE_EQ(metric::calculateKCalfromWork(-500.0), 0.0);
+}
+
+TEST(MetricKCalFromWorkTest, RawValuesStayInStepAcrossClearAndLap) {
+    // bluetoothdevice::update_metrics writes workKCal from the raw joules on every tick, and
+    // bike::clearStats() and setLap() clear both metrics at the same moment
+    metric jouls;
+    metric kcal;
+    for (int i = 0; i < 60; i++) {
+        jouls += 200.0;
+        kcal = metric::calculateKCalfromWork(jouls.valueRaw());
+    }
+    jouls.clear(true);
+    kcal.clear(true);
+    EXPECT_DOUBLE_EQ(kcal.value(), 0.0);
+
+    for (int i = 0; i < 30; i++) {
+        jouls += 300.0;
+        kcal = metric::calculateKCalfromWork(jouls.valueRaw());
+    }
+    jouls.setLap(true);
+    kcal.setLap(true);
+    for (int i = 0; i < 10; i++) {
+        jouls += 100.0;
+        kcal = metric::calculateKCalfromWork(jouls.valueRaw());
+    }
+    EXPECT_NEAR(kcal.value(), metric::calculateKCalfromWork(jouls.value()), 1e-9);
+    EXPECT_NEAR(kcal.value(), 10000.0 / 1004.16, 1e-6);
+    EXPECT_NEAR(kcal.lapValue(), 1000.0 / 1004.16, 1e-6);
+}
+
+TEST(MetricCyclingMETsTest, AcsmLegErgometry) {
+    // METs = (10.8 * W / kg + 7) / 3.5
+    EXPECT_NEAR(metric::calculateCyclingMETs(150.0, 75.0), (10.8 * 2.0 + 7.0) / 3.5, 1e-9); // 8.17
+    EXPECT_NEAR(metric::calculateCyclingMETs(75.0, 75.0), 5.086, 0.001);                    // 1 W/kg
+    // the same power is a lighter effort for a heavier rider
+    EXPECT_LT(metric::calculateCyclingMETs(200.0, 90.0), metric::calculateCyclingMETs(200.0, 60.0));
+}
+
+TEST(MetricCyclingMETsTest, NoPowerOrNoWeightIsRest) {
+    EXPECT_DOUBLE_EQ(metric::calculateCyclingMETs(0.0, 75.0), 1.0);
+    EXPECT_DOUBLE_EQ(metric::calculateCyclingMETs(-10.0, 75.0), 1.0);
+    EXPECT_DOUBLE_EQ(metric::calculateCyclingMETs(150.0, 0.0), 1.0);
+}

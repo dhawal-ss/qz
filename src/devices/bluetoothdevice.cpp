@@ -126,6 +126,13 @@ metric bluetoothdevice::calories() {
         } else {
             return hrKCal;
         }
+    } else if (deviceType() == BIKE && workKCal.value() > 0) {
+        // a bike with power: the energy of its work (update_metrics), not the per-driver estimate in KCal
+        if (activeOnly) {
+            activeKCal.setValue(metric::calculateActiveKCal(workKCal.value(), elapsed.value()));
+            return activeKCal;
+        }
+        return workKCal;
     } else {
         // Power-based calculation (current behavior)
         if (activeOnly) {
@@ -143,6 +150,8 @@ metric bluetoothdevice::totalCalories() {
     
     if (fromHR && Heart.value() > 0) {
         return hrKCal; // Return HR-based total calories
+    } else if (deviceType() == BIKE && workKCal.value() > 0) {
+        return workKCal; // a bike with power: the energy of its work
     } else {
         return KCal;   // Return power-based total calories
     }
@@ -247,7 +256,14 @@ void bluetoothdevice::verticalOscillationSensor(double verticalOscillation) { Q_
 
 bool bluetoothdevice::hasVirtualDevice() { return this->virtualDevice!=nullptr; }
 
-double bluetoothdevice::calculateMETS() { return ((0.048 * m_watt.value()) + 1.19); }
+double bluetoothdevice::calculateMETS() {
+    if (deviceType() == BIKE) {
+        QSettings settings;
+        return metric::calculateCyclingMETs(m_watt.value(),
+                                            settings.value(QZSettings::weight, QZSettings::default_weight).toFloat());
+    }
+    return ((0.048 * m_watt.value()) + 1.19);
+}
 
 void bluetoothdevice::setVirtualDevice(virtualdevice *virtualDevice, VIRTUAL_DEVICE_MODE mode) {
 
@@ -287,11 +303,19 @@ void bluetoothdevice::update_metrics(bool watt_calc, const double watts, const b
 
             elapsed += deltaTime;
         }
+        // work of all the unpaused time: a bike can report power while its speed reads 0
+        m_jouls += (m_watt.value() * deltaTime);
+        if (deviceType() == BIKE) {
+            // drivers keep writing KCal (MET estimate or console calories); for a bike with power
+            // calories() and totalCalories() read this instead. Raw joules: m_jouls and workKCal are
+            // cleared and lapped together, so their offsets stay in step.
+            workKCal = metric::calculateKCalfromWork(m_jouls.valueRaw());
+        }
         if (currentSpeed().value() > 0.0) {
 
             moving += deltaTime;
-            m_jouls += (m_watt.value() * deltaTime);
-            WeightLoss = metric::calculateWeightLoss(KCal.value());
+            WeightLoss = metric::calculateWeightLoss(
+                deviceType() == BIKE && workKCal.value() > 0 ? workKCal.value() : KCal.value());
             if (watt_calc) {
                 m_watt = watts;
             }

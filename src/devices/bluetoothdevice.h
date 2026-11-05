@@ -598,6 +598,13 @@ class bluetoothdevice : public QObject {
     metric KCal;
     metric activeKCal;
     metric hrKCal;
+    /**
+     * @brief workKCal Bikes only: the kilocalories of the work done, m_jouls at 24% gross efficiency
+     * (metric::calculateKCalfromWork). Only update_metrics() writes it, from the raw joules; drivers keep
+     * writing KCal. bike::clearStats()/setLap() clear it together with m_jouls. calories() and totalCalories()
+     * return it instead of KCal once the bike has done work in the session. Units: kcal
+     */
+    metric workKCal;
 
     /**
      * @brief Speed The simulated speed of the device. Units: km/h

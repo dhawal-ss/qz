@@ -369,6 +369,7 @@ void bike::clearStats() {
     Distance1s.clear(true);
     Heart.clear(false);
     m_jouls.clear(true);
+    workKCal.clear(true);
     elevationAcc = 0;
     m_watt.clear(false);
     m_rawWatt.clear(false);
@@ -398,6 +399,7 @@ void bike::setPaused(bool p) {
     Distance1s.setPaused(p);
     Heart.setPaused(p);
     m_jouls.setPaused(p);
+    workKCal.setPaused(p);
     m_watt.setPaused(p);
     m_rawWatt.setPaused(p);
     WeightLoss.setPaused(p);
@@ -424,6 +426,7 @@ void bike::setLap() {
     Distance1s.setLap(true);
     Heart.setLap(false);
     m_jouls.setLap(true);
+    workKCal.setLap(true);
     m_watt.setLap(false);
     m_rawWatt.setLap(false);
     WeightLoss.setLap(false);

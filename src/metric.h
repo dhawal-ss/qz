@@ -77,6 +77,12 @@ class metric {
     static double calculateKCalfromHR(double HR_AVG, double elapsed);
     static double calculateBMR();
     static double calculateActiveKCal(double totalKCal, double elapsed);
+    // Energy burned for mechanical work at 24% gross efficiency: kcal = kJ / (4.184 * 0.24), about
+    // 1 kcal per kJ. Gross, like the other totals: calculateActiveKCal takes the BMR out. 0 without work.
+    static double calculateKCalfromWork(double joules);
+    // ACSM leg cycle ergometry: VO2 (ml/kg/min) = 10.8 * W / kg + 7, METs = VO2 / 3.5.
+    // 1 (rest) without power or without a weight.
+    static double calculateCyclingMETs(double watts, double weight);
 
     static double powerPeak(QList<SessionLine> *session, int seconds);
 

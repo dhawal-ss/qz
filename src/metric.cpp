@@ -669,3 +669,16 @@ double metric::calculateActiveKCal(double totalKCal, double elapsed) {
     // Ensure we don't return negative calories
     return activeKCal > 0 ? activeKCal : 0;
 }
+
+double metric::calculateKCalfromWork(double joules) {
+    if (joules <= 0)
+        return 0;
+    return joules / (4184.0 * 0.24); // 4184 J per kcal, 24% of the energy burned becomes work
+}
+
+double metric::calculateCyclingMETs(double watts, double weight) {
+    if (watts <= 0 || weight <= 0)
+        return 1.0; // at rest
+    // 3.5 ml/kg/min at rest + 3.5 for unloaded pedalling + 10.8 per W/kg; 1 MET = 3.5 ml/kg/min
+    return (10.8 * watts / weight + 7.0) / 3.5;
+}
