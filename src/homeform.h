@@ -547,6 +547,10 @@ class homeform : public QObject {
     int ftpSuggestionCurrent() const { return m_ftpSuggestionCurrent; }
     // Yes: the offered FTP becomes the FTP. Not now: nothing changes
     Q_INVOKABLE void acceptFtpSuggestion();
+    // Reads the FTP again: the offer goes if the FTP is no longer lower. True while there is an offer
+    Q_INVOKABLE bool refreshFtpSuggestion();
+    // A new power record of the last ride, said once the rider is back on the home page
+    Q_INVOKABLE void showPendingRecordToast();
     Q_INVOKABLE void dismissFtpSuggestion();
     bool endNeedsPause() {
         return bluetoothManager && bluetoothManager->device() && bluetoothManager->device()->deviceType() != TREADMILL;
@@ -1139,6 +1143,9 @@ public:
     // the device whose connected() has been true at least once: only its dropouts are recorded as no data
     bluetoothdevice *m_linkReportingDevice = nullptr;
     int m_ftpSuggestion = 0;
+    // the ride that ended is saved: no more backups of it
+    bool m_rideSaved = false;
+    QString m_pendingRecordToast;
     QList<QObject *> m_heroTiles;
     // the lost ride offered: its text, the backup to recover and every backup of that run
     QString m_recoverableRide;

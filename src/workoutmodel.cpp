@@ -562,15 +562,16 @@ QString WorkoutModel::getPelotonUrl(int workoutId) {
     return "";
 }
 
-bool WorkoutModel::hasWorkoutStartingNear(const QDateTime &start, int toleranceSec) {
+bool WorkoutModel::hasWorkoutCovering(const QDateTime &start, int durationSec, int toleranceSec) {
     if (!m_db.isOpen() || !start.isValid())
         return false;
     // start_time is the first record of the file (FitDatabaseProcessor::saveWorkout), stored as Qt
     // writes a QDateTime: the bound limits compare the same way
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral("SELECT COUNT(*) FROM workouts WHERE start_time BETWEEN ? AND ?"));
+    query.prepare(QStringLiteral("SELECT COUNT(*) FROM workouts WHERE start_time BETWEEN ? AND ? AND total_time >= ?"));
     query.addBindValue(start.addSecs(-toleranceSec));
     query.addBindValue(start.addSecs(toleranceSec));
+    query.addBindValue(durationSec - toleranceSec);
     return query.exec() && query.next() && query.value(0).toInt() > 0;
 }
 

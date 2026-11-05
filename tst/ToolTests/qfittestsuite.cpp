@@ -539,10 +539,13 @@ TEST(QFitRecovery, ABackupOfASavedRideIsFoundInTheHistory) {
     const QDateTime start = records.first().time;
     {
         WorkoutModel model(dbPath);
-        EXPECT_TRUE(model.hasWorkoutStartingNear(start, 120));
-        EXPECT_TRUE(model.hasWorkoutStartingNear(start.addSecs(90), 120));
-        EXPECT_FALSE(model.hasWorkoutStartingNear(start.addSecs(600), 120)); // another ride
-        EXPECT_FALSE(model.hasWorkoutStartingNear(QDateTime(), 120));
+        const int duration = records.last().elapsedTime;
+        EXPECT_TRUE(model.hasWorkoutCovering(start, duration, 120));
+        EXPECT_TRUE(model.hasWorkoutCovering(start.addSecs(90), duration, 120));
+        // the backup goes on after the saved ride (a "Save FIT" in the middle): lost
+        EXPECT_FALSE(model.hasWorkoutCovering(start, duration + 600, 120));
+        EXPECT_FALSE(model.hasWorkoutCovering(start.addSecs(600), duration, 120)); // another ride
+        EXPECT_FALSE(model.hasWorkoutCovering(QDateTime(), duration, 120));
     }
 }
 

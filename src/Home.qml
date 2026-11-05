@@ -308,7 +308,16 @@ HomeForm {
     // After a ride whose best 20 minutes beats the FTP (homeform::Stop): offered when the rider is back
     // on this page from the chart page, so the mail of the ride keeps the FTP of the ride and a web
     // view (the chart page on phones) cannot cover the question
-    StackView.onActivated: if (rootItem.ftpSuggestion > 0 && !ftpSuggestionPopup.opened) ftpSuggestionPopup.open()
+    StackView.onActivated: {
+        // the first activation comes before homeform sets rootItem
+        if (typeof rootItem === "undefined")
+            return
+        // a new power record of the ride (the chart page is a web view on phones, above any toast)
+        rootItem.showPendingRecordToast()
+        // the FTP is read again: the rider may have changed it since the ride
+        if (!ftpSuggestionPopup.opened && rootItem.refreshFtpSuggestion())
+            ftpSuggestionPopup.open()
+    }
 
     Popup {
         id: ftpSuggestionPopup

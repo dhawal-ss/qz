@@ -32,6 +32,9 @@
 class toorxtreadmill : public treadmill {
     Q_OBJECT
   public:
+    // a classic Bluetooth (RFCOMM) link: connected while its socket is (the recording drops the
+    // values of a device whose link is down, and the ride bar shows its state)
+    bool connected() override { return socket && socket->state() == QBluetoothSocket::ConnectedState; }
     explicit toorxtreadmill();
 
   public slots:

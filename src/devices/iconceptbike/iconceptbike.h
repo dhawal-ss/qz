@@ -33,6 +33,9 @@ class iconceptbike : public bike {
     Q_OBJECT
   public:
     explicit iconceptbike();
+    // a classic Bluetooth (RFCOMM) link: connected while its socket is (the recording drops the
+    // values of a device whose link is down, and the ride bar shows its state)
+    bool connected() override { return socket && socket->state() == QBluetoothSocket::ConnectedState; }
 
   public slots:
     void deviceDiscovered(const QBluetoothDeviceInfo &device);

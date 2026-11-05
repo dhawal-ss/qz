@@ -127,7 +127,9 @@ Page {
                 id: stop
                 text: rootItem.endNeedsPause ? qsTr("End") : rootItem.stopText
                 minimumWidth: 96
-                visible: !rootItem.labelHelp && (rootItem.rideState === 2 || (!rootItem.endNeedsPause && rootItem.rideState === 1))
+                // a treadmill keeps Stop in every state: with the ride stopped it still stops the belt (YPOO's
+                // stopWhenIdle, a console countdown)
+                visible: !rootItem.labelHelp && (rootItem.rideState === 2 || !rootItem.endNeedsPause)
                 fillColor: window.theme.dangerTonal
                 labelColor: window.theme.danger
                 Accessible.name: text

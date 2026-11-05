@@ -1850,8 +1850,9 @@ QString homeform::safeFileName(const QString &name, const QString &fallback) {
 void homeform::backup() {
 
     static uint8_t index = 0;
-    // a stopped ride is saved: its backups are removed at the save and must not come back
-    if (stopped)
+    // a stopped and saved ride: its backups are removed at the save and must not come back. Until the
+    // save (the RPE popup holds it back) the backups go on
+    if (stopped && m_rideSaved)
         return;
     qDebug() << QStringLiteral("scheduling fit file backup...");
 
@@ -6238,6 +6239,8 @@ void homeform::Start_inner(bool send_event_to_device) {
         }
 
         if (stopped) {
+            m_rideSaved = false;
+            m_pendingRecordToast.clear();
             // a new ride: an FTP offered after the last one and not answered is dropped
             if (m_ftpSuggestion > 0) {
                 m_ftpSuggestion = 0;
@@ -6608,26 +6611,45 @@ void homeform::findRecoverableRide() {
         QStringList paths;
         for (const QFileInfo &f : backups)
             paths.append(f.absoluteFilePath());
-        // the newer of the two holds up to a minute more
-        const QString newest = backups.first().absoluteFilePath();
+        // the newest backup of the run that reads and holds a ride: the newer of the two holds up to a
+        // minute more, but QZ may have died while writing it (an empty file, or one cut short, on which
+        // the FIT decoder throws), and then the older one is the ride
+        QString usable;
         QList<SessionLine> records;
-        FIT_SPORT sport = FIT_SPORT_INVALID;
-        qfit::open(newest, &records, &sport);
-        bool moved = false;
-        for (const SessionLine &s : qAsConst(records)) {
-            if (s.watt > 0 || s.speed > 0) {
-                moved = true;
+        for (const QFileInfo &f : backups) {
+            QList<SessionLine> read;
+            FIT_SPORT sport = FIT_SPORT_INVALID;
+            try {
+                qfit::open(f.absoluteFilePath(), &read, &sport);
+            } catch (...) {
+                qDebug() << "FIT backup unreadable:" << f.absoluteFilePath();
+                read.clear();
+            }
+            bool moved = false;
+            for (const SessionLine &s : qAsConst(read)) {
+                if (s.watt > 0 || s.speed > 0) {
+                    moved = true;
+                    break;
+                }
+            }
+            if (read.count() >= 60 && moved) {
+                usable = f.absoluteFilePath();
+                records = read;
                 break;
             }
         }
-        // QZ open without a ride, or a ride already in the history (saved by a Stop): nothing is lost
-        if (records.count() < 60 || !moved ||
-            (workoutModel && workoutModel->hasWorkoutStartingNear(records.first().time, 120))) {
+        // QZ open without a ride, or a ride the history holds in full (saved by a Stop): nothing is lost.
+        // A history ride with the same start but shorter (a "Save FIT" in the middle of the ride) does
+        // not count: the ride went on after it
+        if (usable.isEmpty() ||
+            (workoutModel &&
+             workoutModel->hasWorkoutCovering(records.first().time, (int)records.last().elapsedTime, 120))) {
             qDebug() << "FIT backup of no lost ride, removed:" << paths;
             for (const QString &p : qAsConst(paths))
                 QFile::remove(p);
             continue;
         }
+        const QString newest = usable;
         m_recoverBackup = newest;
         m_recoverFiles = paths;
         const QDateTime start = records.first().time.toLocalTime();
@@ -6680,8 +6702,31 @@ void homeform::discardRecoverableRide() {
     findRecoverableRide();
 }
 
-void homeform::acceptFtpSuggestion() {
+bool homeform::refreshFtpSuggestion() {
     if (m_ftpSuggestion <= 0)
+        return false;
+    // the rider may have changed the FTP since the ride (the settings page): offered only while it is
+    // still higher than the FTP, and against that FTP
+    QSettings settings;
+    const int ftpNow = qRound(settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble());
+    if (ftpNow >= m_ftpSuggestion)
+        m_ftpSuggestion = 0;
+    else
+        m_ftpSuggestionCurrent = ftpNow;
+    emit ftpSuggestionChanged();
+    return m_ftpSuggestion > 0;
+}
+
+void homeform::showPendingRecordToast() {
+    if (m_pendingRecordToast.isEmpty())
+        return;
+    setToastRequested(m_pendingRecordToast);
+    m_pendingRecordToast.clear();
+}
+
+void homeform::acceptFtpSuggestion() {
+    // never lower an FTP the rider raised since the ride
+    if (!refreshFtpSuggestion())
         return;
     QSettings settings;
     settings.setValue(QZSettings::ftp, (double)m_ftpSuggestion);
@@ -7905,18 +7950,23 @@ void homeform::update() {
             QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0) +
             QObject::tr(" MAX: ") + QString::number((bluetoothManager->device())->wattsMetric().max(), 'f', 0));
         // a running workout with a power target: the target the trainer is asked for (offsets included),
-        // and the average; the maximum is on the tile's AVG Watts neighbours
+        // then the average and the maximum
         const bool workoutRunning = trainProgram && trainProgram->isStarted() && !trainProgram->rows.isEmpty();
         if (workoutRunning && bluetoothManager->device()->deviceType() == BIKE) {
             const double targetWatt = ((bike *)bluetoothManager->device())->lastRequestedPower().value();
             if (targetWatt > 0 && trainProgram->currentRow().power > 0)
-                watt->setSecondLine(tr("Target %1 W").arg(QString::number(targetWatt, 'f', 0)) +
-                                    QStringLiteral(" · ") + QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0));
+                watt->setSecondLine(tr("Target %1 W").arg(QString::number(targetWatt, 'f', 0)) + QStringLiteral(" · ") +
+                                    QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0) +
+                                    QObject::tr(" MAX: ") +
+                                    QString::number(bluetoothManager->device()->wattsMetric().max(), 'f', 0));
         }
         // the Elapsed tile (and the hero) say when the next interval of a running workout starts
+        // hours too when the step has an hour or more left ("m" is the minute of the hour only)
+        const QTime stepLeft = workoutRunning ? trainProgram->currentRowRemainingTime() : QTime(0, 0, 0);
         elapsed->setSecondLine(workoutRunning
                                    ? tr("Next in %1 · %2/%3")
-                                         .arg(trainProgram->currentRowRemainingTime().toString(QStringLiteral("m:ss")))
+                                         .arg(stepLeft.toString(stepLeft.hour() > 0 ? QStringLiteral("h:mm:ss")
+                                                                                    : QStringLiteral("m:ss")))
                                          .arg(trainProgram->currentLogicalStep())
                                          .arg(trainProgram->totalLogicalSteps())
                                    : QString());
@@ -9390,11 +9440,7 @@ bool homeform::getDevice() {
         toggle = !toggle;
         return toggle;
     }
-    // a device whose connected() has never been true does not report its link (the RFCOMM drivers):
-    // it is connected while it exists, as the recording assumes
-    if (this->bluetoothManager->device()->connected())
-        m_linkReportingDevice = this->bluetoothManager->device();
-    return m_linkReportingDevice != this->bluetoothManager->device() || this->bluetoothManager->device()->connected();
+    return this->bluetoothManager->device()->connected();
 }
 
 bool homeform::getLap() {
@@ -10281,6 +10327,9 @@ void homeform::fit_save_clicked() {
 
         // the ride is saved: its backups would look like a lost ride at the next launch
         if (QFile::exists(filename)) {
+            // a save at the end of the ride (not a "Save FIT" in the middle): no more backups of it
+            if (stopped)
+                m_rideSaved = true;
             QMetaObject::invokeMethod(fitBackupWriter, "removeFiles", Qt::QueuedConnection,
                                       Q_ARG(QStringList, QStringList()
                                                              << path + QStringLiteral("0") + backupFitFileName
@@ -10311,9 +10360,11 @@ void homeform::fit_save_clicked() {
             fitProcessor->processFile(filename);
             workoutModel->refresh();
         }
+        // said when the rider is back on the home page: the chart page that opens now is a web view on
+        // phones, drawn above every QML toast
         if (!recordText.isEmpty()) {
             qDebug() << recordText;
-            setToastRequested(recordText);
+            m_pendingRecordToast = recordText;
         }
 
 #ifdef Q_OS_ANDROID
