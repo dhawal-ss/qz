@@ -246,8 +246,12 @@ function process_arr(arr) {
     // Use resistance_avg for ellipticals (deviceType 4), peloton_resistance_avg for bikes/rowers
     $('.summary_resistance_avg').text(Math.floor(deviceType === 4 ? resistance_avg : peloton_resistance_avg) + ' ' + t('unit.level', 'lvl'));
 
-    // Bikes only (deviceType 2): IF and TSS use the cycling FTP
-    const np = normalizedPower(watts.map(function(w) { return Number(w.y) || 0; }));
+    // Bikes only (deviceType 2): IF and TSS use the cycling FTP. From the first pedal stroke, like
+    // the app and the FIT file: the seconds before the rider starts must not pull NP down.
+    let firstPedal = cadence.findIndex(function(c) { return Number(c.y) > 0; });
+    if (firstPedal < 0)
+        firstPedal = 0;
+    const np = normalizedPower(watts.slice(firstPedal).map(function(w) { return Number(w.y) || 0; }));
     const ftpWatt = Number(ftp);
     if (deviceType === 2 && np > 0 && Number.isFinite(ftpWatt) && ftpWatt > 0) {
         const intensity = np / ftpWatt;

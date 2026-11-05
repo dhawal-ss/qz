@@ -68,6 +68,17 @@ homeform *homeform::m_singleton = 0;
 using namespace std::chrono_literals;
 
 namespace {
+// Normalized Power of a bike ride from the first pedal stroke, like the FIT file (qfit.cpp starts
+// at the first sample with cadence): the seconds before the rider starts must not pull NP down.
+double bikeNormalizedPower(const QList<SessionLine> &session) {
+    int first = 0;
+    while (first < session.count() && session.at(first).cadence == 0)
+        first++;
+    if (first == session.count()) // no cadence at all: the whole ride, as qfit does
+        first = 0;
+    return metric::normalizedPower(session, first);
+}
+
 QString uploadActivityLabelFromSport(FIT_SPORT sport) {
     switch (sport) {
     case FIT_SPORT_RUNNING:
@@ -6861,7 +6872,7 @@ void homeform::update() {
         if (bluetoothManager->device()->deviceType() == BIKE &&
             settings.value(QZSettings::tile_tss_enabled, QZSettings::default_tile_tss_enabled).toBool()) {
             const double ftpWatt = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
-            const double np = metric::normalizedPower(Session);
+            const double np = bikeNormalizedPower(Session);
             const double rideSeconds = Session.isEmpty() ? 0.0 : (double)Session.last().elapsedTime;
             tss->setValue(QString::number(metric::trainingStressScore(rideSeconds, np, ftpWatt), 'f', 0));
             tss->setSecondLine(tr("NP %1W IF %2")
@@ -11473,7 +11484,7 @@ void homeform::sendMail() {
     }
 
     if (bluetoothManager->device()->deviceType() == BIKE) {
-        const double np = metric::normalizedPower(Session);
+        const double np = bikeNormalizedPower(Session);
         if (np > 0) {
             textMessage += tr("Normalized Power: %1W").arg(QString::number(np, 'f', 0)) + QStringLiteral("\n");
             if (ftpSetting > 0) {
