@@ -145,6 +145,30 @@ TEST(MetricPowerPeakTest, RideShorterThanTheWindowIsLeftOut) {
     EXPECT_DOUBLE_EQ(metric::powerPeak(&empty, 5), -1.0);
 }
 
+TEST(MetricPowerPeakTest, RepeatedDeviceSecondDoesNotStretchTheWindow) {
+    // The device clock can repeat a second while homeform still records one sample per second:
+    // the window must stay 5 samples long, or the sprint average falls apart
+    QList<uint16_t> watts = repeatedWatts(200, 60);
+    watts.append(repeatedWatts(800, 5));
+    watts.append(repeatedWatts(200, 60));
+    QList<SessionLine> session = powerSession(watts);
+    for (int i = 10; i < session.count(); i++)
+        session[i].elapsedTime -= 1; // sample 10 repeats second 9
+
+    EXPECT_DOUBLE_EQ(metric::powerPeak(&session, 5), 800.0);
+}
+
+TEST(MetricPowerPeakTest, WindowAsLongAsTheRideGivesTheRideAverage) {
+    // 20 minutes of samples whose elapsedTime starts at 1: the 20 minute power is the average,
+    // not 0 (which printed "20 Minutes Power: 0W" and "Estimated FTP: 0W")
+    QList<uint16_t> watts = repeatedWatts(180, 600);
+    watts.append(repeatedWatts(220, 600));
+    QList<SessionLine> session = powerSession(watts, 1);
+
+    EXPECT_DOUBLE_EQ(metric::powerPeak(&session, 20 * 60), 200.0);
+    EXPECT_DOUBLE_EQ(metric::powerPeak(&session, 20 * 60 + 1), -1.0);
+}
+
 TEST(MetricNormalizedPowerTest, SteadyPowerEqualsAveragePower) {
     QList<SessionLine> session = powerSession(repeatedWatts(250, 600));
     EXPECT_NEAR(metric::normalizedPower(session), 250.0, 1e-9);

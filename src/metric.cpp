@@ -406,29 +406,22 @@ double metric::calculateWeightLoss(double kcal) {
 }
 
 double metric::powerPeak(QList<SessionLine> *session, int seconds) {
-    if (session->count() == 0)
-        return -1;
+    // The session has one sample per second (homeform fills timer gaps and drops extra samples,
+    // and the FIT file writes record i at start + i), so a window of N samples is N seconds.
+    // elapsedTime is not used: it follows the device clock, which can repeat or skip a second.
+    // Before, a window ran from one elapsedTime to another and counted N+1 samples over N
+    // seconds (a steady 300 W ride read 360 W as 5 s power).
+    if (seconds <= 0 || session->count() < seconds)
+        return -1; // ride is shorter than the window size!
 
-    // ride is shorter than the window size!
-    if ((uint32_t)seconds > session->last().elapsedTime)
-        return -1;
-
-    // A sample holds the power of the second that ends at its timestamp, so the first sample of a
-    // window only marks where the window starts: its power belongs to the second before it.
-    // Adding it too gave N+1 samples over N seconds (a steady 300 W ride read 360 W as 5 s power).
-    int first = 0;
-    double total = 0.0; // power of the samples after `first`, up to `i`
+    double total = 0.0; // power of the last `seconds` samples
     double best = 0.0;
-    for (int i = 1; i < session->count(); i++) {
+    for (int i = 0; i < session->count(); i++) {
         total += session->at(i).watt;
-        double duration = (double)session->at(i).elapsedTime - (double)session->at(first).elapsedTime;
-        if (duration >= seconds && duration > 0) {
-            double avg = total / duration;
-            if (avg > best)
-                best = avg;
-            first++;
-            total -= session->at(first).watt;
-        }
+        if (i >= seconds)
+            total -= session->at(i - seconds).watt;
+        if (i >= seconds - 1 && total / seconds > best)
+            best = total / seconds;
     }
     return best;
 }

@@ -358,15 +358,17 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
 
     // Normalized Power: use complete 30-s rolling windows only, then
     // fourth-power mean and fourth root. This is the value used by IF/TSS.
-    // Same calculation as the in-app tile and summary (metric.cpp), so they always agree.
-    uint16_t normalized_power = (uint16_t)qRound(metric::normalizedPower(session, firstRealIndex));
+    // Same calculation as the in-app tile and summary (metric.cpp), so they always agree: IF and TSS
+    // come from the exact NP, which is rounded only for the FIT NormalizedPower field.
+    const double exact_normalized_power = metric::normalizedPower(session, firstRealIndex);
+    uint16_t normalized_power = (uint16_t)qRound(exact_normalized_power);
 
     // TSS was originally added in January 2026 before qfit had a Normalized Power
     // calculation, so it used average power as an approximation. NP was added later
     // for Garmin Endurance Score support; use it now for the canonical IF/TSS formulas.
     if (type == BIKE && ftp > 0 && normalized_power > 0) {
-        intensity_factor = normalized_power / ftp;
-        tss = (duration_seconds * normalized_power * intensity_factor) / (ftp * 36.0f);
+        intensity_factor = (float)metric::intensityFactor(exact_normalized_power, ftp);
+        tss = (float)metric::trainingStressScore(duration_seconds, exact_normalized_power, ftp);
         has_tss = true;
         if (training_load == 0.0f)
             training_load = tss;
