@@ -70,6 +70,10 @@ class DataObject : public QObject {
     Q_PROPERTY(QString plusName READ plusName NOTIFY plusNameChanged)
     Q_PROPERTY(QString minusName READ minusName NOTIFY minusNameChanged)
     Q_PROPERTY(QString identificator READ identificator NOTIFY identificatorChanged)
+    // The training zone of the value (power 1-7, heart rate 1-5) and the size of its scale; 0: no zone.
+    // The tiles and the hero strip colour from it (ThemeTokens.zoneColor)
+    Q_PROPERTY(int zone READ zone NOTIFY zoneChanged)
+    Q_PROPERTY(int zoneCount READ zoneCount NOTIFY zoneChanged)
 
   public:
     DataObject(const QString &name, const QString &icon, const QString &value, bool writable, const QString &id,
@@ -103,6 +107,15 @@ class DataObject : public QObject {
     bool largeButton() { return m_largeButton; }
     QString largeButtonLabel() { return m_largeButtonLabel; }
     QString largeButtonColor() { return m_largeButtonColor; }
+    int zone() { return m_zone; }
+    int zoneCount() { return m_zoneCount; }
+    void setZone(int z, int count) {
+        if (z == m_zone && count == m_zoneCount)
+            return;
+        m_zone = z;
+        m_zoneCount = count;
+        emit zoneChanged();
+    }
 
     QString m_id;
     QString m_name;
@@ -118,6 +131,8 @@ class DataObject : public QObject {
     bool m_largeButton = false;
     QString m_largeButtonLabel = QLatin1String("");
     QString m_largeButtonColor = QZSettings::default_tile_preset_resistance_1_color;
+    int m_zone = 0;
+    int m_zoneCount = 0;
 
   signals:
     void valueChanged(QString value);
@@ -136,6 +151,7 @@ class DataObject : public QObject {
     void largeButtonChanged(bool value);
     void largeButtonLabelChanged(QString value);
     void largeButtonColorChanged(QString value);
+    void zoneChanged();
 };
 
 class homeform : public QObject {

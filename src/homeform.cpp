@@ -851,6 +851,12 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
 
     tile_hr_time_in_zone_5 = new DataObject(QStringLiteral("HR Zone 5"), QStringLiteral("icons/icons/heart_red.png"),
                                             QStringLiteral("0:00:00"), false, QStringLiteral("tile_hr_time_in_zone_5"), valueElapsedFontSize, labelFontSize);
+    // the time-in-zone tiles wear the colour of their zone
+    tile_hr_time_in_zone_1->setZone(1, 5);
+    tile_hr_time_in_zone_2->setZone(2, 5);
+    tile_hr_time_in_zone_3->setZone(3, 5);
+    tile_hr_time_in_zone_4->setZone(4, 5);
+    tile_hr_time_in_zone_5->setZone(5, 5);
 
     tile_heat_time_in_zone_1 = new DataObject(QStringLiteral("Heat Zone 1"), QStringLiteral("icons/icons/fan.png"),
                                               QStringLiteral("0:00:00"), false, QStringLiteral("tile_heat_time_in_zone_1"), valueElapsedFontSize, labelFontSize);
@@ -7942,6 +7948,13 @@ void homeform::update() {
             setWattValueFontColor(QStringLiteral("red"));
         }
         bluetoothManager->device()->setPowerZone(ftpZone);
+        // the zone for the colour of the FTP Zone and Watts tiles (no power, no zone); Watts only with
+        // its colour setting on
+        {
+            const int powerZoneNumber = watts > 0 ? qBound(1, int(ftpZone), 7) : 0;
+            ftp->setZone(powerZoneNumber, 7);
+            watt->setZone(tileWattColorEnabled ? powerZoneNumber : 0, 7);
+        }
         ftp->setValue(QStringLiteral("Z") + QString::number(ftpZone, 'f', 1));
         ftp->setSecondLine(ftpMinW + QStringLiteral("-") + ftpMaxW + tr("W ") +
                            QString::number(ftpPerc, 'f', 0) + QStringLiteral("%"));
@@ -8139,6 +8152,7 @@ void homeform::update() {
             break;
         }
         bluetoothManager->device()->setHeartZone(currentHRZone);
+        heart->setZone(bluetoothManager->device()->currentHeart().value() > 0 ? qBound(1, int(currentHRZone), 5) : 0, 5);
         // the whole part is the zone counted by setHeartZone and shown by the colour: round to tenths,
         // but never up into the next zone (each zone is clamped at x.9999, which would read (x+1).0)
         // no heart rate, no zone (the second is not counted either)

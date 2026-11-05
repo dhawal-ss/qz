@@ -49,7 +49,7 @@ Item {
                 width: hero.cellW
                 height: hero.cellH
                 radius: 16
-                color: hero.theme ? hero.theme.surface : "#1C1D21"
+                color: !hero.theme ? "#1C1D21" : zone > 0 ? Qt.tint(hero.theme.surface, Qt.rgba(zc.r, zc.g, zc.b, 0.20)) : hero.theme.surface
                 border.color: hero.theme ? hero.theme.stroke : "#2E2F33"
 
                 // "Heart (bpm)" gives the caption "Heart" and the unit "bpm", as on the tiles
@@ -62,9 +62,13 @@ Item {
                 readonly property real pad: 14 * hero.zoom
                 readonly property bool showSecondLine: hero.cellH >= 120 * hero.zoom && modelData.secondLine !== ""
                 readonly property real valueSize: Math.round(height * (showSecondLine ? 0.46 : 0.54))
+                // the zone of the value tints the cell (power 1-7, heart rate 1-5)
+                readonly property int zone: modelData.zone !== undefined ? modelData.zone : 0
+                readonly property color zc: zone > 0 && hero.theme ? hero.theme.zoneColor(zone, modelData.zoneCount) : "transparent"
+                readonly property color onTint: hero.theme ? (zone > 0 ? hero.theme.textOnTint : hero.theme.textSecondary) : "#A1A1A8"
 
                 Accessible.role: Accessible.StaticText
-                Accessible.name: caption + ": " + shown
+                Accessible.name: caption + ": " + shown + (zone > 0 ? ", " + qsTr("zone %1").arg(zone) : "")
                 Accessible.description: modelData.secondLine
                 Accessible.focusable: true
 
@@ -78,7 +82,7 @@ Item {
                     font.capitalization: Font.AllUppercase
                     font.letterSpacing: 0.4
                     elide: Text.ElideRight
-                    color: hero.theme ? hero.theme.textSecondary : "#A1A1A8"
+                    color: cell.onTint
                     Accessible.ignored: true
                 }
                 Text {
@@ -96,7 +100,7 @@ Item {
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: Math.round(cell.valueSize / 2)
                     font.bold: true
-                    color: hero.theme ? hero.theme.valueColor(modelData.valueFontColor) : "white"
+                    color: !hero.theme ? "white" : cell.zone > 0 ? hero.theme.textPrimary : hero.theme.valueColor(modelData.valueFontColor)
                     Accessible.ignored: true
                 }
                 Text {
@@ -108,7 +112,7 @@ Item {
                     text: cell.unit
                     font.pixelSize: Math.round(0.34 * cell.valueSize)
                     font.weight: Font.Medium
-                    color: hero.theme ? hero.theme.textSecondary : "#A1A1A8"
+                    color: cell.onTint
                     Accessible.ignored: true
                 }
                 Text {
@@ -123,7 +127,7 @@ Item {
                     fontSizeMode: Text.HorizontalFit
                     minimumPixelSize: 11
                     elide: Text.ElideRight
-                    color: hero.theme ? hero.theme.textSecondary : "#A1A1A8"
+                    color: cell.onTint
                     Accessible.ignored: true
                 }
             }

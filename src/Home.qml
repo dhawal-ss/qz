@@ -512,10 +512,14 @@ HomeForm {
             // one value size per tile height, so "99" and "100" W look the same
             readonly property real valueSize: Math.round(height * 0.44)
             property bool autoIncl: false
+            // the zone of the value (homeform DataObject.zone): a band on top, a Z pill and the value colour
+            readonly property color zc: zone > 0 ? window.theme.zoneColor(zone, zoneCount) : "transparent"
+            // the FTP Zone tile already reads "Z4.2": no second Z
+            readonly property bool showZonePill: zone > 0 && !largeButton && String(value).indexOf("Z") !== 0
 
             // VoiceOver accessibility support
             Accessible.role: largeButton ? Accessible.Button : (writable ? Accessible.Pane : Accessible.StaticText)
-            Accessible.name: name + (largeButton ? "" : (": " + value))
+            Accessible.name: name + (largeButton ? "" : (": " + value)) + (zone > 0 && !largeButton ? ", " + qsTr("zone %1").arg(zone) : "")
             Accessible.description: largeButton ? largeButtonLabel : (secondLine !== "" ? secondLine : (writable ? qsTr("Adjustable. Current value: ") + value : qsTr("Current value: ") + value))
             Accessible.focusable: true
 
@@ -545,6 +549,17 @@ HomeForm {
                 id: rect
 
                 // Ignore for VoiceOver - decorative background only
+                Accessible.ignored: true
+            }
+            // the zone band along the top edge, inside the rounded corners
+            Rectangle {
+                visible: zone > 0 && !largeButton
+                x: rect.radius
+                y: 0
+                width: parent.width - 2 * rect.radius
+                height: 4 * id1.s
+                radius: height / 2
+                color: id1.zc
                 Accessible.ignored: true
             }
 
@@ -589,6 +604,7 @@ HomeForm {
                 y: 10 * id1.s
                 height: Math.max(myIcon.height, implicitHeight)
                 width: id1.contentWidth - (myIcon.visible ? myIcon.width + 6 * id1.s : 0) - (autoChip.visible ? autoChip.width + 6 * id1.s : 0)
+                       - (zonePill.visible ? zonePill.width + 6 * id1.s : 0)
                 verticalAlignment: Text.AlignVCenter
                 text: id1.caption
                 font.pixelSize: Math.round(14 * id1.s)
@@ -601,6 +617,26 @@ HomeForm {
 
                 // Ignore for VoiceOver - parent Item handles accessibility
                 Accessible.ignored: true
+            }
+            Rectangle {
+                id: zonePill
+                visible: id1.showZonePill
+                x: myText.x + myText.width + 6 * id1.s
+                y: myText.y + (myText.height - height) / 2
+                height: 18 * id1.s
+                width: zonePillText.implicitWidth + 12 * id1.s
+                radius: height / 2
+                color: id1.zc
+                Accessible.ignored: true
+                Text {
+                    id: zonePillText
+                    anchors.centerIn: parent
+                    text: "Z" + zone
+                    font.pixelSize: Math.round(11 * id1.s)
+                    font.bold: true
+                    color: "#000000"
+                    Accessible.ignored: true
+                }
             }
             Rectangle {
                 id: autoChip
@@ -626,7 +662,8 @@ HomeForm {
             Text {
                 objectName: "value"
                 id: myValue
-                color: window.theme.valueColor(valueFontColor)
+                // zone 1 (recovery) stays white: its grey would read as disabled
+                color: zone > 1 ? id1.zc : (zone === 1 ? window.theme.textPrimary : window.theme.valueColor(valueFontColor))
                 x: id1.pad
                 anchors.bottom: secondLineText.top
                 anchors.bottomMargin: 2 * id1.s

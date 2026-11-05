@@ -21,6 +21,8 @@ TestCase {
             property string secondLine: ""
             property string identificator: ""
             property string valueFontColor: "white"
+            property int zone: 0
+            property int zoneCount: 0
         }
     }
     Component {
@@ -112,5 +114,16 @@ TestCase {
         var c = cells(h)
         verify(c[0].Accessible.name.indexOf("245") >= 0)
         verify(c[1].Accessible.name.indexOf("--") >= 0)
+    }
+
+    function test_zone_tints_the_cell_and_is_read() {
+        var watt = tile("Watt", "245", "watt")
+        watt.zone = 4
+        watt.zoneCount = 7
+        var h = make(1280, [watt, tile("Cadence (rpm)", "88", "cadence")])
+        var c = cells(h)
+        verify(!Qt.colorEqual(c[0].color, tokens.surface), "a zone tints the cell")
+        verify(Qt.colorEqual(c[1].color, tokens.surface), "no zone, no tint")
+        verify(c[0].Accessible.name.indexOf("zone 4") >= 0)
     }
 }

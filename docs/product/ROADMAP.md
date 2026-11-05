@@ -71,6 +71,9 @@ Dashboard v1
   support address and signature are gone; the disclaimer is in Credits).
 - Step 4: Watts, Heart, Cadence and Elapsed large above the tiles on a bike (setting "Big key
   metrics at the top", on by default).
+- Step 5: one zone palette (`ThemeTokens.zoneColor`): the Watts, FTP Zone, Heart and HR
+  time-in-zone tiles carry a zone band, a "Z" pill and the zone colour on their value; the hero
+  cells are tinted by zone; screen readers say "zone 4".
 
 Your numbers
 - The setup wizard asks for FTP, max and resting heart rate (220 - age stays the default).
@@ -88,8 +91,8 @@ Your numbers
    pairing without a restart, live data freshness.
 4. **Zones, one definition**: one power and HR zone model and one palette for tiles, charts and
    targets.
-5. **Ride dashboard v1**: hero metrics, legible tiles, zone colours, safe pause/end controls, a
-   theme system.
+5. **Ride dashboard v1.1**: the hero follows a workout (time to the next interval, the target
+   power), the chart palette matches the tiles, a theme picker (OLED black, light).
 6. **Trainer control you can trust** and **workout engine correctness** (ZWO elements, ramps,
    segment laps, Peloton timing).
 7. **Interval coaching**: current interval, countdown, target in range, next interval.
