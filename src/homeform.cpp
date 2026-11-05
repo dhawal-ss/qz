@@ -7904,6 +7904,22 @@ void homeform::update() {
         watt->setSecondLine(
             QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0) +
             QObject::tr(" MAX: ") + QString::number((bluetoothManager->device())->wattsMetric().max(), 'f', 0));
+        // a running workout with a power target: the target the trainer is asked for (offsets included),
+        // and the average; the maximum is on the tile's AVG Watts neighbours
+        const bool workoutRunning = trainProgram && trainProgram->isStarted() && !trainProgram->rows.isEmpty();
+        if (workoutRunning && bluetoothManager->device()->deviceType() == BIKE) {
+            const double targetWatt = ((bike *)bluetoothManager->device())->lastRequestedPower().value();
+            if (targetWatt > 0 && trainProgram->currentRow().power > 0)
+                watt->setSecondLine(tr("Target %1 W").arg(QString::number(targetWatt, 'f', 0)) +
+                                    QStringLiteral(" · ") + QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0));
+        }
+        // the Elapsed tile (and the hero) say when the next interval of a running workout starts
+        elapsed->setSecondLine(workoutRunning
+                                   ? tr("Next in %1 · %2/%3")
+                                         .arg(trainProgram->currentRowRemainingTime().toString(QStringLiteral("m:ss")))
+                                         .arg(trainProgram->currentLogicalStep())
+                                         .arg(trainProgram->totalLogicalSteps())
+                                   : QString());
 
         if (trainProgram) {
             int8_t lower_requested_peloton_resistance = trainProgram->currentRow().lower_requested_peloton_resistance;
