@@ -494,3 +494,26 @@ TEST(MetricCyclingMETsTest, NoPowerOrNoWeightIsRest) {
     EXPECT_DOUBLE_EQ(metric::calculateCyclingMETs(-10.0, 75.0), 1.0);
     EXPECT_DOUBLE_EQ(metric::calculateCyclingMETs(150.0, 0.0), 1.0);
 }
+
+TEST(MetricFtpSuggestionTest, NinetyFivePercentOfTwentyMinutesWhenItBeatsTheFtp) {
+    // 95% of the best 20 minutes, rounded
+    EXPECT_EQ(metric::ftpSuggestion(240.0, 200.0), 228);
+    EXPECT_EQ(metric::ftpSuggestion(221.0, 200.0), 210); // 209.95
+}
+
+TEST(MetricFtpSuggestionTest, NothingForASmallOrNoGain) {
+    // 2% and 3 W at least: 200 W needs 204 W
+    EXPECT_EQ(metric::ftpSuggestion(214.0, 200.0), 0);   // 203
+    EXPECT_EQ(metric::ftpSuggestion(215.0, 200.0), 204); // 204.25
+    // 100 W: 2% is 2 W, the 3 W floor applies
+    EXPECT_EQ(metric::ftpSuggestion(107.0, 100.0), 0); // 102: +2% but only +2 W
+    EXPECT_EQ(metric::ftpSuggestion(109.0, 100.0), 104);
+    // a lower estimate is never offered
+    EXPECT_EQ(metric::ftpSuggestion(180.0, 200.0), 0);
+}
+
+TEST(MetricFtpSuggestionTest, NoSuggestionWithoutTwentyMinutesOrFromAMisread) {
+    EXPECT_EQ(metric::ftpSuggestion(-1.0, 200.0), 0); // powerPeak: ride shorter than 20 minutes
+    EXPECT_EQ(metric::ftpSuggestion(0.0, 200.0), 0);
+    EXPECT_EQ(metric::ftpSuggestion(800.0, 200.0), 0); // 760 W: above 700 W
+}

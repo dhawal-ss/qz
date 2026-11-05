@@ -2391,6 +2391,7 @@ import AndroidStatusBar 1.0
             property bool proform_treadmill_sport_55: false
             property bool tile_tss_enabled: false
             property int tile_tss_order: 80
+            property bool tile_hero_enabled: true
         }
 
         // The home page has its own Settings copy, read once when it is created: hand it every new

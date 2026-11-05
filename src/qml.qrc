@@ -112,6 +112,8 @@
         <file>Toast.qml</file>
         <file>ToastManager.qml</file>
         <file>ThemeTokens.qml</file>
+        <file>RideButton.qml</file>
+        <file>HeroStrip.qml</file>
         <file>sounds/training-program-segment.wav</file>
         <file>inner_templates/chartjs/elliptical.png</file>
         <file>inner_templates/chartjs/row.png</file>

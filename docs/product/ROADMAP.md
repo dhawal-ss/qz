@@ -24,53 +24,80 @@ Taken by the product lead; each can be reverted on its own.
 
 ## Shipped
 
+Metrics
 - NP, IF and TSS: a live tile for bikes, the end-of-workout summary and the post-ride page, one
   calculation shared with the FIT file.
 - Peak power (5 s to 20 min) fixed: it counted one sample too many (5 s power read 20% high).
 - Estimated FTP at 95% of the best 20 minutes.
 - Fitness, Fatigue and Form on the history page (`docs/product/fitness-form.md`).
-- History: rides imported from other devices no longer show 65535 W / 255 bpm when a sensor was
-  missing.
-- Desktops without Bluetooth start fake, Wi-Fi, USB/serial and ANT equipment.
-
-## Next, in order
-
-### Fix now: wrong numbers and lost rides
-- Average power with zeros everywhere (tile, summary, FIT, history).
-- FTMS power parsed as signed (a negative sample became 9999 W, +18% TSS); spikes ignored in
-  the history TSS.
+- Average power with zeros everywhere: tiles (AVG Watts, AVG Watt Lap, W/kg), the summary and
+  mail, the chart page after Stop, the web templates, the FIT file and the history.
+- FTMS power parsed as signed (a negative sample became 9999 W, +18% TSS); 3000 W or more is
+  recorded as 0 (the same rule as the history TSS).
 - The recorded power is the raw power, not the 3 s / 5 s display smoothing.
 - Calories from work on bikes with power; METs from the ACSM leg ergometry formula.
 - HR zones: the tile showed "Z1.5" for a second counted as Z2, and Z5 could not be reached with
   the defaults.
-- A wall-clock change (NTP, manual) deleted or cloned minutes of the recording.
-- A Bluetooth dropout recorded the last power for the whole gap.
-- ERG left on after a workout or in free-ride blocks.
-- The setup wizard set a resistance offset of 18 for everyone who tapped Next.
-- A typed FTP or weight was lost when leaving the field with Back.
-- Strava upload reported success when it failed.
+
+Recording
+- A wall-clock change (NTP, manual) no longer deletes or clones minutes of the recording; the
+  time a phone sleeps is counted (a clock that includes suspend).
+- A Bluetooth dropout no longer records the last power for the whole gap; a separate power
+  meter or cadence sensor is still recorded while only the trainer's link is down. Drivers that
+  never report their link (RFCOMM) record as before.
+- A stall over a minute keeps the FIT timeline aligned (one line per second).
+- ERG is released after a workout and in free-ride blocks; What's on Zwift inclines and Power
+  Zone Pack fixes; a What's on Zwift workout drives the trainer with the top bar off.
+- The workout name (program, GPX, What's on Zwift) names the FIT file and the uploads, and an old
+  name no longer sticks to the next ride.
+
+Setup and post-ride
+- The setup wizard no longer sets a resistance offset of 18 for everyone; ellipticals get the
+  step too.
+- A typed FTP or weight is saved when leaving the field with Back.
+- Strava upload reports failures; the mail waits for the end of the ride.
+- Ending a ride asks for confirmation by default.
+- History: rides imported from other devices no longer show 65535 W / 255 bpm when a sensor was
+  missing.
+- Desktops without Bluetooth start fake, Wi-Fi, USB/serial and ANT equipment.
+
+Dashboard v1
+- Step 1: dark tokens (`src/ThemeTokens.qml`), flat tiles, quiet chrome.
+- Step 2: legible tile anatomy (caption, value, unit, second line), 44 px touch targets, size
+  classes for phones, tablets and TVs.
+- Step 3: a ride bar (Lap, Pause, then End and Resume on a bike; Stop stays one tap on a
+  treadmill), a status chip (searching, connected, reconnecting, paused), the tiles dimmed while
+  paused, and a connection card with Search now and More help instead of the old help text (the
+  support address and signature are gone; the disclaimer is in Credits).
+- Step 4: Watts, Heart, Cadence and Elapsed large above the tiles on a bike (setting "Big key
+  metrics at the top", on by default).
+
+Your numbers
+- The setup wizard asks for FTP, max and resting heart rate (220 - age stays the default).
+- After a bike ride whose best 20 minutes beats the FTP by 2% and 3 W, QZ offers the new FTP
+  (95% of the 20 minutes) when the rider is back from the chart page.
+
+## Next, in order
 
 ### Then
 1. **One ride, one set of numbers**: a single workout summary used by the FIT file, the history,
    the email and the tiles.
-2. **Your numbers from day one**: FTP, max and resting HR in the setup wizard, and an
-   "Update FTP to N W?" prompt after a ride whose best 20 minutes says so.
-3. **Never lose a ride**: recover the crash backups at the next launch, save or discard after a
+2. **Never lose a ride**: recover the crash backups at the next launch, save or discard after a
    ride, honest upload status with retry.
-4. **First connection that works**: a connection card per sensor role, a filtered device picker,
+3. **First connection that works**: a connection card per sensor role, a filtered device picker,
    pairing without a restart, live data freshness.
-5. **Zones, one definition**: one power and HR zone model and one palette for tiles, charts and
+4. **Zones, one definition**: one power and HR zone model and one palette for tiles, charts and
    targets.
-6. **Ride dashboard v1**: hero metrics, legible tiles, zone colours, safe pause/end controls, a
+5. **Ride dashboard v1**: hero metrics, legible tiles, zone colours, safe pause/end controls, a
    theme system.
-7. **Trainer control you can trust** and **workout engine correctness** (ZWO elements, ramps,
+6. **Trainer control you can trust** and **workout engine correctness** (ZWO elements, ramps,
    segment laps, Peloton timing).
-8. **Interval coaching**: current interval, countdown, target in range, next interval.
-9. **Post-ride summary** built from the workout summary, scrubbable charts, one chart page.
-10. **Progress and records**: power curve and PRs, weekly totals and goals.
-11. **Share and celebrate**: a share card with the ride's numbers and PRs.
-12. **Insights**: aerobic efficiency and decoupling, qualified VO2max, filtered HRV.
-13. **Settings that get out of the way**: devices page, equipment filtering, grouped navigation,
+7. **Interval coaching**: current interval, countdown, target in range, next interval.
+8. **Post-ride summary** built from the workout summary, scrubbable charts, one chart page.
+9. **Progress and records**: power curve and PRs, weekly totals and goals.
+10. **Share and celebrate**: a share card with the ride's numbers and PRs.
+11. **Insights**: aerobic efficiency and decoupling, qualified VO2max, filtered HRV.
+12. **Settings that get out of the way**: devices page, equipment filtering, grouped navigation,
    theme picker.
 
 ## Deferred

@@ -1990,7 +1990,7 @@ QString homeform::bluetoothSearchStatus() {
     if (bluetoothManager->isSearching())
         return scanning;
     if (bluetoothManager->searchStopped())
-        return tr("Search stopped, tap the Bluetooth icon");
+        return tr("Search stopped, tap Search now");
     if (!bluetoothManager->nextSearchMs())
         return QString();
     const qint64 left = bluetoothManager->nextSearchMs() - QDateTime::currentMSecsSinceEpoch();
@@ -4918,6 +4918,19 @@ void homeform::sortTiles() {
         }
     }
 
+    // the hero strip shows these large above the tiles: they leave the grid, so appModel, moveTile and
+    // the drag indices stay aligned
+    m_heroTiles.clear();
+    if (bluetoothManager->device()->deviceType() == BIKE &&
+        settings.value(QZSettings::tile_hero_enabled, QZSettings::default_tile_hero_enabled).toBool()) {
+        for (DataObject *d : {watt, heart, cadence, elapsed}) {
+            if (dataList.removeOne(d))
+                m_heroTiles.append(d);
+        }
+    }
+    qDebug() << "hero tiles" << m_heroTiles.size();
+    emit heroTilesChanged();
+
     engine->rootContext()->setContextProperty(QStringLiteral("appModel"), QVariant::fromValue(dataList));
 }
 
@@ -4995,6 +5008,12 @@ void homeform::deviceConnected(QBluetoothDeviceInfo b) {
 
     m_labelHelp = false;
     emit changeLabelHelp(m_labelHelp);
+    // the ride bar's chip says Connected: the line under it names the equipment, not "Connecting..." or
+    // "<name> found" (a workout or class name stays)
+    if (m_info == QStringLiteral("Connecting...") || m_info.endsWith(QStringLiteral(" found"))) {
+        m_info = b.name();
+        emit infoChanged(m_info);
+    }
 
     QSettings settings;
 
@@ -5008,6 +5027,9 @@ void homeform::deviceConnected(QBluetoothDeviceInfo b) {
         Start_inner(false); // because if you sent the start command to a treadmill it could start the tape
         stopped = true; // when you will press start while you did some kms in pause mode from the beginning, the stats must be resetted
     }
+    // pause_on_start set stopped after Start(): the bar shows Start, not Resume
+    emit rideStateChanged();
+    emit startTextChanged(startText());
 
     sortTiles();
 
@@ -6205,6 +6227,11 @@ void homeform::Start_inner(bool send_event_to_device) {
         }
 
         if (stopped) {
+            // a new ride: an FTP offered after the last one and not answered is dropped
+            if (m_ftpSuggestion > 0) {
+                m_ftpSuggestion = 0;
+                emit ftpSuggestionChanged();
+            }
             trainProgram->restart();
             if (bluetoothManager->device()) {
 
@@ -6257,6 +6284,8 @@ void homeform::Start_inner(bool send_event_to_device) {
         paused = false;
         stopped = false;
     }
+    // outside the top bar block: startTextChanged is only sent with the top bar on
+    emit rideStateChanged();
 
     if (settings.value(QZSettings::top_bar_enabled, QZSettings::default_top_bar_enabled).toBool()) {
 
@@ -6363,6 +6392,19 @@ void homeform::Stop() {
 
     paused = false;
     stopped = true;
+    emit rideStateChanged();
+
+    // a bike ride whose best 20 minutes beats the FTP: Home offers the new one when the rider is back
+    // from the chart page (the mail of the ride keeps the FTP of the ride)
+    if (bluetoothManager->device() && bluetoothManager->device()->deviceType() == BIKE) {
+        const double ftpNow = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
+        const int suggestion = metric::ftpSuggestion(metric::powerPeak(&Session, 20 * 60), ftpNow);
+        if (suggestion > 0) {
+            m_ftpSuggestion = suggestion;
+            m_ftpSuggestionCurrent = qRound(ftpNow);
+            emit ftpSuggestionChanged();
+        }
+    }
 
     emit workoutEventStateChanged(bluetoothdevice::STOPPED);
 
@@ -6443,7 +6485,9 @@ QString homeform::startText() {
 
     QSettings settings;
     if (settings.value(QZSettings::top_bar_enabled, QZSettings::default_top_bar_enabled).toBool()) {
-        if (paused || stopped) {
+        if (paused && !stopped) {
+            return tr("Resume");
+        } else if (paused || stopped) {
             return tr("Start");
         } else {
             return tr("Pause");
@@ -6516,6 +6560,24 @@ void homeform::handleRestoreDefaultWheelDiameter() {
             kickrBike->restoreDefaultWheelDiameter();
         }
     }
+}
+
+void homeform::acceptFtpSuggestion() {
+    if (m_ftpSuggestion <= 0)
+        return;
+    QSettings settings;
+    settings.setValue(QZSettings::ftp, (double)m_ftpSuggestion);
+    setToastRequested(tr("FTP set to %1 W").arg(m_ftpSuggestion));
+    qDebug() << "FTP updated from" << m_ftpSuggestionCurrent << "to" << m_ftpSuggestion;
+    m_ftpSuggestion = 0;
+    emit ftpSuggestionChanged();
+}
+
+void homeform::dismissFtpSuggestion() {
+    if (m_ftpSuggestion <= 0)
+        return;
+    m_ftpSuggestion = 0;
+    emit ftpSuggestionChanged();
 }
 
 double homeform::averageWatts() {
@@ -9184,7 +9246,11 @@ bool homeform::getDevice() {
         toggle = !toggle;
         return toggle;
     }
-    return this->bluetoothManager->device()->connected();
+    // a device whose connected() has never been true does not report its link (the RFCOMM drivers):
+    // it is connected while it exists, as the recording assumes
+    if (this->bluetoothManager->device()->connected())
+        m_linkReportingDevice = this->bluetoothManager->device();
+    return m_linkReportingDevice != this->bluetoothManager->device() || this->bluetoothManager->device()->connected();
 }
 
 bool homeform::getLap() {

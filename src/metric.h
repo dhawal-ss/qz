@@ -85,6 +85,10 @@ class metric {
     static double calculateCyclingMETs(double watts, double weight);
 
     static double powerPeak(QList<SessionLine> *session, int seconds);
+    // The FTP to offer after a ride: 95% of the best 20 minutes (Coggan), rounded, when it beats the
+    // current FTP by 2% and 3 W at least; 0 otherwise. A ride shorter than 20 minutes (peak20 < 0)
+    // and an estimate above 700 W (a misread power) give 0.
+    static int ftpSuggestion(double peak20, double currentFtp);
 
     // Coggan Normalized Power of 1 Hz power samples, from firstIndex to the end: 30 s rolling
     // average, fourth power, mean, fourth root. 0 with fewer than 30 samples.

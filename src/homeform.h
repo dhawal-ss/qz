@@ -154,6 +154,18 @@ class homeform : public QObject {
     Q_PROPERTY(QString startColor READ startColor NOTIFY startColorChanged)
     Q_PROPERTY(QString stopText READ stopText NOTIFY stopTextChanged)
     Q_PROPERTY(QString stopIcon READ stopIcon NOTIFY stopIconChanged)
+    // 0 not recording, 1 recording, 2 paused (stopped first: pause_on_start leaves both flags set)
+    Q_PROPERTY(int rideState READ rideState NOTIFY rideStateChanged)
+    // a ride ends from Pause (End and Resume), except on a treadmill: its Stop stays one tap
+    Q_PROPERTY(bool endNeedsPause READ endNeedsPause NOTIFY rideStateChanged)
+    // After a bike ride whose best 20 minutes says the FTP is higher (metric::ftpSuggestion): the FTP to
+    // offer and the one of the ride; 0 when there is nothing to offer. Set at Stop, cleared by the
+    // answer or the next Start
+    Q_PROPERTY(int ftpSuggestion READ ftpSuggestion NOTIFY ftpSuggestionChanged)
+    Q_PROPERTY(int ftpSuggestionCurrent READ ftpSuggestionCurrent NOTIFY ftpSuggestionChanged)
+    // Bikes with tile_hero_enabled: Watts, Heart, Cadence and Elapsed for the hero strip above the tiles,
+    // and not in appModel. A property, not an invokable: QObjects read through a property stay C++-owned
+    Q_PROPERTY(QList<QObject *> heroTiles READ heroTiles NOTIFY heroTilesChanged)
     Q_PROPERTY(QString stopColor READ stopColor NOTIFY stopColorChanged)
     Q_PROPERTY(QStringList metrics READ metrics)
     Q_PROPERTY(QStringList bluetoothDevices READ bluetoothDevices NOTIFY bluetoothDevicesChanged)
@@ -505,6 +517,16 @@ class homeform : public QObject {
     QString startColor();
     QString stopText();
     QString stopIcon();
+    int rideState() const { return stopped ? 0 : (paused ? 2 : 1); }
+    int ftpSuggestion() const { return m_ftpSuggestion; }
+    QList<QObject *> heroTiles() const { return m_heroTiles; }
+    int ftpSuggestionCurrent() const { return m_ftpSuggestionCurrent; }
+    // Yes: the offered FTP becomes the FTP. Not now: nothing changes
+    Q_INVOKABLE void acceptFtpSuggestion();
+    Q_INVOKABLE void dismissFtpSuggestion();
+    bool endNeedsPause() {
+        return bluetoothManager && bluetoothManager->device() && bluetoothManager->device()->deviceType() != TREADMILL;
+    }
     QString stopColor();
     QString workoutStartDate() {
         if (!Session.isEmpty()) {
@@ -1092,6 +1114,9 @@ public:
     qint64 currentUpdateJitter = 0;
     // the device whose connected() has been true at least once: only its dropouts are recorded as no data
     bluetoothdevice *m_linkReportingDevice = nullptr;
+    int m_ftpSuggestion = 0;
+    QList<QObject *> m_heroTiles;
+    int m_ftpSuggestionCurrent = 0;
 
     peloton *pelotonHandler = nullptr;
     bool m_pelotonAskStart = false;
@@ -1382,6 +1407,9 @@ public:
     void startColorChanged(QString value);
     void stopTextChanged(QString value);
     void stopIconChanged(QString value);
+    void rideStateChanged();
+    void ftpSuggestionChanged();
+    void heroTilesChanged();
     void stopColorChanged(QString value);
     void infoChanged(QString value);
     void topBarHeightChanged(int value);

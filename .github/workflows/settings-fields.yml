@@ -8,6 +8,8 @@ on:
       - 'src/settings-tts.qml'
       - 'src/SettingsNumberField.qml'
       - 'src/SettingsFormatField.qml'
+      - 'src/HeroStrip.qml'
+      - 'src/ThemeTokens.qml'
       - 'tools/check_settings_fields.py'
       - 'tst/qml/**'
       - '.github/workflows/settings-fields.yml'

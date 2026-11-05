@@ -1350,8 +1350,9 @@ const QString QZSettings::history_chart_speed_inclination_order = QStringLiteral
 const QString QZSettings::moovio_lynx_konect_2_0 = QStringLiteral("moovio_lynx_konect_2_0");
 const QString QZSettings::tile_tss_enabled = QStringLiteral("tile_tss_enabled");
 const QString QZSettings::tile_tss_order = QStringLiteral("tile_tss_order");
+const QString QZSettings::tile_hero_enabled = QStringLiteral("tile_hero_enabled");
 
-const uint32_t allSettingsCount = 1045;
+const uint32_t allSettingsCount = 1046;
 
 QVariant allSettings[allSettingsCount][2] = {
     {QZSettings::cryptoKeySettingsProfiles, QZSettings::default_cryptoKeySettingsProfiles},
@@ -2423,6 +2424,7 @@ QVariant allSettings[allSettingsCount][2] = {
     {QZSettings::virtual_device_rower_cadence_offset, QZSettings::default_virtual_device_rower_cadence_offset},
     {QZSettings::tile_tss_enabled, QZSettings::default_tile_tss_enabled},
     {QZSettings::tile_tss_order, QZSettings::default_tile_tss_order},
+    {QZSettings::tile_hero_enabled, QZSettings::default_tile_hero_enabled},
 };
 
 void QZSettings::qDebugAllSettings(bool showDefaults) {

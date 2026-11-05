@@ -676,6 +676,17 @@ double metric::calculateKCalfromWork(double joules) {
     return joules / (4184.0 * 0.24); // 4184 J per kcal, 24% of the energy burned becomes work
 }
 
+int metric::ftpSuggestion(double peak20, double currentFtp) {
+    if (peak20 <= 0)
+        return 0;
+    const int estimate = qRound(peak20 * 0.95);
+    if (estimate > 700)
+        return 0;
+    if (estimate >= currentFtp * 1.02 && estimate >= currentFtp + 3)
+        return estimate;
+    return 0;
+}
+
 double metric::calculateCyclingMETs(double watts, double weight) {
     if (watts <= 0 || weight <= 0)
         return 1.0; // at rest

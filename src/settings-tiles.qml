@@ -59,6 +59,38 @@ ScrollView {
             pageSettings: settingsTilesPane.settings
         }
 
+        SwitchDelegate {
+            // on iOS the title of a switch kept the size of the style while the text around it grew: with a size other than 100 % it takes the one of the window font
+            Binding on font.pixelSize { when: window.scaledFontPx > 0; value: window.scaledFontPx; restoreMode: Binding.RestoreBindingOrValue }
+            id: heroEnabledSwitch
+            text: qsTr("Big key metrics at the top")
+            spacing: 0
+            bottomPadding: 0
+            topPadding: 0
+            rightPadding: 0
+            leftPadding: 0
+            clip: false
+            checked: settings.tile_hero_enabled
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            Layout.fillWidth: true
+            onClicked: settings.tile_hero_enabled = checked
+            Accessible.onPressAction: { toggle(); clicked(); }
+        }
+
+        Label {
+            text: qsTr("Bikes: Watts, Heart, Cadence and Elapsed are shown large above the tiles and no longer in the grid; their order settings have no effect while this is on.")
+            font.bold: true
+            font.italic: true
+            font.pixelSize: window.fontHint
+            bottomPadding: window.hintGap
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+            verticalAlignment: Text.AlignVCenter
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            Layout.fillWidth: true
+            color: Material.color(Material.Lime)
+        }
+
         AccordionCheckElement {
             id: speedEnabledAccordion
             title: qsTr("Speed")

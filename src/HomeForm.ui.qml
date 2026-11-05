@@ -1,7 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Controls 2.5
 import QtQuick.Controls.Material 2.12
-import QtGraphicalEffects 1.12
 import Qt.labs.settings 1.0
 import QtQml 2.15
 
@@ -17,6 +16,10 @@ Page {
     property alias stop: stop
     property alias lap: lap
     property alias row: row
+    property alias searchNow: searchNowButton
+    property alias moreHelp: moreHelpButton
+    // The bar and the status line under it: the tiles start below
+    readonly property int topChromeHeight: topBar.visible ? topBar.height + statusLine.height : 0
     // Search for the equipment ("Next search in 12 s"), set by Home.qml while no device is connected
     property string searchStatus: ""
     // Home.qml sets the new values from the settings page in it (the background color of the top bar)
@@ -30,199 +33,204 @@ Page {
 		  property string theme_background_color: "#303030"
 		}
 
+    // The ride bar (dashboard spec, step 3): the status chip on the left, the ride controls on the
+    // right, the primary one at the edge. Hidden in lock mode and with the top bar off
     Item {
-        width: parent.width
-        height: rootItem.topBarHeight
         id: topBar
-        visible: !window.lockTiles
+        width: parent.width
+        height: rootItem.topBarHeight > 0 ? Math.max(64, window.fontPx(16) + 40) : 0
+        visible: !window.lockTiles && rootItem.topBarHeight > 0
 
+        Rectangle { anchors.fill: parent; color: window.theme.bg; Accessible.ignored: true }
+        Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: window.theme.stroke; Accessible.ignored: true }
+
+        // The connection and the ride at a glance. A tap searches now when no device is connected, or
+        // looks for the heart rate sensor again when one is (what the Bluetooth icon did)
+        Rectangle {
+            id: statusChip
+            readonly property bool searching: rootItem.labelHelp
+            // labelHelp first: rootItem.device blinks while no device exists
+            readonly property bool linkDown: !searching && !rootItem.device
+            readonly property bool pausedRide: !searching && !linkDown && rootItem.rideState === 2
+            readonly property string label: searching ? (page.searchStatus !== "" ? page.searchStatus.split("\n")[0] : qsTr("Searching…"))
+                                          : linkDown ? qsTr("Reconnecting…")
+                                          : pausedRide ? qsTr("Paused") : qsTr("Connected")
+            // the room left of the buttons: the chip gives up its label before a button label is cut
+            readonly property real room: row.x - x - 12
+            readonly property real fullWidth: chipLabel.x + chipLabel.implicitWidth + 14
+            anchors.left: parent.left
+            anchors.leftMargin: window.contentSideMargin
+            anchors.verticalCenter: parent.verticalCenter
+            height: 36
+            radius: 18
+            width: room >= chipLabel.x + 48 ? Math.min(fullWidth, room) : 32
+            color: pausedRide ? window.theme.cautionTonal : window.theme.surfaceRaised
+
+            Rectangle {
+                x: 12
+                anchors.verticalCenter: parent.verticalCenter
+                width: 8; height: 8; radius: 4
+                color: statusChip.searching ? window.theme.caution : statusChip.linkDown ? window.theme.danger : window.theme.go
+                Accessible.ignored: true
+            }
+            Label {
+                id: chipLabel
+                x: 28
+                width: Math.max(0, parent.width - x - 14)
+                visible: parent.width > 32
+                anchors.verticalCenter: parent.verticalCenter
+                text: statusChip.label
+                elide: Text.ElideRight
+                maximumLineCount: 1
+                font.pixelSize: window.fontPx(14)
+                color: statusChip.pausedRide ? window.theme.caution : window.theme.textPrimary
+                Accessible.ignored: true
+            }
+            MouseArea {
+                anchors.fill: parent
+                // at least 44 px tall to touch
+                anchors.topMargin: -4
+                anchors.bottomMargin: -4
+                onClicked: { rootItem.bluetoothSearchNow(); rootItem.reconnectHeartRateBelt(); }
+
+                // VoiceOver/TalkBack: a button that searches. The state is in the name: TalkBack (Qt 5.15)
+                // reads no description when the name is set
+                Accessible.role: Accessible.Button
+                Accessible.name: qsTr("Bluetooth connection") + ": " + statusChip.label
+                Accessible.description: statusChip.label
+                Accessible.focusable: true
+                Accessible.onPressAction: { rootItem.bluetoothSearchNow(); rootItem.reconnectHeartRateBelt(); }
+            }
+        }
+
+        // Lap, End/Stop, then the primary button. A bike ends from Pause (End and Resume), so a stray
+        // tap cannot end a ride; a treadmill keeps Stop while running, its belt must stop in one tap
         Row {
             id: row
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.right: parent.right
+            anchors.rightMargin: window.contentSideMargin
             anchors.verticalCenter: parent.verticalCenter
-            height: topBar.height - 20
-            spacing: 5
-            padding: 5
+            spacing: rootItem.rideState === 2 ? 16 : 8
 
-            Rectangle {
-                width: 50
-                height: row.height
-					 color: "transparent"
-                Accessible.ignored: true
-
-                Column {
-                    id: column
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    height: row.height
-                    spacing: 0
-                    padding: 0
-                    Accessible.ignored: true
-
-                    Rectangle {
-                        width: 50
-                        height: row.height
-                        color: "transparent"
-                        Accessible.ignored: true
-
-                        Image {
-                            anchors.verticalCenter: parent.verticalCenter
-                            id: treadmill_connection
-                            width: 48
-                            height: row.height - 52
-                            source: "icons/icons/bluetooth-icon.png"
-                            enabled: rootItem.device
-                            smooth: true
-
-                            // VoiceOver accessibility: the MouseArea below is the button, read once
-                            Accessible.ignored: true
-                        }
-                        ColorOverlay {
-                            anchors.fill: treadmill_connection
-                            source: treadmill_connection
-                            color: treadmill_connection.enabled ? "#00000000" : "#B0D3d3d3"
-                        }
-                        // No device yet: a tap searches right away instead of waiting for the next search
-                        // (with a device connected bluetoothSearchNow() does nothing). With a device connected the tap
-                        // looks for the chosen heart rate sensor again (reconnectHeartRateBelt() waits for the device)
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: { rootItem.bluetoothSearchNow(); rootItem.reconnectHeartRateBelt(); }
-
-                            // VoiceOver/TalkBack: a button that searches. The state is in the name: TalkBack (Qt 5.15)
-                            // reads no description when the name is set
-                            Accessible.role: Accessible.Button
-                            Accessible.name: qsTr("Bluetooth connection") + ": " + (rootItem.device ? qsTr("Device connected") : qsTr("Device not connected"))
-                            Accessible.description: rootItem.device ? qsTr("Device connected") : qsTr("Device not connected")
-                            Accessible.focusable: true
-                            Accessible.onPressAction: { rootItem.bluetoothSearchNow(); rootItem.reconnectHeartRateBelt(); }
-                        }
-                    }
-                    Image {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        id: treadmill_signal
-                        width: 24
-                        height: row.height - 76
-                        source: rootItem.signal
-                        smooth: true
-                        Accessible.ignored: true
-                    }
-                }
+            RideButton {
+                id: lap
+                text: qsTr("Lap")
+                minimumWidth: 72
+                visible: !rootItem.labelHelp && rootItem.rideState === 1
+                enabled: rootItem.lap
+                fillColor: window.theme.surfaceRaised
+                labelColor: window.theme.textPrimary
+                Accessible.name: qsTr("Lap")
+                Accessible.description: qsTr("Record a new lap")
             }
-
-            Rectangle {
-                width: 120
-                height: row.height
-					 color: "transparent"
-                Accessible.ignored: true
-
-                RoundButton {
-                    icon.source: rootItem.startIcon
-                    icon.height: row.height - 54
-                    icon.width: 46
-                    text: rootItem.startText
-                    // fixed width: keep the size it had before the Text size setting
-                    Binding on font.pixelSize { when: window.scaledFontPx > 0; value: window.appFontPx; restoreMode: Binding.RestoreBindingOrValue }
-                    enabled: true
-                    id: start
-                    width: 120
-                    height: row.height - 4
-
-                    // VoiceOver accessibility
-                    Accessible.role: Accessible.Button
-                    Accessible.name: rootItem.startText
-                    Accessible.description: qsTr("Start workout")
-                    Accessible.focusable: true
-                }
+            RideButton {
+                id: stop
+                text: rootItem.endNeedsPause ? qsTr("End") : rootItem.stopText
+                minimumWidth: 96
+                visible: !rootItem.labelHelp && (rootItem.rideState === 2 || (!rootItem.endNeedsPause && rootItem.rideState === 1))
+                fillColor: window.theme.dangerTonal
+                labelColor: window.theme.danger
+                Accessible.name: text
+                Accessible.description: qsTr("Stop workout")
             }
-
-            Rectangle {
-                width: 120
-                height: row.height
-					 color: "transparent"
-                Accessible.ignored: true
-
-                RoundButton {
-                    icon.source: rootItem.stopIcon
-                    icon.height: row.height - 54
-                    icon.width: 46
-                    text: rootItem.stopText
-                    Binding on font.pixelSize { when: window.scaledFontPx > 0; value: window.appFontPx; restoreMode: Binding.RestoreBindingOrValue }
-                    enabled: true
-                    id: stop
-                    width: 120
-                    height: row.height - 4
-
-                    // VoiceOver accessibility
-                    Accessible.role: Accessible.Button
-                    Accessible.name: rootItem.stopText
-                    Accessible.description: qsTr("Stop workout")
-                    Accessible.focusable: true
-                }
-            }
-
-            Rectangle {
-                id: item2
-                width: 50
-                height: row.height
-					 color: "transparent"
-                Accessible.ignored: true
-
-                RoundButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    id: lap
-                    width: 48
-                    height: row.height - 52
-                    icon.source: "icons/icons/lap.png"
-                    icon.width: 48
-                    icon.height: 48
-                    enabled: rootItem.lap
-                    smooth: true
-
-                    // VoiceOver accessibility
-                    Accessible.role: Accessible.Button
-                    Accessible.name: qsTr("Lap")
-                    Accessible.description: qsTr("Record a new lap")
-                    Accessible.focusable: true
-                }
-                ColorOverlay {
-                    anchors.fill: lap
-                    source: lap
-                    color: lap.enabled ? "#00000000" : "#B0D3d3d3"
-                }
+            RideButton {
+                id: start
+                text: rootItem.startText
+                minimumWidth: rootItem.endNeedsPause || rootItem.rideState !== 1 ? 120 : 96
+                // Pause while riding; Start and Resume are the go colour
+                fillColor: rootItem.rideState === 1 ? window.theme.cautionTonal : window.theme.go
+                labelColor: rootItem.rideState === 1 ? window.theme.caution : "#000000"
+                Accessible.name: text
+                Accessible.description: qsTr("Start workout")
             }
         }
+    }
 
-        Row {
-            id: row1
-            width: parent.width
-            anchors.bottom: row.bottom
-            // a bigger text grows down into the gap above the tiles, not up into the buttons
-            anchors.bottomMargin: window.textScale !== 1 ? -10 - Math.round(statusLabel.height * (1 - 1 / window.textScale)) : -10
+    // The workout or class name under the bar, once the equipment is connected
+    Label {
+        id: statusLine
+        anchors.top: topBar.bottom
+        width: parent.width
+        visible: topBar.visible && !rootItem.labelHelp && rootItem.info !== ""
+        height: visible ? implicitHeight : 0
+        leftPadding: window.contentSideMargin
+        rightPadding: window.contentSideMargin
+        topPadding: 4
+        bottomPadding: 4
+        horizontalAlignment: Text.AlignHCenter
+        text: rootItem.info
+        elide: Text.ElideRight
+        maximumLineCount: 1
+        font.pixelSize: window.fontPx(13)
+        color: window.theme.textSecondary
+    }
+
+    // While no equipment is connected: what QZ is doing and what the rider can do. Outside the bar, so
+    // it shows with the top bar off too; above the tiles
+    Rectangle {
+        id: connectionCard
+        z: 10
+        visible: rootItem.labelHelp
+        width: Math.min(420, page.width - 2 * window.contentSideMargin)
+        height: cardColumn.height + 48
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: page.topChromeHeight + 16
+        radius: window.theme.cardRadius
+        color: window.theme.surface
+        border.color: window.theme.stroke
+
+        Column {
+            id: cardColumn
+            x: 24
+            y: 24
+            width: parent.width - 48
+            spacing: 12
 
             Label {
-                id: statusLabel
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                // the search status may have two lines ("<device> found" and the countdown): the line
-                // grows upwards, so they are set closer to keep the first one off the buttons
-                horizontalAlignment: Text.AlignHCenter
-                lineHeight: text.indexOf("\n") >= 0 ? 0.8 : 1
-                text: page.searchStatus !== "" ? page.searchStatus : rootItem.info
+                width: parent.width
+                text: qsTr("Looking for your equipment")
+                wrapMode: Text.WordWrap
+                font.pixelSize: window.fontPx(20)
+                font.bold: true
+                color: window.theme.textPrimary
             }
-        }
-
-        Label {
-            id: lblHelp
-            width: parent.width
-            leftPadding: window.contentSideMargin
-            rightPadding: window.contentSideMargin
-            anchors.top: row1.bottom
-            anchors.topMargin: 30
-            text: qsTr("This app should automatically connect to your bike/treadmill/rower. <b>If it doesn't, please check</b>:<br>1) your Echelon/Domyos App MUST be closed while qdomyos-zwift is running;<br>2) both Bluetooth and Bluetooth permissions MUST be enabled<br>3) your bike/treadmill/rower should be turned on BEFORE starting this app<br>4) try to restart your device<br><br>If your bike/treadmill disconnects every 30 seconds try to disable the 'virtual device' setting on the left bar.<br><br>In case of issues, please feel free to contact me at roberto.viola83@gmail.com.<br><br><b>Have a nice ride!</b><br/ ><i>QZ specifically disclaims liability for<br>incidental or consequential damages and assumes<br>no responsibility or liability for any loss<br>or damage suffered by any person as a result of<br>the use or misuse of the app.</i><br><br>Roberto Viola")
-            wrapMode: Label.WordWrap
-            visible: rootItem.labelHelp
+            Label {
+                width: parent.width
+                visible: page.searchStatus !== ""
+                text: page.searchStatus
+                wrapMode: Text.WordWrap
+                color: window.theme.textSecondary
+            }
+            // the tips only where they fit: a phone in landscape keeps the buttons on screen
+            Repeater {
+                model: page.height - page.topChromeHeight > 480 ? [qsTr("Turn your bike on and pedal to wake it up."),
+                                                                  qsTr("Close other apps that connect to it, like the maker's app or Zwift Companion."),
+                                                                  qsTr("Keep Bluetooth on and allowed for QZ.")] : []
+                Label {
+                    width: cardColumn.width
+                    text: "\u2022  " + modelData
+                    wrapMode: Text.WordWrap
+                    color: window.theme.textOnTint
+                }
+            }
+            RideButton {
+                id: searchNowButton
+                width: parent.width
+                text: qsTr("Search now")
+                fillColor: "#FFFFFF"
+                labelColor: "#000000"
+                Accessible.name: text
+                Accessible.description: qsTr("Search for the equipment now")
+            }
+            RideButton {
+                id: moreHelpButton
+                width: parent.width
+                text: qsTr("More help")
+                fillColor: "transparent"
+                labelColor: window.theme.textPrimary
+                Accessible.name: text
+                Accessible.description: qsTr("What to check when the equipment does not connect")
+            }
         }
     }
 }

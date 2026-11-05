@@ -302,6 +302,125 @@ HomeForm {
         }
     }
     lap.onClicked: { lap_clicked(); toast.show(qsTr("New lap started!"), 1500); }
+    searchNow.onClicked: { rootItem.bluetoothSearchNow(); rootItem.reconnectHeartRateBelt(); }
+    moreHelp.onClicked: moreHelpPopup.open()
+
+    // After a ride whose best 20 minutes beats the FTP (homeform::Stop): offered when the rider is back
+    // on this page from the chart page, so the mail of the ride keeps the FTP of the ride and a web
+    // view (the chart page on phones) cannot cover the question
+    StackView.onActivated: if (rootItem.ftpSuggestion > 0 && !ftpSuggestionPopup.opened) ftpSuggestionPopup.open()
+
+    Popup {
+        id: ftpSuggestionPopup
+        parent: Overlay.overlay
+        modal: true
+        focus: true
+        anchors.centerIn: parent
+        width: Math.min(420, parent.width - 32)
+        padding: 24
+        // the numbers are kept when it opens: the answer clears rootItem.ftpSuggestion before it closes
+        property int watts: 0
+        property int current: 0
+        onAboutToShow: { watts = rootItem.ftpSuggestion; current = rootItem.ftpSuggestionCurrent }
+        // Back or a tap outside is "Not now"
+        onClosed: rootItem.dismissFtpSuggestion()
+        background: Rectangle { radius: window.theme.cardRadius; color: window.theme.surface; border.color: window.theme.stroke }
+
+        contentItem: Column {
+            spacing: 12
+
+            Label {
+                width: parent.width
+                text: qsTr("New FTP: %1 W").arg(ftpSuggestionPopup.watts)
+                wrapMode: Text.WordWrap
+                font.pixelSize: window.fontPx(22)
+                font.bold: true
+                color: window.theme.go
+            }
+            Label {
+                width: parent.width
+                text: qsTr("Your best 20 minutes in this ride says your FTP is %1 W. It is %2 W now. Your power zones, workout targets and training load follow your FTP.")
+                      .arg(ftpSuggestionPopup.watts).arg(ftpSuggestionPopup.current)
+                wrapMode: Text.WordWrap
+                color: window.theme.textOnTint
+            }
+            RideButton {
+                width: parent.width
+                text: qsTr("Update FTP")
+                fillColor: window.theme.go
+                labelColor: "#000000"
+                onClicked: { rootItem.acceptFtpSuggestion(); ftpSuggestionPopup.close() }
+                Accessible.name: text
+                Accessible.description: qsTr("Set your FTP to %1 W").arg(ftpSuggestionPopup.watts)
+            }
+            RideButton {
+                width: parent.width
+                text: qsTr("Not now")
+                fillColor: "transparent"
+                labelColor: window.theme.textPrimary
+                onClicked: ftpSuggestionPopup.close()
+                Accessible.name: text
+                Accessible.description: qsTr("Keep your FTP")
+            }
+        }
+    }
+
+    // The checklist of the connection card's More help
+    Popup {
+        id: moreHelpPopup
+        parent: Overlay.overlay
+        modal: true
+        focus: true
+        anchors.centerIn: parent
+        width: Math.min(420, parent.width - 32)
+        height: Math.min(helpColumn.height + topPadding + bottomPadding, parent.height - 32)
+        padding: 24
+        background: Rectangle { radius: window.theme.cardRadius; color: window.theme.surface; border.color: window.theme.stroke }
+
+        Flickable {
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: helpColumn.height
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            Column {
+                id: helpColumn
+                width: parent.width
+                spacing: 12
+
+                Label {
+                    width: parent.width
+                    text: qsTr("If your equipment does not connect")
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: window.fontPx(20)
+                    font.bold: true
+                    color: window.theme.textPrimary
+                }
+                Repeater {
+                    model: [qsTr("QZ connects to your bike, treadmill or rower by itself. If it does not:"),
+                            qsTr("1. Close the maker's app (Echelon, Domyos...) and any other app that connects to it."),
+                            qsTr("2. Turn Bluetooth on and allow QZ to use it."),
+                            qsTr("3. Turn the equipment on before you open QZ."),
+                            qsTr("4. Restart your phone or tablet."),
+                            qsTr("If it disconnects every 30 seconds, turn off the virtual device in the settings.")]
+                    Label {
+                        width: helpColumn.width
+                        text: modelData
+                        wrapMode: Text.WordWrap
+                        color: window.theme.textOnTint
+                    }
+                }
+                RideButton {
+                    width: parent.width
+                    text: qsTr("Close")
+                    onClicked: moreHelpPopup.close()
+                    Accessible.name: text
+                    Accessible.description: qsTr("Close the help")
+                }
+            }
+        }
+    }
 
     Component.onCompleted: {
         console.log("home.qml completed");
@@ -332,7 +451,30 @@ HomeForm {
         cellHeight: [130, 140, 156, 180][sizeClass] * settings.ui_zoom / 100
         focus: true
         model: appModel
-        anchors.topMargin: (!window.lockTiles ? rootItem.topBarHeight + 30 : 0)
+        anchors.topMargin: (!window.lockTiles ? topChromeHeight + 8 : 0)
+        // Bikes: Watts, Heart, Cadence and Elapsed large above the tiles; it scrolls with them, so a
+        // phone in landscape still reaches the grid
+        header: HeroStrip {
+            width: gridView.width - gridView.tileGap
+            tiles: typeof rootItem !== "undefined" ? rootItem.heroTiles : []
+            theme: window.theme
+            zoom: settings.ui_zoom / 100
+            availableHeight: gridView.height
+            visible: !window.lockTiles && tiles.length > 0
+            height: visible ? implicitHeight : 0
+            // A taller header is laid out upwards and the view keeps its place: the strip arrives after
+            // the first layout and was left above the top. Keep the view at the beginning when it was there
+            property real lastHeight: 0
+            onHeightChanged: {
+                if (!gridView.moving && gridView.contentY <= -lastHeight + 1)
+                    gridView.contentY = gridView.originY
+                lastHeight = height
+            }
+        }
+        // paused: the tiles step back, the bar shows End and Resume; searching: the connection card
+        // is in front
+        opacity: rootItem.labelHelp ? 0.3 : (rootItem.rideState === 2 ? 0.5 : 1)
+        Behavior on opacity { NumberAnimation { duration: 200 } }
         interactive: !window.lockTiles
         id: gridView
         objectName: "gridview"

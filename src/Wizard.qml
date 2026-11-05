@@ -51,6 +51,10 @@ Page {
         property bool garmin_companion: false
         property string filter_device: "Disabled"
         property bool weight_kg_unit: false
+        property real ftp: 200.0
+        property bool heart_max_override_enable: false
+        property real heart_max_override_value: 195.0
+        property int heart_rate_resting: 60
     }
 
     background: Rectangle {
@@ -1415,6 +1419,154 @@ Page {
                             settings.weight = weightSpinBox.realValue
                             settings.age = ageSpinBox.value
                             settings.sex = genderComboBox.value
+                            stackViewLocal.push(trainingNumbersComponent)
+                        }
+                    }
+
+                    WizardButton {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Back")
+                        onClicked: stackViewLocal.pop()
+                    }
+                }
+            }
+        }
+    }
+
+    // Your training numbers: the FTP sets the power zones, the workout targets and the TSS; the max and
+    // resting heart rate set the heart rate zones. The defaults stay for a rider who does not know them
+    Component {
+        id: trainingNumbersComponent
+
+        Item {
+            anchors.fill: parent
+            // a treadmill has its own FTP (ftp_run, in the treadmill settings)
+            readonly property bool askFtp: selectedOptions.step2 !== "Treadmill"
+            readonly property int ageMaxHr: 220 - settings.age
+
+            ScrollView {
+                contentWidth: availableWidth
+                topPadding: 16
+                // Qt 5.15 keeps a stale implicit height after text wraps: size the content by the column itself
+                contentHeight: contentChildren[0].height
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.fill: parent
+                Layout.preferredHeight: parent.height
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                ColumnLayout {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 20
+                    width: parent.width * 0.9
+
+                    Text {
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Your Training Numbers")
+                        font.pixelSize: window.fontPx(24)
+                        font.bold: true
+                        color: "white"
+                    }
+
+                    Text {
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Not sure? Keep these values: after a hard ride QZ offers you a new FTP.")
+                        font.pixelSize: window.fontPx(16)
+                        color: "#C7C7CC"
+                    }
+
+                    Text {
+                        visible: askFtp
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("FTP (W): the power you can hold for about an hour")
+                        font.pixelSize: window.fontPx(20)
+                        color: "white"
+                    }
+
+                    SpinBox {
+                        id: ftpSpinBox
+                        Accessible.name: qsTr("FTP (W)") + ": " + value
+                        visible: askFtp
+                        Layout.alignment: Qt.AlignHCenter
+                        from: 50
+                        to: 600
+                        stepSize: 5
+                        value: Math.round(settings.ftp)
+                        editable: true
+                    }
+
+                    Text {
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Max heart rate (bpm)")
+                        font.pixelSize: window.fontPx(20)
+                        color: "white"
+                    }
+
+                    SpinBox {
+                        id: maxHrSpinBox
+                        Accessible.name: qsTr("Max heart rate (bpm)") + ": " + value
+                        Layout.alignment: Qt.AlignHCenter
+                        from: 100
+                        to: 230
+                        value: settings.heart_max_override_enable ? Math.round(settings.heart_max_override_value) : ageMaxHr
+                        editable: true
+                    }
+
+                    Text {
+                        wrapMode: Text.WordWrap
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Resting heart rate (bpm)")
+                        font.pixelSize: window.fontPx(20)
+                        color: "white"
+                    }
+
+                    SpinBox {
+                        id: restingHrSpinBox
+                        Accessible.name: qsTr("Resting heart rate (bpm)") + ": " + value
+                        Layout.alignment: Qt.AlignHCenter
+                        from: 30
+                        to: 120
+                        value: settings.heart_rate_resting
+                        editable: true
+                    }
+
+                    Item {
+                        Layout.preferredHeight: 50
+                    }
+
+                    WizardButton {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: qsTr("Next")
+                        onClicked: {
+                            // read every value first: the boxes are bound to the settings, so writing one
+                            // setting (the override flag) moved the max heart rate box before it was read
+                            const ftpValue = ftpSpinBox.value
+                            const maxHr = maxHrSpinBox.value
+                            const restingHr = restingHrSpinBox.value
+                            if (askFtp)
+                                settings.ftp = ftpValue
+                            // the max heart rate from the age (220 - age) needs no override; another value is one
+                            if (maxHr !== ageMaxHr) {
+                                settings.heart_max_override_value = maxHr
+                                settings.heart_max_override_enable = true
+                            } else {
+                                settings.heart_max_override_enable = false
+                            }
+                            settings.heart_rate_resting = restingHr
                             stackViewLocal.push(heartRateDeviceSelectionComponent)
                         }
                     }

@@ -3451,6 +3451,12 @@ class QZSettings {
     static constexpr bool default_tile_tss_enabled = false;
     static const QString tile_tss_order;
     static constexpr int default_tile_tss_order = 80;
+    /**
+     * @brief Bikes: Watts, Heart, Cadence and Elapsed shown large above the tiles (the hero strip of
+     * the dashboard) instead of in the grid.
+     */
+    static const QString tile_hero_enabled;
+    static constexpr bool default_tile_hero_enabled = true;
 
     /**
      * @brief Write the QSettings values using the constants from this namespace.
