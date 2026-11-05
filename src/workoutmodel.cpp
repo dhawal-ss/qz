@@ -140,13 +140,19 @@ void WorkoutModel::refreshTrainingLoad() {
         QList<TrainingLoadRide> rides;
         int total = 0;
         int counted = 0;
+        bool pending = false; // rows the TSS fill has not reached yet
+        QDate lastWorkoutDay; // any workout, counted or not
         while (query.next()) {
             TrainingLoadRide ride;
             ride.start = query.value(0).toDateTime().toLocalTime();
             ride.end = query.value(1).toDateTime().toLocalTime();
             ride.tss = query.value(2).toDouble();
+            if (query.value(2).isNull())
+                pending = true;
             if (!ride.start.isValid() || ride.start.date() > today)
                 continue; // a wrong clock: counted on its day
+            if (!lastWorkoutDay.isValid() || ride.start.date() > lastWorkoutDay)
+                lastWorkoutDay = ride.start.date();
             if (ride.start.date() >= windowStart) {
                 total++;
                 if (ride.tss > 0)
@@ -157,6 +163,10 @@ void WorkoutModel::refreshTrainingLoad() {
         }
         load[QStringLiteral("counted")] = counted;
         load[QStringLiteral("total")] = total;
+        // numbers without the rides still to be filled would look final: say it is still working
+        // (the fill retries them at the next launch if it stopped)
+        if (pending)
+            load[QStringLiteral("updating")] = true;
 
         const QVector<TrainingLoadDay> days = metric::trainingLoad(metric::dailyTrainingStress(rides), today);
         if (!days.isEmpty()) {
@@ -164,7 +174,8 @@ void WorkoutModel::refreshTrainingLoad() {
             const int fatigue = qRound(days.last().fatigue);
             const int fitnessWeekAgo = days.count() > 7 ? qRound(days.at(days.count() - 8).fitness) : 0;
             const int historyDays = days.first().date.daysTo(today) + 1;
-            const int daysSinceLastRide = rides.last().start.date().daysTo(today);
+            // a ride without power or a run is not a break from training either
+            const int daysSinceLastRide = lastWorkoutDay.daysTo(today);
 
             QVariantList fitnessSeries;
             QVariantList fatigueSeries;

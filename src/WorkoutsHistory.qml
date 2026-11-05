@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQml 2.15
 import QtQuick.Controls 2.15
+import QtQuick.Controls.Material 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Window 2.15
 import QtCharts 2.15
@@ -379,6 +380,15 @@ Page {
                 width: workoutListView.width
                 height: shown ? trainingLoadCard.height + 8 : 0
                 visible: shown
+                // A taller header is laid out upwards from the first workout and the view keeps its
+                // place, which left the card above the top (after a date filter is cleared, or when
+                // the fill ends): keep the view at the beginning when it was there
+                property real lastHeight: 0
+                onHeightChanged: {
+                    if (!workoutListView.moving && workoutListView.contentY <= -lastHeight + 1)
+                        workoutListView.contentY = workoutListView.originY
+                    lastHeight = height
+                }
 
                 Rectangle {
                     id: trainingLoadCard
@@ -1149,6 +1159,8 @@ Page {
     // Training Program Loading Dialog
     Dialog {
         id: trainingProgramDialog
+        // a white popup in the app's dark Material theme: its buttons were white on white
+        Material.theme: Material.Light
 
         property string message: ""
         property bool isSuccess: true
@@ -1396,6 +1408,8 @@ Page {
     // What Fitness, Fatigue and Form mean, with this rider's Form zones
     Popup {
         id: trainingLoadPopup
+        // a white popup in the app's dark Material theme: its buttons were white on white
+        Material.theme: Material.Light
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
         width: Math.min(parent.width - 32, 440)
@@ -1406,6 +1420,7 @@ Page {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
         readonly property var load: workoutModel ? workoutModel.trainingLoad : ({})
         readonly property var limits: load.zoneLimits || [0, 0, 0, 0]
+        readonly property bool ready: load.available === true && load.updating !== true
 
         background: Rectangle {
             color: "white"
@@ -1450,8 +1465,10 @@ Page {
                         color: "#333333"
                     }
                 }
+                // the zones need the numbers: hidden while they are worked out
                 Text {
                     width: parent.width
+                    visible: trainingLoadPopup.ready
                     text: qsTr("Form zones for your fitness")
                     font.pixelSize: window.fontPx(14)
                     font.bold: true
@@ -1469,6 +1486,7 @@ Page {
                     Row {
                         width: trainingLoadPopupColumn.width
                         spacing: 8
+                        visible: trainingLoadPopup.ready
                         readonly property bool current: trainingLoadPopup.load.status === modelData.status
                         Rectangle {
                             width: 10
@@ -1509,6 +1527,8 @@ Page {
     // Calendar Popup
     Popup {
         id: calendarPopup
+        // a white popup in the app's dark Material theme: its buttons were white on white
+        Material.theme: Material.Light
         x: (parent.width - width) / 2
         y: (parent.height - height) / 2
         width: Math.min(parent.width * 0.9, 400)
