@@ -3447,6 +3447,11 @@ class QZSettings {
     static const QString moovio_lynx_konect_2_0;
     static constexpr bool default_moovio_lynx_konect_2_0 = false;
 
+    static const QString tile_tss_enabled;
+    static constexpr bool default_tile_tss_enabled = false;
+    static const QString tile_tss_order;
+    static constexpr int default_tile_tss_order = 80;
+
     /**
      * @brief Write the QSettings values using the constants from this namespace.
      * @param showDefaults Optionally indicates if the default should be shown with the key.

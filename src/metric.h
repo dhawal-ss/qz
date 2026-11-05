@@ -61,6 +61,14 @@ class metric {
     static double calculateActiveKCal(double totalKCal, double elapsed);
 
     static double powerPeak(QList<SessionLine> *session, int seconds);
+
+    // Coggan Normalized Power of 1 Hz power samples, from firstIndex to the end: 30 s rolling
+    // average, fourth power, mean, fourth root. 0 with fewer than 30 samples.
+    static double normalizedPower(const QList<SessionLine> &session, int firstIndex = 0);
+    // Intensity Factor = NP / FTP. 0 when FTP is not set.
+    static double intensityFactor(double normalizedPower, double ftp);
+    // Training Stress Score = seconds * NP * IF / (FTP * 3600) * 100. 0 when FTP is not set.
+    static double trainingStressScore(double seconds, double normalizedPower, double ftp);
     
   private:
     double m_value = 0;

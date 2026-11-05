@@ -659,6 +659,8 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
                              QStringLiteral("0"), true, QStringLiteral("powerAvg"), 48, labelFontSize, QStringLiteral("white"), QLatin1String(""), 0, true, tr("Off"), QStringLiteral("grey"));
     hrv = new DataObject(QString(), QStringLiteral("icons/icons/heart_red.png"),
                          QStringLiteral("0"), false, QStringLiteral("hrv"), 48, labelFontSize);
+    tss = new DataObject(QString(), QStringLiteral("icons/icons/watt.png"),
+                         QStringLiteral("0"), false, QStringLiteral("tss"), 48, labelFontSize);
     pidHR = new DataObject(QString(), QStringLiteral("icons/icons/heart_red.png"),
                            QStringLiteral("0"), true, QStringLiteral("pid_hr"), 48, labelFontSize);
     extIncline = new DataObject(QString(), QStringLiteral("icons/icons/inclination.png"),
@@ -2472,6 +2474,7 @@ void homeform::setTileNames() {
     autoVirtualShiftingClimb->setName(tr("Climb"));
     powerAvg->setName(tr("Power Avg"));
     hrv->setName(tr("HRV (ms)"));
+    tss->setName(tr("TSS"));
     pidHR->setName(tr("PID Heart"));
     extIncline->setName(tr("Ext.Inclin.(%)"));
     instantaneousStrideLengthCM->setName(tr("Stride L.(%1)").arg(cm));
@@ -3771,6 +3774,12 @@ void homeform::sortTiles() {
                 settings.value(QZSettings::tile_coretemperature_order, QZSettings::default_tile_coretemperature_order).toInt() == i) {
                 coreTemperature->setGridId(i);
                 dataList.append(coreTemperature);
+            }
+
+            if (settings.value(QZSettings::tile_tss_enabled, QZSettings::default_tile_tss_enabled).toBool() &&
+                settings.value(QZSettings::tile_tss_order, QZSettings::default_tile_tss_order).toInt() == i) {
+                tss->setGridId(i);
+                dataList.append(tss);
             }
         }
     } else if (bluetoothManager->device()->deviceType() == ROWING) {
@@ -6848,6 +6857,17 @@ void homeform::update() {
         wattKg->setSecondLine(
             QObject::tr("AVG: ") + QString::number(bluetoothManager->device()->wattKg().average(), 'f', 1) +
             QObject::tr(" MAX: ") + QString::number(bluetoothManager->device()->wattKg().max(), 'f', 1));
+        // O(samples) once a second: a few thousand additions even on a long ride
+        if (bluetoothManager->device()->deviceType() == BIKE &&
+            settings.value(QZSettings::tile_tss_enabled, QZSettings::default_tile_tss_enabled).toBool()) {
+            const double ftpWatt = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
+            const double np = metric::normalizedPower(Session);
+            const double rideSeconds = Session.isEmpty() ? 0.0 : (double)Session.last().elapsedTime;
+            tss->setValue(QString::number(metric::trainingStressScore(rideSeconds, np, ftpWatt), 'f', 0));
+            tss->setSecondLine(tr("NP %1W IF %2")
+                                   .arg(QString::number(np, 'f', 0),
+                                        QString::number(metric::intensityFactor(np, ftpWatt), 'f', 2)));
+        }
         QLocale locale = QLocale::system();
 
         // Format the time based on the locale
@@ -11440,6 +11460,9 @@ void homeform::sendMail() {
     double ftpSetting = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
     peak = metric::powerPeak(&Session, 20 * 60);
     if (peak >= 0) {
+        textMessage += tr("20 Minutes Power: %1W %2W/Kg")
+                           .arg(QString::number(peak, 'f', 0), QString::number(peak / weightKg, 'f', 1)) +
+                       QStringLiteral("\n");
         peak = (peak * 0.95) * 0.95;
         textMessage += tr("Estimated FTP: %1W").arg(QString::number(peak, 'f', 0)) + QStringLiteral(" ");
         if (peak > ftpSetting) {
@@ -11450,6 +11473,19 @@ void homeform::sendMail() {
     }
 
     if (bluetoothManager->device()->deviceType() == BIKE) {
+        const double np = metric::normalizedPower(Session);
+        if (np > 0) {
+            textMessage += tr("Normalized Power: %1W").arg(QString::number(np, 'f', 0)) + QStringLiteral("\n");
+            if (ftpSetting > 0) {
+                const double rideSeconds = (double)Session.last().elapsedTime;
+                textMessage += tr("Intensity Factor: %1")
+                                   .arg(QString::number(metric::intensityFactor(np, ftpSetting), 'f', 2)) +
+                               QStringLiteral("\n");
+                textMessage += tr("Training Stress Score: %1")
+                                   .arg(QString::number(metric::trainingStressScore(rideSeconds, np, ftpSetting), 'f', 0)) +
+                               QStringLiteral("\n");
+            }
+        }
         textMessage +=
             tr("Average Cadence: %1")
                 .arg(QString::number(((bike *)bluetoothManager->device())->currentCadence().average(), 'f', 0)) +

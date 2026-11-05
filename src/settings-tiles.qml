@@ -6015,5 +6015,54 @@ ScrollView {
             Layout.fillWidth: true
             color: Material.color(Material.Lime)
         }
+
+        AccordionCheckElement {
+            id: tssEnabledAccordion
+            title: qsTr("Training Stress Score (TSS)")
+            linkedBoolSetting: "tile_tss_enabled"
+            settings: settingsTilesPane.settings
+            accordionContent: RowLayout {
+                spacing: 10
+                Label {
+                    id: labeltssOrder
+                    text: qsTr("order index:")
+                    wrapMode: window.labelWrap
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignRight
+                }
+                UiComboBox {
+                    id: tssOrderTextField
+                    Accessible.name: tssEnabledAccordion.title + ", " + labeltssOrder.text + " " + tssOrderTextField.displayText
+                    model: rootItem.tile_order
+                    savedText: settings.tile_tss_order
+                    Layout.fillHeight: false
+                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                    onActivated: {
+                        displayText = tssOrderTextField.currentValue
+                     }
+                }
+                Button {
+                    id: oktssOrderButton
+                    text: qsTr("OK")
+                    enabled: tssOrderTextField.dirty
+                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                    onClicked: {settings.tile_tss_order = tssOrderTextField.displayText; toast.show(qsTr("Setting saved!")); }
+                }
+            }
+        }
+
+        Label {
+            text: qsTr("Bikes only. Training load of the ride from Normalized Power and your FTP: one hour at FTP scores 100. The second line shows Normalized Power (NP) and Intensity Factor (IF = NP / FTP).")
+            font.bold: true
+            font.italic: true
+            font.pixelSize: window.fontHint
+            bottomPadding: window.hintGap
+            textFormat: Text.PlainText
+            wrapMode: Text.WordWrap
+            verticalAlignment: Text.AlignVCenter
+            Layout.alignment: Qt.AlignLeft | Qt.AlignTop
+            Layout.fillWidth: true
+            color: Material.color(Material.Lime)
+        }
     }
 }

@@ -2,6 +2,7 @@
 #include "qdebugfixup.h"
 #include "qzsettings.h"
 #include <QSettings>
+#include <cmath>
 
 #ifdef TEST
 static uint32_t random_value_uint32 = 0;
@@ -404,68 +405,66 @@ double metric::calculateWeightLoss(double kcal) {
     return kcal / 7716.1854; // comes from 1 lbs = 3500 kcal. Converted to kg
 }
 
-struct IntervalBest {
-    double avg = 0;
-    int64_t start = 0;
-    int64_t stop = 0;
-};
-
-struct CompareBests {
-    // Sort by decreasing power and increasing start time.
-    bool operator()(const IntervalBest &a, const IntervalBest &b) const {
-        if (a.avg > b.avg)
-            return true;
-        if (b.avg > a.avg)
-            return false;
-        return a.start < b.start;
-    }
-};
-
 double metric::powerPeak(QList<SessionLine> *session, int seconds) {
-    QList<IntervalBest> bests;
-    QList<IntervalBest> _results;
-
-    uint windowSize = seconds;
-    double total = 0.0;
-    QList<const SessionLine *> window;
-
     if (session->count() == 0)
         return -1;
 
-           // ride is shorter than the window size!
-    if (windowSize > session->last().elapsedTime)
+    // ride is shorter than the window size!
+    if ((uint32_t)seconds > session->last().elapsedTime)
         return -1;
 
-    int i = 0;
-    // We're looking for intervals with durations in [windowSizeSecs, windowSizeSecs + secsDelta).
-    foreach (SessionLine point, *session) {
-
-        total += point.watt;
-        window.append(&session->at(i));
-        double duration = window.last()->elapsedTime - window.first()->elapsedTime;
-
-        if (duration >= windowSize) {
-            double start = window.first()->elapsedTime;
-            double stop = window.last()->elapsedTime;
+    // A sample holds the power of the second that ends at its timestamp, so the first sample of a
+    // window only marks where the window starts: its power belongs to the second before it.
+    // Adding it too gave N+1 samples over N seconds (a steady 300 W ride read 360 W as 5 s power).
+    int first = 0;
+    double total = 0.0; // power of the samples after `first`, up to `i`
+    double best = 0.0;
+    for (int i = 1; i < session->count(); i++) {
+        total += session->at(i).watt;
+        double duration = (double)session->at(i).elapsedTime - (double)session->at(first).elapsedTime;
+        if (duration >= seconds && duration > 0) {
             double avg = total / duration;
-            IntervalBest b;
-            b.start = start;
-            b.stop = stop;
-            b.avg = avg;
-            bests.append(b);
-
-            total -= window.first()->watt;
-            window.removeFirst();
+            if (avg > best)
+                best = avg;
+            first++;
+            total -= session->at(first).watt;
         }
-        i++;
     }
+    return best;
+}
 
-    std::sort(bests.begin(), bests.end(), CompareBests());
+double metric::normalizedPower(const QList<SessionLine> &session, int firstIndex) {
+    const int window = 30;
+    if (firstIndex < 0)
+        firstIndex = 0;
+    double sum30 = 0.0; // sum of the last 30 samples
+    double sum4 = 0.0;  // sum of the fourth powers of the 30 s averages
+    int averages = 0;
+    for (int i = firstIndex; i < session.count(); i++) {
+        sum30 += session.at(i).watt;
+        if (i - firstIndex >= window)
+            sum30 -= session.at(i - window).watt;
+        if (i - firstIndex >= window - 1) {
+            double avg = sum30 / window;
+            sum4 += avg * avg * avg * avg;
+            averages++;
+        }
+    }
+    if (averages == 0)
+        return 0.0;
+    return std::pow(sum4 / averages, 0.25);
+}
 
-    if(bests.length() > 0)
-        return bests.first().avg;
-    else
-        return 0;
+double metric::intensityFactor(double normalizedPower, double ftp) {
+    if (ftp <= 0 || normalizedPower <= 0)
+        return 0.0;
+    return normalizedPower / ftp;
+}
+
+double metric::trainingStressScore(double seconds, double normalizedPower, double ftp) {
+    if (ftp <= 0 || normalizedPower <= 0 || seconds <= 0)
+        return 0.0;
+    return (seconds * normalizedPower * intensityFactor(normalizedPower, ftp)) / (ftp * 3600.0) * 100.0;
 }
 
 // VO2 (L/min) = 0.0108 x power (W) + 0.007 x body mass (kg)

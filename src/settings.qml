@@ -2389,6 +2389,8 @@ import AndroidStatusBar 1.0
             property real virtual_device_rower_cadence_gain: 1.0
             property real virtual_device_rower_cadence_offset: 0.0
             property bool proform_treadmill_sport_55: false
+            property bool tile_tss_enabled: false
+            property int tile_tss_order: 80
         }
 
         // The home page has its own Settings copy, read once when it is created: hand it every new

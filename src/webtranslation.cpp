@@ -152,6 +152,12 @@ const WebTranslationEntry entries[] = {
     //: Chart summary: total work done during the workout, shown in kJ (energy), not power in watts.
     {"chart.totalOutput", QT_TRANSLATE_NOOP("WebTranslations", "Total Output")},
     {"chart.calories", QT_TRANSLATE_NOOP("WebTranslations", "Calories")},
+    //: Chart summary: Normalized Power (NP), the cycling power figure that weights hard efforts more than average power, in watts.
+    {"chart.normalizedPower", QT_TRANSLATE_NOOP("WebTranslations", "Normalized Power")},
+    //: Chart summary: Training Stress Score (TSS), the training load of the ride; one hour at FTP scores 100.
+    {"chart.trainingStress", QT_TRANSLATE_NOOP("WebTranslations", "Training Stress (TSS)")},
+    //: Chart summary value: TSS, then the Intensity Factor (IF = Normalized Power / FTP). Keep {tss} and {if}.
+    {"chart.tssValue", QT_TRANSLATE_NOOP("WebTranslations", "{tss} (IF {if})")},
     {"chart.avgCadence", QT_TRANSLATE_NOOP("WebTranslations", "AVG Cadence")},
     {"chart.maxCadence", QT_TRANSLATE_NOOP("WebTranslations", "Max Cadence")},
     {"chart.avgResistance", QT_TRANSLATE_NOOP("WebTranslations", "AVG Resistance")},

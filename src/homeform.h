@@ -1024,6 +1024,7 @@ public:
     DataObject *autoVirtualShiftingSprint;
     DataObject *powerAvg;
     DataObject *hrv;
+    DataObject *tss;
 
   private:
     static homeform *m_singleton;

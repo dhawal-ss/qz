@@ -1,4 +1,5 @@
 #include "qfit.h"
+#include "metric.h"
 
 #include <QSettings>
 #include <cmath>
@@ -206,7 +207,6 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
     uint16_t max_watt = 0;
     uint32_t total_work_joules = 0;
     double max_speed_ms = 0;
-    std::vector<double> np_power_samples;
 
     // Variables for core temperature summaries used by Garmin Connect.
     double core_temp_sum = 0;
@@ -259,7 +259,6 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
                 max_watt = (uint16_t)session.at(i).watt;
             total_work_joules += (uint32_t)session.at(i).watt;
         }
-        np_power_samples.push_back(session.at(i).watt > 0 ? session.at(i).watt : 0.0);
 
         // Collect the values actually written to FIT records.
         const uint8_t cadence = cadenceForFit(session.at(i).cadence);
@@ -359,21 +358,8 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
 
     // Normalized Power: use complete 30-s rolling windows only, then
     // fourth-power mean and fourth root. This is the value used by IF/TSS.
-    uint16_t normalized_power = 0;
-    if (np_power_samples.size() >= 30) {
-        std::vector<double> rolling30;
-        rolling30.reserve(np_power_samples.size() - 29);
-        for (size_t idx = 29; idx < np_power_samples.size(); idx++) {
-            double sum = 0;
-            for (size_t j = idx - 29; j <= idx; j++)
-                sum += np_power_samples[j];
-            rolling30.push_back(sum / 30.0);
-        }
-        double sum4 = 0;
-        for (double v : rolling30)
-            sum4 += std::pow(v, 4.0);
-        normalized_power = (uint16_t)std::pow(sum4 / rolling30.size(), 0.25);
-    }
+    // Same calculation as the in-app tile and summary (metric.cpp), so they always agree.
+    uint16_t normalized_power = (uint16_t)qRound(metric::normalizedPower(session, firstRealIndex));
 
     // TSS was originally added in January 2026 before qfit had a Normalized Power
     // calculation, so it used average power as an approximation. NP was added later

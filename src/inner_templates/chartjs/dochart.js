@@ -75,6 +75,26 @@ function ensureHeartZones() {
     }
 }
 
+// Same calculation as metric::normalizedPower (metric.cpp): 30 s rolling average of the 1 Hz
+// power samples, fourth power, mean, fourth root. 0 with fewer than 30 samples.
+function normalizedPower(samples) {
+    const window = 30;
+    let sum30 = 0;
+    let sum4 = 0;
+    let averages = 0;
+    for (let i = 0; i < samples.length; i++) {
+        sum30 += samples[i];
+        if (i >= window)
+            sum30 -= samples[i - window];
+        if (i >= window - 1) {
+            const avg = sum30 / window;
+            sum4 += avg * avg * avg * avg;
+            averages++;
+        }
+    }
+    return averages > 0 ? Math.pow(sum4 / averages, 0.25) : 0;
+}
+
 function process_arr(arr) {
     let watts = [];
     let reqpower = [];
@@ -225,6 +245,20 @@ function process_arr(arr) {
     $('.summary_cadence_avg').text(Math.floor(cadence_avg) + ' ' + t('unit.rpm', 'rpm'));
     // Use resistance_avg for ellipticals (deviceType 4), peloton_resistance_avg for bikes/rowers
     $('.summary_resistance_avg').text(Math.floor(deviceType === 4 ? resistance_avg : peloton_resistance_avg) + ' ' + t('unit.level', 'lvl'));
+
+    // Bikes only (deviceType 2): IF and TSS use the cycling FTP
+    const np = normalizedPower(watts.map(function(w) { return Number(w.y) || 0; }));
+    const ftpWatt = Number(ftp);
+    if (deviceType === 2 && np > 0 && Number.isFinite(ftpWatt) && ftpWatt > 0) {
+        const intensity = np / ftpWatt;
+        const tss = maxEl * np * intensity / (ftpWatt * 3600) * 100;
+        $('.summary_normalized_power').text(Math.round(np) + ' ' + t('unit.w', 'W'));
+        $('.summary_tss').text(t('chart.tssValue', '{tss} (IF {if})')
+            .replace('{tss}', Math.round(tss))
+            .replace('{if}', intensity.toFixed(2)));
+    } else {
+        $('.training_stress_row').hide();
+    }
 
     const backgroundFill = {
       id: 'custom_canvas_background_color',
