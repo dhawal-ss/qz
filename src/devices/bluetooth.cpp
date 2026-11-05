@@ -16,6 +16,36 @@
 #include <QAndroidJniObject>
 #endif
 
+// The equipment a Bluetooth scan does not find: fake devices, IP, USB/serial and ANT trainers.
+// finished() starts them (deviceDiscovered() with an empty QBluetoothDeviceInfo), so they must
+// not wait for a scan that never ends. One list for the constructor and finished().
+static bool nonBluetoothDeviceConfigured() {
+    QSettings settings;
+    auto isSet = [&settings](const QString &key, const QString &defaultValue) {
+        return !settings.value(key, defaultValue).toString().isEmpty();
+    };
+    auto isOn = [&settings](const QString &key, bool defaultValue) { return settings.value(key, defaultValue).toBool(); };
+    return isOn(QZSettings::applewatch_fakedevice, QZSettings::default_applewatch_fakedevice) ||
+           isOn(QZSettings::fakedevice_treadmill, QZSettings::default_fakedevice_treadmill) ||
+           isOn(QZSettings::fakedevice_elliptical, QZSettings::default_fakedevice_elliptical) ||
+           isOn(QZSettings::fakedevice_rower, QZSettings::default_fakedevice_rower) ||
+           isOn(QZSettings::antbike, QZSettings::default_antbike) ||
+           isOn(QZSettings::android_antbike, QZSettings::default_android_antbike) ||
+           isOn(QZSettings::waterrower_usb, QZSettings::default_waterrower_usb) ||
+           isSet(QZSettings::nordictrack_2950_ip, QZSettings::default_nordictrack_2950_ip) ||
+           isSet(QZSettings::tdf_10_ip, QZSettings::default_tdf_10_ip) ||
+           isSet(QZSettings::proform_elliptical_ip, QZSettings::default_proform_elliptical_ip) ||
+           isSet(QZSettings::proform_rower_ip, QZSettings::default_proform_rower_ip) ||
+           isSet(QZSettings::proformtdf4ip, QZSettings::default_proformtdf4ip) ||
+           isSet(QZSettings::proformtdf1ip, QZSettings::default_proformtdf1ip) ||
+           isSet(QZSettings::proformtreadmillip, QZSettings::default_proformtreadmillip) ||
+           isSet(QZSettings::computrainer_serialport, QZSettings::default_computrainer_serialport) ||
+           isSet(QZSettings::kettler_usb_serialport, QZSettings::default_kettler_usb_serialport) ||
+           isSet(QZSettings::freebeat_serialport, QZSettings::default_freebeat_serialport) ||
+           isSet(QZSettings::csafe_rower, QZSettings::default_csafe_rower) ||
+           isSet(QZSettings::csafe_elliptical_port, QZSettings::default_csafe_elliptical_port);
+}
+
 static void updateDiscoveredDevice(QList<QBluetoothDeviceInfo> &devices, const QBluetoothDeviceInfo &device) {
     QMutableListIterator<QBluetoothDeviceInfo> i(devices);
     while (i.hasNext()) {
@@ -79,37 +109,13 @@ bluetooth::bluetooth(bool logs, const QString &deviceName, bool noWriteResistanc
         }
     });
 
-    QString nordictrack_2950_ip =
-        settings.value(QZSettings::nordictrack_2950_ip, QZSettings::default_nordictrack_2950_ip).toString();
-    QString tdf_10_ip_ctor = settings.value(QZSettings::tdf_10_ip, QZSettings::default_tdf_10_ip).toString();
-    QString proform_elliptical_ip_ctor =
-        settings.value(QZSettings::proform_elliptical_ip, QZSettings::default_proform_elliptical_ip).toString();
-    QString proform_rower_ip_ctor =
-        settings.value(QZSettings::proform_rower_ip, QZSettings::default_proform_rower_ip).toString();
-    bool waterrower_usb_ctor =
-        settings.value(QZSettings::waterrower_usb, QZSettings::default_waterrower_usb).toBool();
-    bool fake_bike =
-        settings.value(QZSettings::applewatch_fakedevice, QZSettings::default_applewatch_fakedevice).toBool();
-    bool fake_treadmill =
-    settings.value(QZSettings::fakedevice_treadmill, QZSettings::default_fakedevice_treadmill).toBool();
-    bool fakedevice_elliptical_ctor =
-        settings.value(QZSettings::fakedevice_elliptical, QZSettings::default_fakedevice_elliptical).toBool();
-    bool fakedevice_rower_ctor =
-        settings.value(QZSettings::fakedevice_rower, QZSettings::default_fakedevice_rower).toBool();
-    bool antbike_ctor = settings.value(QZSettings::antbike, QZSettings::default_antbike).toBool();
-    bool android_antbike_ctor =
-        settings.value(QZSettings::android_antbike, QZSettings::default_android_antbike).toBool();
     // The 15s discovery watchdog below exists solely to unstick fake/virtual devices
     // (Fake Treadmill/Bike/etc, IP-based trainers) on platforms where the discovery
     // agent's finished() signal never fires (e.g. Waydroid containers without a
     // functional Bluetooth radio). If none of those virtual devices are configured,
     // there is nothing relying on the watchdog, so we leave real discovery alone and
     // let it take as long as it genuinely needs instead of forcing it to end early.
-    bool reliesOnFakeOrVirtualDevice = fake_bike || fake_treadmill || fakedevice_elliptical_ctor ||
-                                        fakedevice_rower_ctor || !nordictrack_2950_ip.isEmpty() ||
-                                        !tdf_10_ip_ctor.isEmpty() || !proform_elliptical_ip_ctor.isEmpty() ||
-                                        !proform_rower_ip_ctor.isEmpty() || antbike_ctor || android_antbike_ctor ||
-                                        waterrower_usb_ctor;
+    bool reliesOnFakeOrVirtualDevice = nonBluetoothDeviceConfigured();
 
     if (!gymMode && settings.value(QZSettings::peloton_bike_ocr, QZSettings::default_peloton_bike_ocr).toBool() &&
         !pelotonBike) {
@@ -165,8 +171,12 @@ bluetooth::bluetooth(bool logs, const QString &deviceName, bool noWriteResistanc
         // No scan will ever finish without an adapter, and finished() is what starts the fake, IP,
         // USB and ANT devices: those stayed on "Connecting..." forever on a desktop without Bluetooth.
         // Queued, so it runs once the event loop starts and homeform has connected to our signals.
-        if (reliesOnFakeOrVirtualDevice)
+        // No Bluetooth accessory (HR belt, power or cadence sensor, controller) can be found either:
+        // without this, a configured accessory kept the device chain waiting for it forever.
+        if (reliesOnFakeOrVirtualDevice) {
+            forceHeartBeltOffForTimeout = true;
             QTimer::singleShot(0, this, &bluetooth::finished);
+        }
     } else
 
 #endif
@@ -306,25 +316,8 @@ void bluetooth::finished() {
     debug(QStringLiteral("BTLE scanning finished"));
 
     QSettings settings;
-    bool antbike =
-        settings.value(QZSettings::antbike, QZSettings::default_antbike).toBool();
-    bool android_antbike =
-        settings.value(QZSettings::android_antbike, QZSettings::default_android_antbike).toBool();
-    QString nordictrack_2950_ip =
-        settings.value(QZSettings::nordictrack_2950_ip, QZSettings::default_nordictrack_2950_ip).toString();
-    QString tdf_10_ip = settings.value(QZSettings::tdf_10_ip, QZSettings::default_tdf_10_ip).toString();
-    QString proform_elliptical_ip = settings.value(QZSettings::proform_elliptical_ip, QZSettings::default_proform_elliptical_ip).toString();
-    QString proform_rower_ip = settings.value(QZSettings::proform_rower_ip, QZSettings::default_proform_rower_ip).toString();
-    bool fake_bike =
-        settings.value(QZSettings::applewatch_fakedevice, QZSettings::default_applewatch_fakedevice).toBool();
-    bool fakedevice_elliptical =
-        settings.value(QZSettings::fakedevice_elliptical, QZSettings::default_fakedevice_elliptical).toBool();
-    bool fakedevice_rower = settings.value(QZSettings::fakedevice_rower, QZSettings::default_fakedevice_rower).toBool();
-    bool fakedevice_treadmill =
-        settings.value(QZSettings::fakedevice_treadmill, QZSettings::default_fakedevice_treadmill).toBool();
-    bool waterrower_usb = settings.value(QZSettings::waterrower_usb, QZSettings::default_waterrower_usb).toBool();
-    // wifi devices on windows
-    if (!nordictrack_2950_ip.isEmpty() || !tdf_10_ip.isEmpty() || fake_bike || fakedevice_elliptical || fakedevice_rower || fakedevice_treadmill || !proform_elliptical_ip.isEmpty() || !proform_rower_ip.isEmpty() || antbike || android_antbike || waterrower_usb) {
+    // wifi, USB/serial, ANT and fake devices
+    if (nonBluetoothDeviceConfigured()) {
         // faking a bluetooth device for non-BLE devices
         qDebug() << "faking a bluetooth device for non-BLE device";
         deviceDiscovered(QBluetoothDeviceInfo());
