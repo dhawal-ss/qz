@@ -410,6 +410,10 @@ class bluetooth : public QObject, public SignalHandler {
     // Android: while Bluetooth is off, asks the adapter every 2 s whether it is on again
     QTimer bluetoothOffPoll;
     QTimer rescanTimer;
+    // every 60 s: a chosen heart rate sensor gone silent is searched for again (reconnectHeartRateBelt, quiet)
+    QTimer hrmWatchdog;
+    // the next connectHeartRateBelt() comes from a quiet search: no "no heart rate" toast
+    bool m_hrmQuiet = false;
     qint64 nextRescanMs = 0;
     bool rescanStopped = false;
     // Android 7.0 and later ignore the scan starts after the 5th one in this window
@@ -467,7 +471,8 @@ class bluetooth : public QObject, public SignalHandler {
     void zwiftRideRightOnOff(bool pressed);
   public slots:
     void restart();
-    void reconnectHeartRateBelt(const QString &name = QString());
+    // quiet: a search of the heart rate watchdog, without the "searching" and "not found" toasts
+    void reconnectHeartRateBelt(const QString &name = QString(), bool quiet = false);
     void selectGymModeDevice(const QString &deviceName);
     /**
      * @brief switchDevice Drops the connected equipment and searches for deviceName ("Disabled" for any),

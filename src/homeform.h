@@ -49,7 +49,6 @@
 #endif
 #endif
 
-class RideLibrary;
 
 class DataObject : public QObject {
 
@@ -258,14 +257,6 @@ class homeform : public QObject {
     // Connect to this bike (filter_device, "Disabled" for any) without a restart. False when QZ is set to
     // quit when the connection is lost: then the app restarts to switch
     Q_INVOKABLE bool switchBike(const QString &name);
-    // The ride in the Android notification: the clock counts from startedAtMs while it moves, the
-    // text holds the numbers, and Pause (or Resume) and Lap; hidden when the ride is over
-    Q_INVOKABLE void showRideNotification(const QString &title, const QString &text, double startedAtMs, bool paused);
-    Q_INVOKABLE void hideRideNotification();
-    // a tap on the notification's buttons: 0 none, 1 pause or resume, 2 lap; each one is taken once
-    Q_INVOKABLE int takeRideNotificationAction();
-    // the screen stays on while this is on (Bikemodo: on the ride screen only)
-    Q_INVOKABLE void setKeepScreenOn(bool on);
     // ends the ride without saving it, for a ride of a few seconds started by mistake
     Q_INVOKABLE void discardRide();
     // the name the ride is saved with (a Bikemodo workout); QZ clears it when a ride starts
@@ -273,8 +264,6 @@ class homeform : public QObject {
     // The level that gives these watts at the cadence now, from the bike's own power table: only an
     // Echelon has one Bikemodo trusts (-1 for every other bike). Nothing is set on the bike.
     Q_INVOKABLE int levelForWatts(int watts);
-    // a beep and a buzz of the ride (0 a tick, 1 a count, 2 a change), quiet on silent
-    Q_INVOKABLE void cue(int kind);
     // A workout file (.zwo, the format of Zwift and intervals.icu) as the blocks of a Bikemodo workout:
     // { name, blocks: [[minutes, zone, watts], ...] } with watts from the FTP setting, -1 for a free
     // block; empty when it cannot be read. Ramps become steps of 30 s or more.
@@ -284,24 +273,6 @@ class homeform : public QObject {
     Q_INVOKABLE QVariantMap routeFile(const QString &path);
     // today's workout downloaded from intervals.icu (training/intervals-icu), "" for none yet
     Q_INVOKABLE QString intervalsWorkoutToday();
-    // Readiness from Health Connect (BikemodoHealth.kt): whether it is there, the dialog to allow
-    // reading HRV, resting heart rate and sleep, a read of the last 35 days in the background, and
-    // its answer once (JSON, "" while it is not there)
-    Q_INVOKABLE bool healthAvailable();
-    Q_INVOKABLE void healthRequestRead();
-    Q_INVOKABLE void healthRefresh();
-    Q_INVOKABLE QString healthTake();
-    // the home screen widget's numbers (the week, the goal, the streak), and the week's recap for
-    // Monday's notification, kept with the Monday of its week (yyyy-MM-dd)
-    Q_INVOKABLE void updateWidget(const QString &value, const QString &detail, const QString &streak,
-                                  const QString &weekKey, const QString &recapTitle, const QString &recapText);
-    // the widget's line about the body today (Health Connect readiness), "" for none
-    Q_INVOKABLE void updateWidgetBody(const QString &words);
-    // the phone's font size (1 is the default) and whether its animations are off, for Theme
-    Q_INVOKABLE double systemFontScale();
-    Q_INVOKABLE bool systemAnimationsOff();
-    // the phone's dark theme, for Bikemodo's Look: Phone (main2.qml)
-    Q_INVOKABLE bool systemNightMode();
     // the Bluetooth bike other apps (Zwift) see: whether it is up, and whether an app is on it
     Q_INVOKABLE bool virtualBikeRunning();
     Q_INVOKABLE bool virtualBikeInUse();
@@ -530,10 +501,13 @@ class homeform : public QObject {
         if (!dev || (dev->deviceType() != BIKE && dev->deviceType() != ELLIPTICAL))
             return false;
         const QString className = QString::fromLatin1(dev->metaObject()->className());
+        // an Echelon is set by its knob: Bikemodo only prompts the level (never sets it), so its ride
+        // screen shows the level and Pause, Lap and End, not level buttons (You > Resistance control: On
+        // brings them back)
         const QStringList readOnly = {QStringLiteral("pelotonbike"), QStringLiteral("cscbike"),
                                       QStringLiteral("m3ibike"),     QStringLiteral("nautilusbike"),
                                       QStringLiteral("xcxbike"),     QStringLiteral("eliterizer"),
-                                      QStringLiteral("elitesterzosmart")};
+                                      QStringLiteral("elitesterzosmart"), QStringLiteral("echelonconnectsport")};
         return !readOnly.contains(className);
     }
 
@@ -1214,7 +1188,6 @@ public:
     bool m_fitImportQuiet = false;
     bool m_fitImportRunning = false;
     WorkoutModel *workoutModel = nullptr;
-    RideLibrary *rideLibrary = nullptr;
     int m_pelotonLoginState = -1;
     int m_pzpLoginState = -1;
     int m_zwiftLoginState = -1;
@@ -1465,6 +1438,9 @@ public:
     void infoChanged(QString value);
     void topBarHeightChanged(int value);
     void bluetoothDevicesChanged(QStringList value);
+    // a ride saved as a .fit file, and rides brought into the fit folder (Bikemodo's ride library)
+    void fitSaved(const QString &filename);
+    void fitFolderChanged();
     void tile_orderChanged(QStringList value);
     void changeLabelHelp(bool value);
     void changePelotonAskStart(bool value);

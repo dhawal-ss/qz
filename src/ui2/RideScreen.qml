@@ -413,7 +413,7 @@ Item {
         if (core === null)
             return
         if (cueSound)
-            core.cue(kind)
+            bikemodoBridge.cue(kind)
         if (cueVoice && words)
             core.say(words)
     }

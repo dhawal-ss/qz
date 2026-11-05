@@ -44,7 +44,7 @@ Item {
     property bool healthAsked: false
     property bool healthDismissed: false
     property var bodyNow: null
-    readonly property bool healthOffered: core !== null && !healthAsked && !healthDismissed && core.healthAvailable()
+    readonly property bool healthOffered: core !== null && !healthAsked && !healthDismissed && bikemodoBridge.healthAvailable()
     property bool connected: false
     property string deviceName: ""
     property string searchStatus: ""
@@ -326,14 +326,14 @@ Item {
         uiStore.setValue("healthRead", true)
         healthAsked = true
         if (core !== null)
-            core.healthRequestRead()
+            bikemodoBridge.healthRequestRead()
         // the dialog takes a while: read once it has had time, and again when Today shows
         healthAgain.restart()
     }
     function readBody() {
         if (core === null)
             return
-        core.healthRefresh()
+        bikemodoBridge.healthRefresh()
         healthWait = 20
         healthPoll.start()
     }
@@ -343,7 +343,7 @@ Item {
         interval: 500
         repeat: true
         onTriggered: {
-            var text = todayPage.core !== null ? todayPage.core.healthTake() : ""
+            var text = todayPage.core !== null ? bikemodoBridge.healthTake() : ""
             if (text !== "") {
                 stop()
                 var o = Body.parse(text)
@@ -368,7 +368,7 @@ Item {
         var words = bodyNow.state === "good" ? qsTr("Well recovered")
                   : bodyNow.state === "normal" ? qsTr("Body as usual")
                   : bodyNow.state === "easy" ? qsTr("Take it easy today") : ""
-        core.updateWidgetBody(words)
+        bikemodoBridge.updateWidgetBody(words)
     }
 
     // the body says take it easy: a recovery spin in place of a harder idea (a plan keeps its ride)
@@ -398,7 +398,7 @@ Item {
         var text = weekValue >= goalValue ? qsTr("Goal reached: %1.").arg(value) : qsTr("%1 of your weekly goal.").arg(value)
         if (streak !== "")
             text += " " + streak + "."
-        core.updateWidget(value, detail, streak, monday, title, text)
+        bikemodoBridge.updateWidget(value, detail, streak, monday, title, text)
     }
 
     // the FTP test result: used, or let go

@@ -188,10 +188,10 @@ ApplicationWindow {
     function readSystemDisplay() {
         if (core === null)
             return
-        systemReduceMotion = core.systemAnimationsOff()
-        var scale = uiSettings.textScaleOverride > 0 ? uiSettings.textScaleOverride : core.systemFontScale()
+        systemReduceMotion = bikemodoBridge.systemAnimationsOff()
+        var scale = uiSettings.textScaleOverride > 0 ? uiSettings.textScaleOverride : bikemodoBridge.systemFontScale()
         Theme.textScale = Math.min(1.25, Math.max(1, scale))
-        systemDark = core.systemNightMode()
+        systemDark = bikemodoBridge.systemNightMode()
         applyLook()
     }
     Connections {
@@ -244,7 +244,7 @@ ApplicationWindow {
 
     // the screen stays on while the ride screen shows, and may sleep everywhere else
     readonly property bool keepAwake: mode === "ride" || mode === "demo"
-    onKeepAwakeChanged: if (core !== null) core.setKeepScreenOn(keepAwake)
+    onKeepAwakeChanged: if (core !== null) bikemodoBridge.setKeepScreenOn(keepAwake)
 
     // the Ride button: straight into the ride once the bike is there, else find it first
     function requestRide() {
@@ -397,7 +397,7 @@ ApplicationWindow {
         if (core === null)
             return
         core.historyPageOpened()
-        core.setKeepScreenOn(keepAwake)
+        bikemodoBridge.setKeepScreenOn(keepAwake)
         readSystemDisplay()
     }
     Connections {
@@ -628,7 +628,7 @@ ApplicationWindow {
     // The ride in the Android notification: the clock, the watts and Pause and Lap, every 2 s
     // while a ride is open; its buttons are taken once a second
     readonly property bool notifying: core !== null && live.elapsed > 0 && !live.stopped
-    onNotifyingChanged: if (!notifying && core !== null) core.hideRideNotification()
+    onNotifyingChanged: if (!notifying && core !== null) bikemodoBridge.hideRideNotification()
     Timer {
         interval: 2000
         repeat: true
@@ -645,7 +645,7 @@ ApplicationWindow {
                 words.push(qsTr("Looking for the bike"))
             }
             var startedAt = Date.now() - live.elapsed * 1000
-            window.core.showRideNotification(live.paused ? qsTr("Paused at %1").arg(Metrics.clock(live.elapsed)) : qsTr("Riding"),
+            bikemodoBridge.showRideNotification(live.paused ? qsTr("Paused at %1").arg(Metrics.clock(live.elapsed)) : qsTr("Riding"),
                                              words.join("  ·  "), startedAt, live.paused)
         }
     }
@@ -654,7 +654,7 @@ ApplicationWindow {
         repeat: true
         running: window.notifying
         onTriggered: {
-            var action = window.core.takeRideNotificationAction()
+            var action = bikemodoBridge.takeRideNotificationAction()
             if (action === 0)
                 return
             if (window.mode === "ride" && rideLoader.item !== null) {
@@ -675,6 +675,13 @@ ApplicationWindow {
     Connections {
         target: live
         function onStoppedChanged() {
+            // a ride starts with no heart rate from the chosen sensor (a watch that stopped sharing
+            // since the last ride): look for it again now, not only when the watchdog next does
+            if (!live.stopped && window.mode !== "demo" && window.core !== null && live.heartRate <= 0) {
+                var belt = String(qzSettings.value("heart_rate_belt_name", "Disabled"))
+                if (belt !== "" && belt.indexOf("Disabled") !== 0)
+                    window.core.reconnectHeartRateBelt(belt)
+            }
             // the workout ends with the ride (in the log when the engine ended it: End logs its own)
             if (live.stopped && window.mode !== "demo") {
                 if (!window.finishing && window.metricsObject !== null)

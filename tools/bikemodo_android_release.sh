@@ -65,6 +65,10 @@ lrelease src/qdomyos-zwift.pri > /dev/null
 qmake -spec android-clang 'ANDROID_ABIS=arm64-v8a' "ANDROID_NDK_ROOT=$NDK" 'CONFIG+=release' 'CONFIG+=bikemodo'
 make qmake_all > /dev/null
 make -j"$JOBS" -C src -f Makefile.qdomyos-zwift arm64-v8a-all
+# one ABI at a time: two at once break qdomyos-zwift_metatypes.json (see bikemodo_android_build.sh)
+for abi in armeabi-v7a x86 x86_64; do
+  make -j"$JOBS" -C src -f Makefile.qdomyos-zwift "$abi-all"
+done
 make -j"$JOBS"
 rm -rf "$WORK/output/android"
 make INSTALL_ROOT="$WORK/output/android" install > /dev/null

@@ -1,7 +1,6 @@
 #include "homeform.h"
 #ifdef BIKEMODO
-#include "ridemetrics.h"
-#include "ridelibrary.h"
+#include "bikemodobridge.h"
 #endif
 #include <QTranslator>
 #include "devices/lifefitnesstreadmill/lifefitnessworkout.h"
@@ -944,12 +943,11 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
             &homeform::setActivityDescription);
     engine->rootContext()->setContextProperty(QStringLiteral("rootItem"), (QObject *)this);
 #ifdef BIKEMODO
-    // Bikemodo's live numbers and its ride library, for src/ui2 (bikemodo.pri)
-    RideMetrics *metrics = new RideMetrics(bl, this);
-    engine->rootContext()->setContextProperty(QStringLiteral("rideMetrics"), metrics);
-    rideLibrary = new RideLibrary(getWritableAppDir(), this);
-    rideLibrary->setMetrics(metrics);
-    engine->rootContext()->setContextProperty(QStringLiteral("rideLibrary"), rideLibrary);
+    // Bikemodo's seam (bikemodo.pri): its ride library, live numbers and Android calls for src/ui2,
+    // told of every ride saved here
+    BikemodoBridge *bridge = new BikemodoBridge(bl, engine, getWritableAppDir(), this);
+    connect(this, &homeform::fitSaved, bridge, &BikemodoBridge::fitSaved, Qt::DirectConnection);
+    connect(this, &homeform::fitFolderChanged, bridge, &BikemodoBridge::fitFolderChanged, Qt::DirectConnection);
 #endif
     connect(this, &homeform::restoreDefaultWheelDiameter, this, &homeform::handleRestoreDefaultWheelDiameter);
 
@@ -2126,52 +2124,6 @@ bool homeform::switchBike(const QString &name) {
     return true;
 }
 
-void homeform::showRideNotification(const QString &title, const QString &text, double startedAtMs, bool paused) {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject jTitle = QAndroidJniObject::fromString(title);
-    QAndroidJniObject jText = QAndroidJniObject::fromString(text);
-    QAndroidJniObject jToggle = QAndroidJniObject::fromString(paused ? tr("Resume") : tr("Pause"));
-    QAndroidJniObject jLap = QAndroidJniObject::fromString(tr("Lap"));
-    QAndroidJniObject::callStaticMethod<void>(
-        "org/cagnulen/qdomyoszwift/NotificationClient", "showRide",
-        "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;JZLjava/lang/String;Ljava/lang/String;)V",
-        QtAndroid::androidContext().object(), jTitle.object<jstring>(), jText.object<jstring>(), (jlong)startedAtMs,
-        (jboolean)paused, jToggle.object<jstring>(), jLap.object<jstring>());
-#else
-    Q_UNUSED(title);
-    Q_UNUSED(text);
-    Q_UNUSED(startedAtMs);
-    Q_UNUSED(paused);
-#endif
-}
-
-void homeform::hideRideNotification() {
-#ifdef Q_OS_ANDROID
-    //: Android notification: title shown while QZ works in the background.
-    QAndroidJniObject ready = QAndroidJniObject::fromString(tr("Bikemodo is ready"));
-    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/NotificationClient", "hideRide",
-                                              "(Landroid/content/Context;Ljava/lang/String;)V",
-                                              QtAndroid::androidContext().object(), ready.object<jstring>());
-#endif
-}
-
-int homeform::takeRideNotificationAction() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticMethod<jint>("org/cagnulen/qdomyoszwift/NotificationClient", "takeAction",
-                                                     "()I");
-#else
-    return 0;
-#endif
-}
-
-void homeform::setKeepScreenOn(bool on) {
-#ifdef Q_OS_ANDROID
-    KeepAwakeHelper::keepScreenOn(on);
-#else
-    Q_UNUSED(on);
-#endif
-}
-
 int homeform::levelForWatts(int watts) {
     bluetoothdevice *dev = bluetoothManager ? bluetoothManager->device() : nullptr;
     echelonconnectsport *echelon = qobject_cast<echelonconnectsport *>(dev);
@@ -2291,69 +2243,6 @@ QString homeform::intervalsWorkoutToday() {
     return files.isEmpty() ? QString() : dir.absoluteFilePath(files.first());
 }
 
-void homeform::updateWidget(const QString &value, const QString &detail, const QString &streak, const QString &weekKey,
-                            const QString &recapTitle, const QString &recapText) {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject jValue = QAndroidJniObject::fromString(value);
-    QAndroidJniObject jDetail = QAndroidJniObject::fromString(detail);
-    QAndroidJniObject jStreak = QAndroidJniObject::fromString(streak);
-    QAndroidJniObject jWeek = QAndroidJniObject::fromString(weekKey);
-    QAndroidJniObject jTitle = QAndroidJniObject::fromString(recapTitle);
-    QAndroidJniObject jText = QAndroidJniObject::fromString(recapText);
-    QAndroidJniObject::callStaticMethod<void>(
-        "org/cagnulen/qdomyoszwift/BikemodoWidget", "update",
-        "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;"
-        "Ljava/lang/String;)V",
-        QtAndroid::androidContext().object(), jValue.object<jstring>(), jDetail.object<jstring>(), jStreak.object<jstring>(),
-        jWeek.object<jstring>(), jTitle.object<jstring>(), jText.object<jstring>());
-#else
-    Q_UNUSED(value);
-    Q_UNUSED(detail);
-    Q_UNUSED(streak);
-    Q_UNUSED(weekKey);
-    Q_UNUSED(recapTitle);
-    Q_UNUSED(recapText);
-#endif
-}
-
-double homeform::systemFontScale() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticMethod<jfloat>("org/cagnulen/qdomyoszwift/BikemodoSystem", "fontScale",
-                                                       "(Landroid/content/Context;)F", QtAndroid::androidContext().object());
-#else
-    return 1.0;
-#endif
-}
-
-bool homeform::systemAnimationsOff() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoSystem", "animationsOff",
-                                                         "(Landroid/content/Context;)Z", QtAndroid::androidContext().object());
-#else
-    return false;
-#endif
-}
-
-bool homeform::systemNightMode() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoSystem", "nightMode",
-                                                         "(Landroid/content/Context;)Z", QtAndroid::androidContext().object());
-#else
-    return true;
-#endif
-}
-
-void homeform::updateWidgetBody(const QString &words) {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject jWords = QAndroidJniObject::fromString(words);
-    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoWidget", "updateBody",
-                                              "(Landroid/content/Context;Ljava/lang/String;)V",
-                                              QtAndroid::androidContext().object(), jWords.object<jstring>());
-#else
-    Q_UNUSED(words);
-#endif
-}
-
 QStringList homeform::powerMeterNames() {
     QStringList names;
     if (!bluetoothManager)
@@ -2374,48 +2263,6 @@ bool homeform::virtualBikeInUse() {
     if (!virtualBikeRunning())
         return false;
     return bluetoothManager->device()->VirtualDevice()->connected();
-}
-
-bool homeform::healthAvailable() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoHealth", "available",
-                                                         "(Landroid/content/Context;)Z",
-                                                         QtAndroid::androidContext().object());
-#else
-    return false;
-#endif
-}
-
-void homeform::healthRequestRead() {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoHealth", "requestRead",
-                                              "(Landroid/content/Context;)V", QtAndroid::androidActivity().object());
-#endif
-}
-
-void homeform::healthRefresh() {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoHealth", "refresh",
-                                              "(Landroid/content/Context;)V", QtAndroid::androidContext().object());
-#endif
-}
-
-QString homeform::healthTake() {
-#ifdef Q_OS_ANDROID
-    return QAndroidJniObject::callStaticObjectMethod<jstring>("org/cagnulen/qdomyoszwift/BikemodoHealth", "take").toString();
-#else
-    return QString();
-#endif
-}
-
-void homeform::cue(int kind) {
-#ifdef Q_OS_ANDROID
-    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoCues", "cue",
-                                              "(Landroid/content/Context;I)V", QtAndroid::androidContext().object(),
-                                              (jint)kind);
-#else
-    Q_UNUSED(kind);
-#endif
 }
 
 void homeform::discardRide() {
@@ -9962,12 +9809,8 @@ void homeform::importFitFilesToHistory(const QStringList &files) {
     }
     setFitImportRunning(true);
     QMetaObject::invokeMethod(fitProcessor, "importFiles", Qt::QueuedConnection, Q_ARG(QStringList, files));
-#ifdef BIKEMODO
-    // the files are in the fit folder now: the ride library reads them too
-    if (rideLibrary) {
-        rideLibrary->rescan();
-    }
-#endif
+    // the files are in the fit folder now: a ride library reads them too
+    emit fitFolderChanged();
 }
 
 bool homeform::deleteTrainingProgramFile(const QString &fileUrl) {
@@ -10432,11 +10275,7 @@ void homeform::fit_save_clicked() {
             fitProcessor->processFile(filename);
             workoutModel->refresh();
         }
-#ifdef BIKEMODO
-        if (rideLibrary) {
-            rideLibrary->importFile(filename);
-        }
-#endif
+        emit fitSaved(filename);
 
 #ifdef Q_OS_ANDROID
         healthConnectWriteWorkout(Session, dev, workoutName);
