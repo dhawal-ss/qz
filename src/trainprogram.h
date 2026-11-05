@@ -1,6 +1,7 @@
 #ifndef TRAINPROGRAM_H
 #define TRAINPROGRAM_H
 #include "bluetooth.h"
+#include <QElapsedTimer>
 #include <QGeoCoordinate>
 #include <QMutex>
 #include <QObject>
@@ -234,7 +235,7 @@ private slots:
     int lastLapButtonToastTick = -30;
     
     int64_t currentTimerJitter = 0;
-    QDateTime lastSchedulerCall = QDateTime::currentDateTime();
+    QElapsedTimer lastSchedulerCall; // monotonic: a wall-clock step is not a late or early tick
 
     QUdpSocket* pelotonOCRsocket = nullptr;
     void pelotonOCRcomputeTime(QString t);

@@ -6224,7 +6224,10 @@ void homeform::Start_inner(bool send_event_to_device) {
                 stravaPelotonActivityName = QLatin1String("");
                 stravaPelotonInstructorName = QLatin1String("");
                 movieFileName = QLatin1String("");
-                stravaWorkoutName = QLatin1String("");
+                // Stop() empties the rows of the program that ended: rows here are a program or GPX loaded
+                // since then, so its name names this workout too
+                if (trainProgram->rows.isEmpty())
+                    stravaWorkoutName = QLatin1String("");
                 stravaPelotonWorkoutType = FIT_SPORT_INVALID;
                 emit workoutNameChanged(workoutName());
                 emit instructorNameChanged(instructorName());
@@ -6365,6 +6368,9 @@ void homeform::Stop() {
         saveSessionAsTrainingProgram();
     }
 
+    // this workout's FIT file is not written yet (the RPE popup defers it, no device skips it): until it is,
+    // the mail must not attach the previous workout's file
+    lastFitFileSaved = QString();
     m_workoutRpe = -1;
     m_workoutFeel = -1;
     if (!settings.value(QZSettings::rpe_feel_popup_enabled, QZSettings::default_rpe_feel_popup_enabled).toBool()) {
@@ -6515,9 +6521,14 @@ void homeform::update() {
     double currentHRZone = 1;
     double ftpZone = 1;
 
-    // Timer jitter detection (same logic as trainprogram::scheduler)
-    QDateTime now = QDateTime::currentDateTime();
-    qint64 msecsElapsed = lastUpdateCall.msecsTo(now);
+    // Timer jitter detection (same logic as trainprogram::scheduler), on a monotonic clock: with the wall
+    // clock an NTP sync or a manual time change looked like minutes of late (cloned lines) or early
+    // (deleted lines) ticks
+    qint64 msecsElapsed = 1000;
+    if (lastUpdateCall.isValid())
+        msecsElapsed = lastUpdateCall.restart();
+    else
+        lastUpdateCall.start();
     
     // Reset jitter if it's getting too large
     if (qAbs(currentUpdateJitter) > 5000) {
@@ -6525,7 +6536,6 @@ void homeform::update() {
     }
     
     currentUpdateJitter += msecsElapsed - 1000;
-    lastUpdateCall = now;
 
     qDebug() << "homeform::update fired!" << "elapsed:" << msecsElapsed << "jitter:" << currentUpdateJitter;
 
@@ -8996,12 +9006,15 @@ void homeform::update() {
                 }
             }
 
+            // while the device link is down (BLE dropout, reconnecting) the device keeps its last values:
+            // record no speed, distance, power or cadence instead of repeating them for the whole gap
+            const bool deviceConnected = bluetoothManager->device()->connected();
             bool treadmill_direct_distance = settings.value(QZSettings::treadmill_direct_distance, QZSettings::default_treadmill_direct_distance).toBool();
             double distance1s = 0;
             if (treadmill_direct_distance) {
                 distance1s = bluetoothManager->device()->odometer();
             } else {
-                if(bluetoothManager->device()->currentSpeed().value() > 0 && !isinf(bluetoothManager->device()->currentSpeed().value()))
+                if(deviceConnected && bluetoothManager->device()->currentSpeed().value() > 0 && !isinf(bluetoothManager->device()->currentSpeed().value()))
                     bluetoothManager->device()->addCurrentDistance1s((bluetoothManager->device()->currentSpeed().value() / 3600.0));
                 distance1s = bluetoothManager->device()->currentDistance1s().value();
             }
@@ -9010,7 +9023,9 @@ void homeform::update() {
 
             // the recorded power (FIT file, NP, TSS, peaks) is the device value: the 3 s / 5 s power
             // averaging setting smooths the watt tile only
-            const double recordedWatts = bluetoothManager->device()->wattsMetric().value();
+            const double recordedWatts = deviceConnected ? bluetoothManager->device()->wattsMetric().value() : 0;
+            const double recordedSpeed = deviceConnected ? bluetoothManager->device()->currentSpeed().value() : 0;
+            const uint8_t recordedCadence = deviceConnected ? cadence : 0;
 
             // Calculate current elapsed time in seconds
             uint32_t currentElapsedSeconds = bluetoothManager->device()->elapsedTime().second() +
@@ -9022,23 +9037,31 @@ void homeform::update() {
             }
 
             // Check for timer jitter gaps and fill missing SessionLine records (same logic as trainprogram)
+            bool skipSessionLine = false;
             if (!Session.empty() && qAbs(currentUpdateJitter) > 1000) {
                 if (currentUpdateJitter > 1000) {
                     // We are late... fill the missing seconds with SessionLine records
                     int missedSeconds = currentUpdateJitter / 1000;
+                    // a long stall (app suspended, event loop blocked) is not filled with minutes of copies
+                    // of the current values: at most one minute, the rest of the gap is dropped
+                    if (missedSeconds > 60) {
+                        qDebug() << "Timer jitter gap of" << missedSeconds << "s: filling only 60 s";
+                        currentUpdateJitter = 60000 + (currentUpdateJitter % 1000);
+                        missedSeconds = 60;
+                    }
                     qDebug() << "Timer jitter detected: filling" << missedSeconds << "missing SessionLine records";
                     
                     // Create SessionLine records for each missed second using current device values
                     uint32_t lastRecordedTime = Session.last().elapsedTime;
                     for (int i = 1; i <= missedSeconds; i++) {
                         SessionLine gapFill(
-                            bluetoothManager->device()->currentSpeed().value(), inclination, distance1s,
+                            recordedSpeed, inclination, distance1s,
                             recordedWatts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
-                            pace, cadence, bluetoothManager->device()->calories().value(),
+                            pace, recordedCadence, bluetoothManager->device()->calories().value(),
                             bluetoothManager->device()->elevationGain().value(),
                             bluetoothManager->device()->negativeElevationGain().value(),
-                            lastRecordedTime + i,  // Fill each missing second
-                            lapTrigger, totalStrokes, avgStrokesRate, maxStrokesRate, avgStrokesLength,
+                            lastRecordedTime + i,  // Fill each missing second; the lap goes on this tick's own line
+                            false, totalStrokes, avgStrokesRate, maxStrokesRate, avgStrokesLength,
                             bluetoothManager->device()->currentCordinate(), strideLength, groundContact, verticalOscillation, stepCount,
                             target_cadence->value().toDouble(), target_power->value().toDouble(), target_resistance->value().toDouble(),
                             target_incline->value().toDouble(), target_speed->value().toDouble(),
@@ -9052,25 +9075,18 @@ void homeform::update() {
                     // Adjust jitter counter (same as trainprogram)
                     currentUpdateJitter -= (missedSeconds * 1000);
                 } else if (currentUpdateJitter < -1000) {
-                    // We are early (negative jitter)... remove excess SessionLine records
-                    int excessSeconds = (-currentUpdateJitter) / 1000;
-                    qDebug() << "Negative timer jitter detected: removing" << excessSeconds << "excess SessionLine records";
-                    
-                    // Remove excess SessionLine records from the end
-                    for (int i = 0; i < excessSeconds && !Session.empty(); i++) {
-                        Session.removeLast();
-                        qDebug() << "Removed excess SessionLine record";
-                    }
-                    
-                    // Adjust jitter counter (same as trainprogram)
-                    currentUpdateJitter += (excessSeconds * 1000);
+                    // We are early (negative jitter)... skip this tick's SessionLine. Recorded lines are never
+                    // deleted: with the wall clock a step back removed minutes of the session here
+                    qDebug() << "Negative timer jitter detected: skipping this SessionLine record";
+                    skipSessionLine = true;
+                    currentUpdateJitter += 1000;
                 }
             }
 
             SessionLine s(
-                bluetoothManager->device()->currentSpeed().value(), inclination, distance1s,
+                recordedSpeed, inclination, distance1s,
                 recordedWatts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
-                pace, cadence, bluetoothManager->device()->calories().value(),
+                pace, recordedCadence, bluetoothManager->device()->calories().value(),
                 bluetoothManager->device()->elevationGain().value(),
                 bluetoothManager->device()->negativeElevationGain().value(),
                 currentElapsedSeconds,
@@ -9083,10 +9099,16 @@ void homeform::update() {
                 bluetoothManager->device()->currentHRV().value(),
                 bluetoothManager->device()->getRRIntervalsAndClear());
 
-            Session.append(s);
+            if (skipSessionLine) {
+                // an early tick records no line: its RR intervals go on the previous line, a lap stays
+                // pending for the next one
+                Session.last().rrIntervals.append(s.rrIntervals);
+            } else {
+                Session.append(s);
 
-            if (lapTrigger) {
-                lapTrigger = false;
+                if (lapTrigger) {
+                    lapTrigger = false;
+                }
             }
 
 #ifndef Q_OS_IOS
@@ -9974,6 +9996,8 @@ void homeform::fit_save_clicked() {
         QString workoutName = "";
         if (!stravaPelotonActivityName.isEmpty() && !stravaPelotonInstructorName.isEmpty())
             workoutName = stravaPelotonActivityName + " - " + stravaPelotonInstructorName;
+        else if (stravaPelotonActivityName.isEmpty() && !stravaWorkoutName.isEmpty())
+            workoutName = stravaWorkoutName; // the training program or GPX loaded for this workout
 
         // Determine workout source and metadata
         QString workoutSource = "QZ";
@@ -10354,6 +10378,11 @@ bool homeform::strava_upload_file(const QByteArray &data, const QString &remoten
         } else {
             activityLabel = uploadActivityLabelFromFitFile(remotename);
         }
+        // the training program or GPX loaded for this workout names it, as on the top bar (not an older
+        // workout uploaded from the history)
+        if (!stravaWorkoutName.isEmpty() && remotename == lastFitFileSaved) {
+            activityLabel = stravaWorkoutName;
+        }
         activityName = prefix + activityLabel + activityName;
     }
     activityNamePart.setHeader(QNetworkRequest::ContentTypeHeader,
@@ -10426,17 +10455,8 @@ void homeform::errorOccurredUploadStrava(QNetworkReply::NetworkError code) {
         qDebug() << "Error string:" << replyStrava->errorString();
         qDebug() << "HTTP status code:" << replyStrava->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
-        QByteArray errorData = replyStrava->readAll();
-        qDebug() << "Error response body:" << QString(errorData);
-        
-        QJsonDocument jsonResponse = QJsonDocument::fromJson(errorData);
-        if (!jsonResponse.isNull()) {
-            qDebug() << "JSON error message:" << jsonResponse.toJson();
-        }
-        
-        setToastRequested(QObject::tr("Strava Upload Failed: %1").arg(replyStrava->errorString()));        
-    } else {
-        setToastRequested(QObject::tr("Strava Upload Failed"));
+        // only logged: finished() follows every error and writeFileCompleted() reads the body and shows the
+        // result (reading the body here left it empty there, and a toast here was replaced by "Completed!")
     }
 }
 
@@ -10445,13 +10465,23 @@ void homeform::writeFileCompleted() {
 
     QNetworkReply *reply = static_cast<QNetworkReply *>(QObject::sender());
 
-    QString response = reply->readAll();
-    // QString uploadError = QStringLiteral("invalid response or parser error");
-    // NOTE: clazy-unused-non-trivial-variable
+    QByteArray response = reply->readAll();
+    int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    qDebug() << "reply:" << statusCode << response;
 
-    qDebug() << "reply:" << response;
-
-    setToastRequested(QObject::tr("Strava Upload Completed!"));
+    // Strava takes the file with 201 Created. An expired token (401), a refused file (4xx) or no network
+    // (no HTTP status at all) end here too: show Strava's own message, else the network error
+    QJsonObject body = QJsonDocument::fromJson(response).object();
+    QString uploadError = body.value(QStringLiteral("error")).toString();
+    if (statusCode >= 200 && statusCode < 300 && uploadError.isEmpty()) {
+        setToastRequested(QObject::tr("Strava Upload Completed!"));
+        return;
+    }
+    if (uploadError.isEmpty())
+        uploadError = body.value(QStringLiteral("message")).toString();
+    if (uploadError.isEmpty())
+        uploadError = reply->errorString();
+    setToastRequested(QObject::tr("Strava Upload Failed: %1").arg(uploadError));
 }
 
 void homeform::onStravaGranted() {
@@ -11321,8 +11351,9 @@ void homeform::sendMail() {
     QString weightLossUnit = tr("Kg");
     double WeightLoss = 0;
 
-    // TODO: add a condition to avoid sending mail when the user look at the chart while is riding
-    if (settings.value(QZSettings::user_email, QZSettings::default_user_email).toString().length() == 0 ||
+    // only once the workout is stopped: the Charts page calls this too, and mid-ride it mailed a partial
+    // workout and set mailSent, so the mail at the real end of the workout was skipped
+    if (!stopped || settings.value(QZSettings::user_email, QZSettings::default_user_email).toString().length() == 0 ||
         !bluetoothManager->device()) {
         return;
     }
@@ -12528,6 +12559,9 @@ bool homeform::intervalsicu_upload_file(const QByteArray &data, const QString &r
     QString activityName;
     if (!stravaPelotonActivityName.isEmpty()) {
         activityName = stravaPelotonActivityName + QStringLiteral(" - ") + stravaPelotonInstructorName;
+    } else if (!stravaWorkoutName.isEmpty() && remotename == lastFitFileSaved) {
+        // the training program or GPX loaded for this workout names it, as on Strava
+        activityName = prefix + stravaWorkoutName;
     } else {
         if (bluetoothManager && bluetoothManager->device()) {
             if (bluetoothManager->device()->deviceType() == TREADMILL) {

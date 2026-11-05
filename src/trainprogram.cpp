@@ -677,8 +677,13 @@ void trainprogram::scheduler() {
         if (settings.value(QZSettings::zwift_erg, QZSettings::default_zwift_erg).toBool() != enabled)
             settings.setValue(QZSettings::zwift_erg, enabled);
     };
-    QDateTime now = QDateTime::currentDateTime();
-    qint64 msecsElapsed = lastSchedulerCall.msecsTo(now);
+    // monotonic clock: with the wall clock an NTP sync or a manual time change jumped the workout by
+    // the size of the step (ticks += seconds below), forward or back
+    qint64 msecsElapsed = 1000;
+    if (lastSchedulerCall.isValid())
+        msecsElapsed = lastSchedulerCall.restart();
+    else
+        lastSchedulerCall.start();
 
     // Reset jitter if it's getting too large
     if (qAbs(currentTimerJitter) > 5000) {
@@ -686,7 +691,6 @@ void trainprogram::scheduler() {
     }
 
     currentTimerJitter += msecsElapsed - 1000;
-    lastSchedulerCall = now;
 
     // outside the if case about a valid train program because the information for the floating window url should be
     // sent anyway

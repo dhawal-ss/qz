@@ -281,6 +281,13 @@ void bluetoothdevice::update_metrics(bool watt_calc, const double watts, const b
 
     QDateTime current = QDateTime::currentDateTime();
     double deltaTime = (((double)_lastTimeUpdate.msecsTo(current)) / ((double)1000.0));
+    // a wall-clock step back (NTP sync, manual time change) is not negative ride time or energy
+    if (deltaTime < 0)
+        deltaTime = 0;
+    // energy and elevation: the drivers stop calling this while their link is down, so on reconnect the
+    // whole gap arrives as one delta with the power and speed from before the dropout still in the
+    // metrics. Calls are normally 0.05-1 s apart: count at most 5 s of a longer gap
+    const double integrationDeltaTime = qMin(deltaTime, 5.0);
     QSettings settings;
     QString heartRateBeltName =
         settings.value(QZSettings::heart_rate_belt_name, QZSettings::default_heart_rate_belt_name).toString();
@@ -304,7 +311,7 @@ void bluetoothdevice::update_metrics(bool watt_calc, const double watts, const b
             elapsed += deltaTime;
         }
         // work of all the unpaused time: a bike can report power while its speed reads 0
-        m_jouls += (m_watt.value() * deltaTime);
+        m_jouls += (m_watt.value() * integrationDeltaTime);
         if (deviceType() == BIKE) {
             // drivers keep writing KCal (MET estimate or console calories); for a bike with power
             // calories() and totalCalories() read this instead. Raw joules: m_jouls and workKCal are
@@ -341,9 +348,9 @@ void bluetoothdevice::update_metrics(bool watt_calc, const double watts, const b
     }
     METS = calculateMETS();
     if (currentInclination().value() > 0)
-        elevationAcc += (currentSpeed().value() / 3600.0) * 1000.0 * (currentInclination().value() / 100.0) * deltaTime;
+        elevationAcc += (currentSpeed().value() / 3600.0) * 1000.0 * (currentInclination().value() / 100.0) * integrationDeltaTime;
     else if (currentInclination().value() < 0)
-        negativeElevationAcc += (currentSpeed().value() / 3600.0) * 1000.0 * fabs(currentInclination().value() / 100.0) * deltaTime;
+        negativeElevationAcc += (currentSpeed().value() / 3600.0) * 1000.0 * fabs(currentInclination().value() / 100.0) * integrationDeltaTime;
 
     _lastTimeUpdate = current;
     _firstUpdate = false;

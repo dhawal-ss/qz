@@ -20,6 +20,7 @@
 #include "fitbackupwriter.h"
 #include <QChart>
 #include <QColor>
+#include <QElapsedTimer>
 #include <QGraphicsScene>
 #include <QMediaPlayer>
 #include <QNetworkReply>
@@ -1078,8 +1079,9 @@ public:
     QDateTime automaticShiftingGearUpStartTime = QDateTime::currentDateTime();
     QDateTime automaticShiftingGearDownStartTime = QDateTime::currentDateTime();
 
-    // Timer jitter detection variables (same logic as trainprogram::scheduler)
-    QDateTime lastUpdateCall = QDateTime::currentDateTime();
+    // Timer jitter detection variables (same logic as trainprogram::scheduler). Monotonic, so a wall-clock
+    // step (NTP sync, manual time change) is not a late or early tick; started by the first update()
+    QElapsedTimer lastUpdateCall;
     qint64 currentUpdateJitter = 0;
 
     peloton *pelotonHandler = nullptr;
