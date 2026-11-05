@@ -3500,6 +3500,13 @@ void bluetooth::connectedAndDiscovered() {
                 break;
             }
         }
+        // not seen by the scan: a paired watch (Fitbit) with its own app's link open does not advertise, so
+        // connect at its saved address, quietly (the watchdog keeps trying if it does not share yet)
+        if (!heartRateBelt && !heartRateBeltName.startsWith(QStringLiteral("Disabled"))) {
+            m_hrmQuiet = true;
+            if (!connectSavedHeartRateBelt(heartRateBeltName))
+                m_hrmQuiet = false;
+        }
 
         for (const QBluetoothDeviceInfo &b : qAsConst(devices)) {
             if (((b.name().startsWith(ftmsAccessoryName))) && !ftmsAccessory &&
@@ -4189,8 +4196,9 @@ void bluetooth::connectHeartRateBelt(const QBluetoothDeviceInfo &b) {
     const bool quiet = m_hrmQuiet;
     m_hrmQuiet = false;
     auto firstHeartRate = std::make_shared<QMetaObject::Connection>();
-    *firstHeartRate = connect(belt, &heartratebelt::heartRate, this, [firstHeartRate, name]() {
+    *firstHeartRate = connect(belt, &heartratebelt::heartRate, this, [this, firstHeartRate, name]() {
         QObject::disconnect(*firstHeartRate);
+        m_hrmDirectNext = true;
         if (homeform::singleton())
             homeform::singleton()->setToastRequested(QObject::tr("%1 (HR sensor) connected!").arg(name));
     });
@@ -4246,8 +4254,8 @@ void bluetooth::reconnectHeartRateBelt(const QString &name, bool quiet) {
         return;
     }
 
-    // The same sensor gone silent: the list of seen devices still has it, so connect only after a fresh scan
-    // finds it advertising again
+    // The same sensor gone silent: the list of seen devices still has it, so the old scan entry is not used
+    // (below: its saved address, or a fresh scan)
     const bool silentSameSensor =
         heartRateBelt && !heartRateBeltName.startsWith(QStringLiteral("Disabled")) &&
         heartRateBelt->bluetoothDevice.name().startsWith(heartRateBeltName);
@@ -4281,6 +4289,17 @@ void bluetooth::reconnectHeartRateBelt(const QString &name, bool quiet) {
         }
     }
 
+    // A paired watch whose own app keeps a link open (Fitbit: for hours after it last advertised) does not
+    // advertise, so a scan never finds it even while it shares heart rate. Its saved address does: the
+    // connection rides that open link. Every other try scans, for a sensor back under a new address.
+    if (m_hrmDirectNext) {
+        m_hrmDirectNext = false;
+        if (connectSavedHeartRateBelt(heartRateBeltName))
+            return;
+    } else {
+        m_hrmDirectNext = true;
+    }
+
     hrmDiscoveryAgent = new QBluetoothDeviceDiscoveryAgent(this);
     hrmDiscoveryName = heartRateBeltName;
     connect(hrmDiscoveryAgent, &QBluetoothDeviceDiscoveryAgent::deviceDiscovered, this,
@@ -4305,6 +4324,27 @@ void bluetooth::reconnectHeartRateBelt(const QString &name, bool quiet) {
     startHeartRateBeltScan(hrmDiscoveryAgent);
     if (!quiet && homeform::singleton())
         homeform::singleton()->setToastRequested(QObject::tr("Searching for %1 (HR sensor)...").arg(heartRateBeltName));
+}
+
+bool bluetooth::connectSavedHeartRateBelt(const QString &name) {
+#ifdef Q_OS_ANDROID
+    QSettings settings;
+    const QString lastName =
+        settings.value(QZSettings::hrm_lastdevice_name, QZSettings::default_hrm_lastdevice_name).toString();
+    const QBluetoothAddress address(
+        settings.value(QZSettings::hrm_lastdevice_address, QZSettings::default_hrm_lastdevice_address).toString());
+    if (heartRateBelt || !this->device() || name.isEmpty() || name.startsWith(QStringLiteral("Disabled")) ||
+        lastName.isEmpty() || !lastName.startsWith(name) || address.isNull())
+        return false;
+    qDebug() << "heart rate sensor: connecting at its saved address" << address.toString();
+    QBluetoothDeviceInfo info(address, lastName, 0);
+    info.setCoreConfigurations(QBluetoothDeviceInfo::LowEnergyCoreConfiguration);
+    connectHeartRateBelt(info);
+    return true;
+#else
+    Q_UNUSED(name);
+    return false;
+#endif
 }
 
 // This scan counts in the Android limit too (5 starts in 30 s): like searchNow() it leaves room for an

@@ -400,6 +400,10 @@ class bluetooth : public QObject, public SignalHandler {
     bool gymModeEnabled() const;
     void handleControllerGearChange(bool increase, bool allowMyWhooshOverride);
     void connectHeartRateBelt(const QBluetoothDeviceInfo &b);
+    // Connects the chosen sensor at the address it had last time, without a scan (Android): a paired watch
+    // whose own app keeps a link open does not advertise, so no scan finds it. False when there is no saved
+    // address for this sensor
+    bool connectSavedHeartRateBelt(const QString &name);
     void stopHeartRateBeltDiscovery();
     void startHeartRateBeltScan(QBluetoothDeviceDiscoveryAgent *agent);
 
@@ -414,6 +418,9 @@ class bluetooth : public QObject, public SignalHandler {
     QTimer hrmWatchdog;
     // the next connectHeartRateBelt() comes from a quiet search: no "no heart rate" toast
     bool m_hrmQuiet = false;
+    // the next reconnectHeartRateBelt() connects at the saved address first; a try that brings no heart rate
+    // makes the one after it scan instead (a sensor back under a new address), and so on, in turn
+    bool m_hrmDirectNext = true;
     qint64 nextRescanMs = 0;
     bool rescanStopped = false;
     // Android 7.0 and later ignore the scan starts after the 5th one in this window
