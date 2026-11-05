@@ -20,7 +20,7 @@
 #include "fitbackupwriter.h"
 #include <QChart>
 #include <QColor>
-#include <QElapsedTimer>
+#include "monotonicclock.h"
 #include <QGraphicsScene>
 #include <QMediaPlayer>
 #include <QNetworkReply>
@@ -532,6 +532,12 @@ class homeform : public QObject {
         }
     }
     QString instructorName() { return stravaPelotonInstructorName; }
+    // Average power of the ride and of the current lap, zeros included, from the recorded seconds: the
+    // numbers of the AVG Watts and AVG Watt Lap tiles, the mail, the chart page and the FIT file
+    double averageWatts();
+    double lapAverageWatts();
+    // averageWatts() / weight, so the W/kg average agrees with AVG Watts
+    double averageWattKg();
     int pelotonLogin() { return m_pelotonLoginState; }
     int pzpLogin() { return m_pzpLoginState; }
     int zwiftLogin() { return m_zwiftLoginState; }
@@ -1079,9 +1085,10 @@ public:
     QDateTime automaticShiftingGearUpStartTime = QDateTime::currentDateTime();
     QDateTime automaticShiftingGearDownStartTime = QDateTime::currentDateTime();
 
-    // Timer jitter detection variables (same logic as trainprogram::scheduler). Monotonic, so a wall-clock
-    // step (NTP sync, manual time change) is not a late or early tick; started by the first update()
-    QElapsedTimer lastUpdateCall;
+    // Timer jitter detection variables (same logic as trainprogram::scheduler). On monotonicMsecsIncludingSleep(),
+    // so a wall-clock step (NTP sync, manual time change) is not a late or early tick and the time a phone
+    // sleeps is; -1 until the first update()
+    qint64 lastUpdateCallMs = -1;
     qint64 currentUpdateJitter = 0;
     // the device whose connected() has been true at least once: only its dropouts are recorded as no data
     bluetoothdevice *m_linkReportingDevice = nullptr;

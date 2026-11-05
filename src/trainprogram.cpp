@@ -679,11 +679,11 @@ void trainprogram::scheduler() {
     };
     // monotonic clock: with the wall clock an NTP sync or a manual time change jumped the workout by
     // the size of the step (ticks += seconds below), forward or back
+    const qint64 nowMs = monotonicMsecsIncludingSleep();
     qint64 msecsElapsed = 1000;
-    if (lastSchedulerCall.isValid())
-        msecsElapsed = lastSchedulerCall.restart();
-    else
-        lastSchedulerCall.start();
+    if (lastSchedulerCallMs >= 0)
+        msecsElapsed = nowMs - lastSchedulerCallMs;
+    lastSchedulerCallMs = nowMs;
 
     // Reset jitter if it's getting too large
     if (qAbs(currentTimerJitter) > 5000) {

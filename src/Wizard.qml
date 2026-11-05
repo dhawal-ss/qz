@@ -346,8 +346,11 @@ Page {
                                         } else {
                                             settings.wahoo_rgt_dircon = true
                                         }
-                                        // The next step asks for the resistance of a bike: the other devices skip it
-                                        stackViewLocal.push(selectedOptions.step2 === "Bike" ? zwiftComponent : finalStepComponent)
+                                        // The next step asks for the flat-road resistance (bike_resistance_offset): bikes and
+                                        // ellipticals use it (an elliptical turns the app's slope into resistance), the
+                                        // other devices skip it
+                                        stackViewLocal.push(selectedOptions.step2 === "Bike" || selectedOptions.step2 === "Elliptical"
+                                                            ? zwiftComponent : finalStepComponent)
                                     }
                                 }
                             }
@@ -556,7 +559,7 @@ Page {
                         horizontalAlignment: Text.AlignHCenter
                         Layout.fillWidth: true
                         Layout.alignment: Qt.AlignHCenter
-                        text: qsTr("Bike Resistance Level")
+                        text: selectedOptions.step2 === "Elliptical" ? qsTr("Elliptical Resistance Level") : qsTr("Bike Resistance Level")
                         font.pixelSize: window.fontPx(24)
                         font.bold: true
                         color: "white"
@@ -564,7 +567,8 @@ Page {
 
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        text: qsTr("What resistance level feels like a flat road on your bike?")
+                        text: selectedOptions.step2 === "Elliptical" ? qsTr("What resistance level feels like a flat road on your elliptical?")
+                                                                    : qsTr("What resistance level feels like a flat road on your bike?")
                         font.pixelSize: window.fontPx(20)
                         wrapMode: Text.WordWrap
                         width: stackViewLocal.width * 0.8

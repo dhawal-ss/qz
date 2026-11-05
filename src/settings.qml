@@ -3418,7 +3418,7 @@ import AndroidStatusBar 1.0
                     }
 
                     Label {
-                        text: qsTr("This prevents your bike or treadmill from sending its calories-burned calculation to QZ and defaults to QZ's more accurate calculation.")
+                        text: qsTr("This prevents your bike or treadmill from sending its calories-burned calculation to QZ and defaults to QZ's more accurate calculation. On a bike that measures power, QZ always counts calories from the work you do, unless calories come from heart rate.")
                         font.bold: true
                         font.italic: true
                         font.pixelSize: window.fontHint

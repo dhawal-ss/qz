@@ -69,7 +69,9 @@ TextField {
     // Return/Enter emits editingFinished before accepted (Qt 5.15): the row's Enter handler saves
     // that value, without a toast as before, so the handler below leaves it alone
     property bool returnPressed: false
-    Keys.onPressed: if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) returnPressed = true
+    // only an Enter that is accepted (acceptable text) emits editingFinished; any other key clears the
+    // flag, so a stale one cannot swallow the save when the field is left later
+    Keys.onPressed: returnPressed = (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && acceptableInput
     onEditingFinished: {
         if (returnPressed) {
             returnPressed = false

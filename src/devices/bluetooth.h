@@ -189,6 +189,12 @@ class bluetooth : public QObject, public SignalHandler {
     bluetoothdevice *device();
     bluetoothdevice *externalInclination() { return eliteRizer; }
     bluetoothdevice *heartRateDevice() { return heartRateBelt; }
+    // a separate power meter (bike) or Stryd (treadmill) that feeds the device's power and cadence is connected
+    bool powerAccessoryConnected() {
+        return (powerSensor && powerSensor->connected()) || (powerSensorRun && powerSensorRun->connected());
+    }
+    // a separate cadence sensor that feeds the device's cadence is connected
+    bool cadenceAccessoryConnected() { return cadenceSensor && cadenceSensor->connected(); }
     QList<QBluetoothDeviceInfo> devices;
     bool onlyDiscover = false;
     volatile bool homeformLoaded = false;

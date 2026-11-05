@@ -828,6 +828,7 @@ ios/M3iIOS-Interface.h \
 material.h \
 devices/mcfbike/mcfbike.h \
 metric.h \
+monotonicclock.h \
 devices/nautiluselliptical/nautiluselliptical.h \
 devices/nautilustreadmill/nautilustreadmill.h \
 devices/npecablebike/npecablebike.h \

@@ -429,6 +429,21 @@ TestCase {
         compare(toast.shown, 0)
     }
 
+    function test_enter_on_empty_then_leaving_saves() {
+        store.weight = 75
+        toast.shown = 0
+        var f = make(savingField)
+        f.selectAll()
+        keyClick(Qt.Key_Backspace)           // empty: not acceptable, Enter emits nothing
+        keyClick(Qt.Key_Return)
+        compare(store.weight, 75)
+        type(f, "80")
+        elsewhere.forceActiveFocus()         // the Enter above must not swallow this save
+        compare(store.weight, 80)
+        verify(!f.dirty)
+        compare(toast.shown, 1)
+    }
+
     function test_leaving_row_without_enter_handler_saves_nothing() {
         store.weight = 75
         toast.shown = 0

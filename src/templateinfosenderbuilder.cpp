@@ -1839,13 +1839,14 @@ void TemplateInfoSenderBuilder::buildContext(bool forceReinit) {
         obj.setProperty(QStringLiteral("difficult"), device->difficult());
         obj.setProperty(QStringLiteral("watts"), (device->wattsMetricforUI()));
         dep = device->wattsMetric();
-        obj.setProperty(QStringLiteral("watts_avg"), dep.average());
+        // the averages of the tiles, the mail and the FIT file (recorded seconds, zeros included)
+        obj.setProperty(QStringLiteral("watts_avg"), homeform::singleton()->averageWatts());
         obj.setProperty(QStringLiteral("watts_color"), homeform::singleton()->watt->valueFontColor());
-        obj.setProperty(QStringLiteral("watts_lapavg"), dep.lapAverage());
+        obj.setProperty(QStringLiteral("watts_lapavg"), homeform::singleton()->lapAverageWatts());
         obj.setProperty(QStringLiteral("watts_max"), dep.max());
         obj.setProperty(QStringLiteral("watts_lapmax"), dep.lapMax());
         obj.setProperty(QStringLiteral("kgwatts"), (dep = device->wattKg()).value());
-        obj.setProperty(QStringLiteral("kgwatts_avg"), dep.average());
+        obj.setProperty(QStringLiteral("kgwatts_avg"), homeform::singleton()->averageWattKg());
         obj.setProperty(QStringLiteral("kgwatts_max"), dep.max());
         obj.setProperty(QStringLiteral("workoutName"), workoutName);
         obj.setProperty(QStringLiteral("workoutStartDate"), workoutStartDate);

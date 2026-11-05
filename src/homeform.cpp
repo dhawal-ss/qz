@@ -1688,6 +1688,9 @@ void homeform::peloton_start_workout() {
             trainProgram = nullptr;
         }
         trainProgram = new trainprogram(pelotonHandler->trainrows, bluetoothManager);
+        // a Peloton class is named by stravaPelotonActivityName: the name of a program or GPX loaded
+        // before does not name it
+        stravaWorkoutName = QLatin1String("");
         if (!stravaPelotonActivityName.isEmpty() && !stravaPelotonInstructorName.isEmpty()) {
             QString path = getWritableAppDir() + "training/" + workoutNameBasedOnBluetoothDevice() + "/" +
                            stravaPelotonInstructorName + "/";
@@ -6515,6 +6518,33 @@ void homeform::handleRestoreDefaultWheelDiameter() {
     }
 }
 
+double homeform::averageWatts() {
+    if (!bluetoothManager || !bluetoothManager->device())
+        return 0;
+    return sessionAveragePower(Session, bluetoothManager->device()->deviceType(),
+                               bluetoothManager->device()->wattsMetric().average());
+}
+
+double homeform::lapAverageWatts() {
+    if (!bluetoothManager || !bluetoothManager->device())
+        return 0;
+    // a lap ends on the line that carries lapTrigger (qfit.cpp closes the lap there): this lap is the
+    // lines after the last such line, none yet while a lap press waits for its line
+    if (lapTrigger)
+        return 0;
+    for (int i = Session.count() - 1; i >= 0; i--) {
+        if (Session.at(i).lapTrigger)
+            return metric::averagePower(Session, i + 1);
+    }
+    return averageWatts();
+}
+
+double homeform::averageWattKg() {
+    QSettings settings;
+    const double weight = settings.value(QZSettings::weight, QZSettings::default_weight).toDouble();
+    return weight > 0 ? averageWatts() / weight : 0;
+}
+
 void homeform::update() {
 
     QSettings settings;
@@ -6523,12 +6553,12 @@ void homeform::update() {
 
     // Timer jitter detection (same logic as trainprogram::scheduler), on a monotonic clock: with the wall
     // clock an NTP sync or a manual time change looked like minutes of late (cloned lines) or early
-    // (deleted lines) ticks
+    // (deleted lines) ticks. The clock counts the time a phone sleeps, which is a late tick
+    const qint64 nowMs = monotonicMsecsIncludingSleep();
     qint64 msecsElapsed = 1000;
-    if (lastUpdateCall.isValid())
-        msecsElapsed = lastUpdateCall.restart();
-    else
-        lastUpdateCall.start();
+    if (lastUpdateCallMs >= 0)
+        msecsElapsed = nowMs - lastUpdateCallMs;
+    lastUpdateCallMs = nowMs;
     
     // Reset jitter if it's getting too large
     if (qAbs(currentUpdateJitter) > 5000) {
@@ -6876,13 +6906,12 @@ void homeform::update() {
         lapElapsed->setValue(bluetoothManager->device()->lapElapsedTime().toString(QStringLiteral("h:mm:ss")));
         lapElapsed->setSecondLine(QString::number(bluetoothManager->device()->lapOdometer() * unit_conversion, 'f', 2));
         // every second from the start of the ride, zeros included, like the FIT file (O(samples))
-        const double averageWatt = sessionAveragePower(Session, bluetoothManager->device()->deviceType(),
-                                                       bluetoothManager->device()->wattsMetric().average());
+        const double averageWatt = averageWatts();
         avgWatt->setValue(QString::number(averageWatt, 'f', 0));
-        avgWattLap->setValue(QString::number(bluetoothManager->device()->wattsMetric().lapAverage(), 'f', 0));
+        avgWattLap->setValue(QString::number(lapAverageWatts(), 'f', 0));
         wattKg->setValue(QString::number(bluetoothManager->device()->wattKg().value(), 'f', 1));
         wattKg->setSecondLine(
-            QObject::tr("AVG: ") + QString::number(bluetoothManager->device()->wattKg().average(), 'f', 1) +
+            QObject::tr("AVG: ") + QString::number(averageWattKg(), 'f', 1) +
             QObject::tr(" MAX: ") + QString::number(bluetoothManager->device()->wattKg().max(), 'f', 1));
         // O(samples) once a second: a few thousand additions even on a long ride
         if (bluetoothManager->device()->deviceType() == BIKE &&
@@ -8980,7 +9009,7 @@ void homeform::update() {
                                      QString::number(bluetoothManager->device()->wattKg().value(), 'f', 1));
                         if (settings.value(QZSettings::tts_avg_watt_kg, QZSettings::default_tts_avg_watt_kg).toBool())
                             s.append((description ? tr(", average watt for kilograms") : ",") +
-                                     QString::number(bluetoothManager->device()->wattKg().average(), 'f', 1));
+                                     QString::number(averageWattKg(), 'f', 1));
                         if (settings.value(QZSettings::tts_max_watt_kg, QZSettings::default_tts_max_watt_kg).toBool())
                             s.append((description ? tr(", max watt for kilograms") : ",") +
                                      QString::number(bluetoothManager->device()->wattKg().max(), 'f', 1));
@@ -9027,10 +9056,17 @@ void homeform::update() {
             qDebug() << "Current Distance 1s:" << distance1s << bluetoothManager->device()->currentSpeed().value() << watts;
 
             // the recorded power (FIT file, NP, TSS, peaks) is the device value: the 3 s / 5 s power
-            // averaging setting smooths the watt tile only
-            const double recordedWatts = deviceConnected ? bluetoothManager->device()->wattsMetric().value() : 0;
+            // averaging setting smooths the watt tile only. A separate power meter or cadence sensor keeps
+            // sending while only the trainer's link is down: what it feeds is still recorded
+            const bool powerFromAccessory = bluetoothManager->powerAccessoryConnected();
+            const bool cadenceFromAccessory = powerFromAccessory || bluetoothManager->cadenceAccessoryConnected();
+            // 3000 W or more is a misread (a negative Cycling Power sample read unsigned, capped at watt_max;
+            // the sprint record is about 2,700 W): recorded as 0, the rule of the history TSS
+            const double deviceWatts = bluetoothManager->device()->wattsMetric().value();
+            const double recordedWatts =
+                ((deviceConnected || powerFromAccessory) && deviceWatts < 3000) ? deviceWatts : 0;
             const double recordedSpeed = deviceConnected ? bluetoothManager->device()->currentSpeed().value() : 0;
-            const uint8_t recordedCadence = deviceConnected ? cadence : 0;
+            const uint8_t recordedCadence = (deviceConnected || cadenceFromAccessory) ? cadence : 0;
 
             // Calculate current elapsed time in seconds
             uint32_t currentElapsedSeconds = bluetoothManager->device()->elapsedTime().second() +
@@ -9046,23 +9082,20 @@ void homeform::update() {
             if (!Session.empty() && qAbs(currentUpdateJitter) > 1000) {
                 if (currentUpdateJitter > 1000) {
                     // We are late... fill the missing seconds with SessionLine records
-                    int missedSeconds = currentUpdateJitter / 1000;
-                    // a long stall (app suspended, event loop blocked) is not filled with minutes of copies
-                    // of the current values: at most one minute, the rest of the gap is dropped
-                    if (missedSeconds > 60) {
-                        qDebug() << "Timer jitter gap of" << missedSeconds << "s: filling only 60 s";
-                        currentUpdateJitter = 60000 + (currentUpdateJitter % 1000);
-                        missedSeconds = 60;
-                    }
+                    const int missedSeconds = currentUpdateJitter / 1000;
                     qDebug() << "Timer jitter detected: filling" << missedSeconds << "missing SessionLine records";
-                    
-                    // Create SessionLine records for each missed second using current device values
+
+                    // Create SessionLine records for each missed second using current device values. Every
+                    // second gets a line (the FIT file stamps records by their index), but a long stall
+                    // (app suspended, event loop blocked) is not one minute after another of copies of the
+                    // current values: after the first minute the lines record no speed, power or cadence
                     uint32_t lastRecordedTime = Session.last().elapsedTime;
                     for (int i = 1; i <= missedSeconds; i++) {
+                        const bool copyValues = i <= 60;
                         SessionLine gapFill(
-                            recordedSpeed, inclination, distance1s,
-                            recordedWatts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
-                            pace, recordedCadence, bluetoothManager->device()->calories().value(),
+                            copyValues ? recordedSpeed : 0, inclination, distance1s,
+                            copyValues ? recordedWatts : 0, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
+                            pace, copyValues ? recordedCadence : (uint8_t)0, bluetoothManager->device()->calories().value(),
                             bluetoothManager->device()->elevationGain().value(),
                             bluetoothManager->device()->negativeElevationGain().value(),
                             lastRecordedTime + i,  // Fill each missing second; the lap goes on this tick's own line
@@ -9810,22 +9843,27 @@ void homeform::trainprogram_preview(const QUrl &fileName) {
 void homeform::trainprogram_zwo_loaded(const QString &s) {
     qDebug() << QStringLiteral("trainprogram_zwo_loaded") << s;
     trainProgram = new trainprogram(zwiftworkout::loadJSON(s), bluetoothManager);
+    // the name of a program or GPX loaded before does not name this workout
+    stravaWorkoutName = QLatin1String("");
     if (trainProgram) {
         QJsonDocument doc = QJsonDocument::fromJson(s.toUtf8());
         if (doc.isObject()) {
             QJsonObject obj = doc.object();
             if (obj.contains(QStringLiteral("name"))) {
                 stravaPelotonActivityName = obj[QStringLiteral("name")].toString();
+                // kept at Start (which clears the Peloton name): it names the FIT file and the uploads
+                stravaWorkoutName = stravaPelotonActivityName;
                 stravaPelotonInstructorName = QStringLiteral("");
                 emit workoutNameChanged(workoutName());
                 emit instructorNameChanged(instructorName());
 
+                // with the top bar off this returned here, before trainProgramSignals(): the workout
+                // never drove the trainer
                 QSettings settings;
-                if (!settings.value(QZSettings::top_bar_enabled, QZSettings::default_top_bar_enabled).toBool()) {
-                    return;
+                if (settings.value(QZSettings::top_bar_enabled, QZSettings::default_top_bar_enabled).toBool()) {
+                    m_info = workoutName();
+                    emit infoChanged(m_info);
                 }
-                m_info = workoutName();
-                emit infoChanged(m_info);
             }
         }
     }
@@ -11445,14 +11483,12 @@ void homeform::sendMail() {
                    QStringLiteral("\n");
     textMessage +=
         tr("Average Watt: %1")
-            .arg(QString::number(sessionAveragePower(Session, bluetoothManager->device()->deviceType(),
-                                                     bluetoothManager->device()->wattsMetric().average()),
-                                 'f', 0)) +
+            .arg(QString::number(averageWatts(), 'f', 0)) +
         QStringLiteral("\n");
     textMessage += tr("Max Watt: %1").arg(QString::number(bluetoothManager->device()->wattsMetric().max(), 'f', 0)) +
                    QStringLiteral("\n");
     textMessage +=
-        tr("Average Watt/Kg: %1").arg(QString::number(bluetoothManager->device()->wattKg().average(), 'f', 1)) + "\n";
+        tr("Average Watt/Kg: %1").arg(QString::number(averageWattKg(), 'f', 1)) + "\n";
     textMessage +=
         tr("Max Watt/Kg: %1").arg(QString::number(bluetoothManager->device()->wattKg().max(), 'f', 1)) + "\n";
     textMessage += tr("Average Heart Rate: %1")
