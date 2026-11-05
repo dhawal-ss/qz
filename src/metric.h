@@ -83,6 +83,10 @@ class metric {
     // Coggan Normalized Power of 1 Hz power samples, from firstIndex to the end: 30 s rolling
     // average, fourth power, mean, fourth root. 0 with fewer than 30 samples.
     static double normalizedPower(const QList<SessionLine> &session, int firstIndex = 0);
+    // Average of 1 Hz power samples from firstIndex to the end, zeros (coasting) included as in
+    // TrainingPeaks, WKO and Garmin: an average of the non-zero samples only can read above NP.
+    // 0 without samples.
+    static double averagePower(const QList<SessionLine> &session, int firstIndex = 0);
     // Intensity Factor = NP / FTP. 0 when FTP is not set.
     static double intensityFactor(double normalizedPower, double ftp);
     // Training Stress Score = seconds * NP * IF / (FTP * 3600) * 100. 0 when FTP is not set.
@@ -90,7 +94,8 @@ class metric {
 
     // TSS of a recorded ride whose records may not be 1 s apart (FIT files of other devices):
     // a record's power holds until the next record, a gap over 30 s is a pause and counts as 1 s,
-    // and of several records in the same second the last one is kept. Then NP and TSS as above.
+    // and of several records in the same second the last one is kept. Power of 3000 W or more (FIT
+    // "no value", a broken sample) counts as 0. Then NP and TSS as above.
     static double rideTrainingStress(const QList<SessionLine> &records, double ftp);
     // TSS per local day of the rides, sorted by start. A ride that starts before the end of the
     // previous counted ride is the same ride recorded twice (QZ and a watch): the higher TSS is kept.

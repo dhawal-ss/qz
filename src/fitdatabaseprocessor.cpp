@@ -241,7 +241,7 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
     int maxHr = 0, totalHr = 0, hrCount = 0;
     int maxCadence = 0, totalCadence = 0, cadenceCount = 0;
     double maxSpeed = 0, totalSpeed = 0, speedCount = 0;
-    int maxPower = 0, totalPower = 0, powerCount = 0;
+    int maxPower = 0;
     double totalAscent = 0, totalDescent = 0;
     double lastElevation = session.first().coordinate.altitude();
 
@@ -270,8 +270,6 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
         // Power
         if (point.watt > 0) {
             maxPower = qMax(maxPower, static_cast<int>(point.watt));
-            totalPower += point.watt;
-            powerCount++;
         }
 
         // Elevation changes
@@ -316,7 +314,7 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
     query.addBindValue(maxCadence);
     query.addBindValue(speedCount > 0 ? totalSpeed / speedCount : 0);
     query.addBindValue(maxSpeed);
-    query.addBindValue(powerCount > 0 ? totalPower / powerCount : 0);
+    query.addBindValue(qRound(metric::averagePower(session))); // every record, zeros included
     query.addBindValue(maxPower);
     query.addBindValue(totalAscent);
     query.addBindValue(totalDescent);

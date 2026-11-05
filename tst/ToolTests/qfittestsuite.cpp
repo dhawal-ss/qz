@@ -295,6 +295,51 @@ TEST(QFitExport, HalfCadenceSessionStatistics) {
     settings.sync();
 }
 
+// Average power counts every second from the first pedal stroke, coasting included, as Garmin
+// Connect and TrainingPeaks do: the average of the non-zero seconds only read above NP.
+TEST(QFitExport, AveragePowerCountsCoasting) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+
+    // 10 s before the first pedal stroke, 60 s at 300 W, then 60 s coasting
+    QList<SessionLine> workout;
+    const QDateTime start(QDate(2026, 3, 1), QTime(8, 0));
+    for (int i = 0; i < 130; ++i) {
+        const bool pedaling = i >= 10 && i < 70;
+        SessionLine line;
+        line.time = start.addSecs(i);
+        line.elapsedTime = i;
+        line.speed = i < 10 ? 0.0 : 25.0;
+        line.distance = i < 10 ? 0.0 : (i - 10) * 0.007;
+        line.cadence = pedaling ? 90 : 0;
+        line.watt = pedaling ? 300 : 0;
+        workout.append(line);
+    }
+
+    struct PowerReader : fit::MesgListener {
+        FIT_UINT16 average = 0;
+        bool hasSession = false;
+
+        void OnMesg(fit::Mesg &mesg) override {
+            if (mesg.GetNum() == FIT_MESG_NUM_SESSION) {
+                average = fit::SessionMesg(mesg).GetAvgPower();
+                hasSession = true;
+            }
+        }
+    };
+
+    const QString path = tempDir.filePath("coasting.fit");
+    qfit::save(path, workout, BIKE, QFIT_PROCESS_NONE, FIT_SPORT_INVALID);
+
+    std::ifstream file(path.toStdString(), std::ios::binary);
+    ASSERT_TRUE(file.is_open()) << "Missing FIT file: " << path.toStdString();
+    fit::Decode decoder;
+    PowerReader reader;
+    ASSERT_TRUE(decoder.Read(file, reader));
+    ASSERT_TRUE(reader.hasSession);
+    EXPECT_EQ(reader.average, 150); // 18000 J over the 120 s from the first stroke; it read 300
+}
+
 // A ride recorded by another device without a power meter, an HR strap or a cadence sensor: its
 // records have no power, heart rate, cadence or calories field, and Garmin-style enhanced_speed.
 // Those fields read as FIT's "invalid" values (65535 W, 255 bpm...), which the history showed as

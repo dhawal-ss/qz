@@ -79,6 +79,25 @@ double bikeNormalizedPower(const QList<SessionLine> &session) {
     return metric::normalizedPower(session, first);
 }
 
+// Average power, zeros included, from where the FIT file starts (qfit.cpp firstRealIndex: the
+// first sample with speed on a treadmill or an elliptical, with cadence on a bike or a rower),
+// so the tile, the summary and the FIT file show the same number. `fallback` until Session has a
+// sample.
+double sessionAveragePower(const QList<SessionLine> &session, BLUETOOTH_TYPE type, double fallback) {
+    if (session.isEmpty())
+        return fallback;
+    int first = 0;
+    for (int i = 0; i < session.count(); i++) {
+        const SessionLine &s = session.at(i);
+        if ((s.speed > 0 && (type == TREADMILL || type == ELLIPTICAL)) ||
+            (s.cadence > 0 && (type == BIKE || type == ROWING))) {
+            first = i;
+            break;
+        }
+    }
+    return metric::averagePower(session, first);
+}
+
 QString uploadActivityLabelFromSport(FIT_SPORT sport) {
     switch (sport) {
     case FIT_SPORT_RUNNING:
@@ -6865,7 +6884,10 @@ void homeform::update() {
             QObject::tr(" MAX: ") + QString::number(bluetoothManager->device()->currentMETS().max(), 'f', 1));
         lapElapsed->setValue(bluetoothManager->device()->lapElapsedTime().toString(QStringLiteral("h:mm:ss")));
         lapElapsed->setSecondLine(QString::number(bluetoothManager->device()->lapOdometer() * unit_conversion, 'f', 2));
-        avgWatt->setValue(QString::number(bluetoothManager->device()->wattsMetric().average(), 'f', 0));
+        // every second from the start of the ride, zeros included, like the FIT file (O(samples))
+        const double averageWatt = sessionAveragePower(Session, bluetoothManager->device()->deviceType(),
+                                                       bluetoothManager->device()->wattsMetric().average());
+        avgWatt->setValue(QString::number(averageWatt, 'f', 0));
         avgWattLap->setValue(QString::number(bluetoothManager->device()->wattsMetric().lapAverage(), 'f', 0));
         wattKg->setValue(QString::number(bluetoothManager->device()->wattKg().value(), 'f', 1));
         wattKg->setSecondLine(
@@ -7678,7 +7700,7 @@ void homeform::update() {
         }
 
         watt->setSecondLine(
-            QObject::tr("AVG: ") + QString::number((bluetoothManager->device())->wattsMetric().average(), 'f', 0) +
+            QObject::tr("AVG: ") + QString::number(averageWatt, 'f', 0) +
             QObject::tr(" MAX: ") + QString::number((bluetoothManager->device())->wattsMetric().max(), 'f', 0));
 
         if (trainProgram) {
@@ -8870,7 +8892,7 @@ void homeform::update() {
                                      QString::number(bluetoothManager->device()->wattsMetric().value(), 'f', 0));
                         if (settings.value(QZSettings::tts_avg_watt, QZSettings::default_tts_avg_watt).toBool())
                             s.append((description ? tr(", average watt ") : ",") +
-                                     QString::number(bluetoothManager->device()->wattsMetric().average(), 'f', 0));
+                                     QString::number(averageWatt, 'f', 0));
                         if (settings.value(QZSettings::tts_max_watt, QZSettings::default_tts_max_watt).toBool())
                             s.append((description ? tr(", max watt ") : ",") +
                                      QString::number(bluetoothManager->device()->wattsMetric().max(), 'f', 0));
@@ -9011,6 +9033,10 @@ void homeform::update() {
 
             qDebug() << "Current Distance 1s:" << distance1s << bluetoothManager->device()->currentSpeed().value() << watts;
 
+            // the recorded power (FIT file, NP, TSS, peaks) is the device value: the 3 s / 5 s power
+            // averaging setting smooths the watt tile only
+            const double recordedWatts = bluetoothManager->device()->wattsMetric().value();
+
             // Calculate current elapsed time in seconds
             uint32_t currentElapsedSeconds = bluetoothManager->device()->elapsedTime().second() +
                 (bluetoothManager->device()->elapsedTime().minute() * 60) +
@@ -9032,7 +9058,7 @@ void homeform::update() {
                     for (int i = 1; i <= missedSeconds; i++) {
                         SessionLine gapFill(
                             bluetoothManager->device()->currentSpeed().value(), inclination, distance1s,
-                            watts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
+                            recordedWatts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
                             pace, cadence, bluetoothManager->device()->calories().value(),
                             bluetoothManager->device()->elevationGain().value(),
                             bluetoothManager->device()->negativeElevationGain().value(),
@@ -9068,7 +9094,7 @@ void homeform::update() {
 
             SessionLine s(
                 bluetoothManager->device()->currentSpeed().value(), inclination, distance1s,
-                watts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
+                recordedWatts, resistance, peloton_resistance, (uint8_t)bluetoothManager->device()->currentHeart().value(),
                 pace, cadence, bluetoothManager->device()->calories().value(),
                 bluetoothManager->device()->elevationGain().value(),
                 bluetoothManager->device()->negativeElevationGain().value(),
@@ -11407,7 +11433,10 @@ void homeform::sendMail() {
                                             'f', (miles ? 0 : 1))) +
                    QStringLiteral("\n");
     textMessage +=
-        tr("Average Watt: %1").arg(QString::number(bluetoothManager->device()->wattsMetric().average(), 'f', 0)) +
+        tr("Average Watt: %1")
+            .arg(QString::number(sessionAveragePower(Session, bluetoothManager->device()->deviceType(),
+                                                     bluetoothManager->device()->wattsMetric().average()),
+                                 'f', 0)) +
         QStringLiteral("\n");
     textMessage += tr("Max Watt: %1").arg(QString::number(bluetoothManager->device()->wattsMetric().max(), 'f', 0)) +
                    QStringLiteral("\n");

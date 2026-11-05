@@ -231,6 +231,11 @@ resistance_t ftmsbike::rawResistanceForDevice(const QString &deviceName, resista
     return qBound<resistance_t>(50, displayedResistance * 10 + 50, 200);
 }
 
+double ftmsbike::powerAt(const QByteArray &data, int index) {
+    const int16_t power = static_cast<int16_t>(((uint8_t)data.at(index + 1) << 8) | (uint8_t)data.at(index));
+    return power > 0 ? power : 0.0;
+}
+
 void ftmsbike::zwiftPlayInit() {
     QSettings settings;
     bool gears_zwift_ratio = settings.value(QZSettings::gears_zwift_ratio, QZSettings::default_gears_zwift_ratio).toBool();
@@ -1109,8 +1114,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
                 m_watt = wattFromHR(true);
                 emit debug(QStringLiteral("Current Watt from HR: ") + QString::number(m_watt.value()));
             } else {
-                double ftms_watt = ((double)(((uint16_t)((uint8_t)newValue.at(index + 1)) << 8) |
-                                   (uint16_t)((uint8_t)newValue.at(index))));
+                double ftms_watt = powerAt(newValue, index);
                 m_rawWatt = ftms_watt;  // Always update rawWatt from FTMS bike data
                 if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                         .toString()
@@ -1132,8 +1136,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
 
         if (Flags.avgPower && newValue.length() > index + 1) {
             double avgPower;
-            avgPower = ((double)(((uint16_t)((uint8_t)newValue.at(index + 1)) << 8) |
-                                 (uint16_t)((uint8_t)newValue.at(index))));
+            avgPower = powerAt(newValue, index);
             index += 2;
             emit debug(QStringLiteral("Current Average Watt: ") + QString::number(avgPower));
             // Use average power if instant power is zero or not available
@@ -1209,7 +1212,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
         uint8_t index = 4;
 
         if (newValue.length() > 3) {
-            double ftms_watt = (((uint16_t)((uint8_t)newValue.at(3)) << 8) | (uint16_t)((uint8_t)newValue.at(2)));
+            double ftms_watt = powerAt(newValue, 2);
             m_rawWatt = ftms_watt;  // Always update rawWatt from FTMS bike data
             if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                     .toString()
@@ -1578,8 +1581,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
                 m_watt = wattFromHR(true);
                 emit debug(QStringLiteral("Current Watt from HR (0x2ACE): ") + QString::number(m_watt.value()));
             } else {
-                double ftms_watt = ((double)(((uint16_t)((uint8_t)newValue.at(index + 1)) << 8) |
-                                       (uint16_t)((uint8_t)newValue.at(index))));
+                double ftms_watt = powerAt(newValue, index);
                 m_rawWatt = ftms_watt;
                 if (settings.value(QZSettings::power_sensor_name, QZSettings::default_power_sensor_name)
                         .toString()
@@ -1596,8 +1598,7 @@ void ftmsbike::characteristicChanged(const QLowEnergyCharacteristic &characteris
                 return;
 
             double avgPower;
-            avgPower = ((double)(((uint16_t)((uint8_t)newValue.at(index + 1)) << 8) |
-                                 (uint16_t)((uint8_t)newValue.at(index))));
+            avgPower = powerAt(newValue, index);
             emit debug(QStringLiteral("Current Average Watt: ") + QString::number(avgPower));
             index += 2;
         }

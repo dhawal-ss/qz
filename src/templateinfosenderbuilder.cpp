@@ -2027,18 +2027,18 @@ void TemplateInfoSenderBuilder::previewSessionOnChart(QList<SessionLine> *sessio
     
     // Pre-calculate stats for performance
     double avgWatts = 0, maxWatts = 0, avgHeart = 0, maxHeart = 0, avgSpeed = 0, maxSpeed = 0, avgCadence = 0, maxCadence = 0;
-    double totalWatts = 0, totalHeart = 0, totalSpeed = 0, totalCadence = 0;
-    int validWatts = 0, validHeart = 0, validSpeed = 0, validCadence = 0;
+    double totalHeart = 0, totalSpeed = 0, totalCadence = 0;
+    int validHeart = 0, validSpeed = 0, validCadence = 0;
     
     // Single optimized pass
     for (const SessionLine &s : *session) {
-        if (s.watt > 0) { totalWatts += s.watt; validWatts++; maxWatts = qMax((double)s.watt, maxWatts); }
+        maxWatts = qMax((double)s.watt, maxWatts);
         if (s.heart > 0) { totalHeart += s.heart; validHeart++; maxHeart = qMax((double)s.heart, maxHeart); }
         if (s.speed > 0) { totalSpeed += s.speed; validSpeed++; maxSpeed = qMax(s.speed, maxSpeed); }
         if (s.cadence > 0) { totalCadence += s.cadence; validCadence++; maxCadence = qMax((double)s.cadence, maxCadence); }
     }
     
-    avgWatts = validWatts > 0 ? totalWatts / validWatts : 0;
+    avgWatts = metric::averagePower(*session); // every sample, zeros included, like the FIT file
     avgHeart = validHeart > 0 ? totalHeart / validHeart : 0;
     avgSpeed = validSpeed > 0 ? totalSpeed / validSpeed : 0;
     avgCadence = validCadence > 0 ? totalCadence / validCadence : 0;

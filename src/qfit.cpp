@@ -197,8 +197,7 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
     int hr_count = 0;
     uint8_t min_hr = 255;
     uint8_t max_hr = 0;
-    double watt_sum = 0;
-    int watt_count = 0;
+    int watt_count = 0; // samples with power: whether the ride has power data
 
     // Cadence, power, and speed summaries (all device types)
     double cadence_sum = 0;
@@ -253,7 +252,6 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
 
         // Collect power data for TSS / NP / session stats
         if (session.at(i).watt > 0) {
-            watt_sum += session.at(i).watt;
             watt_count++;
             if ((uint16_t)session.at(i).watt > max_watt)
                 max_watt = (uint16_t)session.at(i).watt;
@@ -665,7 +663,8 @@ void qfit::save(const QString &filename, QList<SessionLine> session, BLUETOOTH_T
         sessionMesg.SetMaxCadence(max_cadence);
     }
     if (watt_count > 0) {
-        sessionMesg.SetAvgPower((uint16_t)(watt_sum / watt_count));
+        // every second from the first pedal stroke, zeros included like NP (TrainingPeaks, Garmin)
+        sessionMesg.SetAvgPower((uint16_t)qRound(metric::averagePower(session, firstRealIndex)));
         sessionMesg.SetMaxPower(max_watt);
         if (normalized_power > 0)
             sessionMesg.SetNormalizedPower(normalized_power);

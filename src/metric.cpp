@@ -457,6 +457,17 @@ double metric::normalizedPower(const QList<SessionLine> &session, int firstIndex
     return normalizedPowerOf(watts);
 }
 
+double metric::averagePower(const QList<SessionLine> &session, int firstIndex) {
+    if (firstIndex < 0)
+        firstIndex = 0;
+    if (firstIndex >= session.count())
+        return 0.0;
+    double sum = 0.0;
+    for (int i = firstIndex; i < session.count(); i++)
+        sum += session.at(i).watt;
+    return sum / (session.count() - firstIndex);
+}
+
 double metric::intensityFactor(double normalizedPower, double ftp) {
     if (ftp <= 0 || normalizedPower <= 0)
         return 0.0;
@@ -482,7 +493,9 @@ double metric::rideTrainingStress(const QList<SessionLine> &records, double ftp)
             if (seconds > pauseSeconds)
                 seconds = 1; // paused or stopped, not riding time
         }
-        const double watt = records.at(i).watt == 0xFFFF ? 0.0 : records.at(i).watt; // FIT "no value"
+        // FIT "no value" (0xFFFF) and power no rider produces, such as a negative sint16 read as
+        // uint16 (0xFFFD is 65533 W): one such second would make the NP and TSS of the ride useless
+        const double watt = records.at(i).watt >= 3000 ? 0.0 : records.at(i).watt;
         for (int s = 0; s < seconds; s++)
             watts.append(watt);
     }

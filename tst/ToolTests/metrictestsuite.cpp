@@ -202,6 +202,36 @@ TEST(MetricNormalizedPowerTest, FirstIndexSkipsTheSamplesBeforeIt) {
     EXPECT_LT(metric::normalizedPower(session), 200.0);
 }
 
+TEST(MetricAveragePowerTest, CoastingCountsAsZero) {
+    // 10 intervals of 60 s at 320 W and 60 s coasting: 160 W, as TrainingPeaks and Garmin show
+    // it. The average of the non-zero seconds read 320 W, above NP.
+    QList<uint16_t> watts;
+    for (int interval = 0; interval < 10; interval++) {
+        watts.append(repeatedWatts(320, 60));
+        watts.append(repeatedWatts(0, 60));
+    }
+    QList<SessionLine> session = powerSession(watts);
+
+    EXPECT_DOUBLE_EQ(metric::averagePower(session), 160.0);
+    EXPECT_LT(metric::averagePower(session), metric::normalizedPower(session));
+}
+
+TEST(MetricAveragePowerTest, FirstIndexSkipsTheSamplesBeforeIt) {
+    QList<uint16_t> watts = repeatedWatts(0, 40);
+    watts.append(repeatedWatts(200, 300));
+    QList<SessionLine> session = powerSession(watts);
+
+    EXPECT_DOUBLE_EQ(metric::averagePower(session, 40), 200.0);
+    EXPECT_DOUBLE_EQ(metric::averagePower(session), 60000.0 / 340.0);
+    EXPECT_DOUBLE_EQ(metric::averagePower(session, -1), metric::averagePower(session));
+}
+
+TEST(MetricAveragePowerTest, NoSamplesGivesZero) {
+    EXPECT_DOUBLE_EQ(metric::averagePower(QList<SessionLine>()), 0.0);
+    QList<SessionLine> session = powerSession(repeatedWatts(200, 10));
+    EXPECT_DOUBLE_EQ(metric::averagePower(session, 10), 0.0);
+}
+
 TEST(MetricTrainingStressTest, OneHourAtFtpIsOneHundred) {
     EXPECT_DOUBLE_EQ(metric::intensityFactor(250.0, 250.0), 1.0);
     EXPECT_NEAR(metric::trainingStressScore(3600.0, 250.0, 250.0), 100.0, 1e-9);
@@ -267,6 +297,20 @@ TEST(MetricRideTrainingStressTest, TheLastRecordOfASecondIsKept) {
         records.append(line);
     }
     EXPECT_NEAR(metric::rideTrainingStress(records, 250.0), 100.0, 0.01);
+}
+
+TEST(MetricRideTrainingStressTest, ImpossiblePowerCountsAsZero) {
+    // a negative sint16 power read as uint16 (0xFFFD) gave this hour a TSS of about 870
+    QList<SessionLine> records = recordsEvery(1, 3600, 250);
+    records[100].watt = 0xFFFD;
+    records[200].watt = 9999; // the watt_max cap
+    records[300].watt = 3000;
+    EXPECT_NEAR(metric::rideTrainingStress(records, 250.0), 100.0, 0.5);
+
+    // a real sprint still counts
+    records = recordsEvery(1, 3600, 250);
+    records[100].watt = 2999;
+    EXPECT_GT(metric::rideTrainingStress(records, 250.0), 100.5);
 }
 
 static QMap<QDate, double> everyDay(const QDate &first, int days, double tss) {

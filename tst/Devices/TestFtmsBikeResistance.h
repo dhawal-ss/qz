@@ -36,3 +36,13 @@ TEST(FtmsBikeResistanceTest, ConvertsDisplayedZBike20ResistanceBackToRawOnlyWhen
     EXPECT_EQ(ftmsbike::rawResistanceForDevice(QStringLiteral("ZBike2.0"), -1), -1);
     EXPECT_EQ(ftmsbike::rawResistanceForDevice(QStringLiteral("ZBike2.0 Pro"), 5), 5);
 }
+
+TEST(FtmsBikePowerTest, ReadsPowerAsSint16AndNegativeAsZero) {
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("fa00"), 0), 250.0);
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("4400e803"), 2), 1000.0);
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("ff7f"), 0), 32767.0);
+    // -3 W (back-pedalling) was read as 65533 W and shown as the 9999 W cap
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("fdff"), 0), 0.0);
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("0080"), 0), 0.0);
+    EXPECT_DOUBLE_EQ(ftmsbike::powerAt(QByteArray::fromHex("0000"), 0), 0.0);
+}

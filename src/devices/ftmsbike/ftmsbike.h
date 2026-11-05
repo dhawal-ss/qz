@@ -83,6 +83,9 @@ class ftmsbike : public bike {
     void enableManualResistancePowerAdjustment(resistance_t resistance);
     static resistance_t normalizedResistanceForDevice(const QString &deviceName, double rawResistance);
     static resistance_t rawResistanceForDevice(const QString &deviceName, resistance_t displayedResistance);
+    // FTMS and Cycling Power "Instantaneous Power" and "Average Power" are sint16, little endian at
+    // index: a negative value (back-pedalling, a coasting trainer) is 0 W, not 65533 W
+    static double powerAt(const QByteArray &data, int index);
 
     // Most FTMS bikes can use QZ's software ERG emulation, but FS-YK devices
     // should stay on direct resistance control because it doesn't send the current resistance value and it conflicts
