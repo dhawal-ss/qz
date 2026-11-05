@@ -60,6 +60,28 @@ TextField {
     onSavedTextChanged: if (savedText !== undefined) text = savedText
     Component.onCompleted: if (savedText !== undefined) text = savedText
 
+    // Leaving the field (Back, another field, the OK button) saves an edited valid value, as OK
+    // does: a weight or an FTP typed and left with Back was lost. The Enter handler of the row
+    // saves it (onAccepted does what OK does, tools/check_settings_fields.py), and the toast of
+    // OK says so, once: the OK button, grey once the value is saved, takes no tap. After Enter
+    // (saved, no toast, as before) nothing is left to save. A row without onAccepted still needs
+    // OK: nothing is saved, no toast
+    // Return/Enter emits editingFinished before accepted (Qt 5.15): the row's Enter handler saves
+    // that value, without a toast as before, so the handler below leaves it alone
+    property bool returnPressed: false
+    Keys.onPressed: if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) returnPressed = true
+    onEditingFinished: {
+        if (returnPressed) {
+            returnPressed = false
+            return
+        }
+        if (!valid || !dirty)
+            return
+        field.accepted()
+        if (!dirty)
+            toast.show(qsTranslate("settings", "Setting saved!"))
+    }
+
     onTextEdited: {
         if (decimals <= 0)
             return

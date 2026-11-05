@@ -2125,7 +2125,7 @@ import AndroidStatusBar 1.0
             property bool toorxtreadmill_discovery_completed: false
             property bool taurua_ic90: false
             property bool proform_csx210: false
-            property bool confirm_stop_workout: false                       
+            property bool confirm_stop_workout: true                       
             property bool proform_rower_750r: false             
             property bool virtual_device_force_treadmill: false
             property bool proform_trainer_9_0: false

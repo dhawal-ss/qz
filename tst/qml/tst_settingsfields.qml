@@ -372,6 +372,87 @@ TestCase {
         verify(!f.dirty)
     }
 
+    // ---- Leaving a field ----
+
+    // Leaving an edited field (Back, another field, the OK button) saves a valid value as Enter
+    // does, with the toast of OK, once. `toast` stands for the one of main.qml
+    QtObject {
+        id: toast
+        property int shown: 0
+        function show(text) { shown++ }
+    }
+    // Takes the focus as the next field or the OK button does
+    Item { id: elsewhere; width: 10; height: 10 }
+    Component {
+        id: savingField
+        SettingsNumberField { width: 300; minimum: 1; savedText: store.weight; onAccepted: if (valid) store.weight = value }
+    }
+    Component {
+        id: savingTextField
+        SettingsTextField { width: 300; savedText: textStore.nickname; onAccepted: textStore.nickname = text }
+    }
+
+    function test_leaving_saves_edited_value() {
+        store.weight = 75
+        toast.shown = 0
+        var f = make(savingField)
+        f.selectAll()
+        type(f, "80,5")
+        elsewhere.forceActiveFocus()
+        compare(store.weight, 80.5)
+        verify(!f.dirty)                     // a grey OK: it takes no second tap
+        compare(toast.shown, 1)
+    }
+
+    function test_leaving_keeps_invalid_value_unsaved() {
+        store.weight = 75
+        toast.shown = 0
+        var f = make(savingField)
+        f.selectAll()
+        type(f, "0")                         // under the minimum
+        elsewhere.forceActiveFocus()
+        compare(store.weight, 75)
+        verify(f.dirty)
+        compare(toast.shown, 0)
+    }
+
+    function test_enter_then_leaving_saves_once_without_toast() {
+        store.weight = 75
+        toast.shown = 0
+        var f = make(savingField)
+        f.selectAll()
+        type(f, "81")
+        keyClick(Qt.Key_Return)              // Enter saves without a toast, as before
+        compare(store.weight, 81)
+        verify(!f.dirty)
+        elsewhere.forceActiveFocus()
+        compare(toast.shown, 0)
+    }
+
+    function test_leaving_row_without_enter_handler_saves_nothing() {
+        store.weight = 75
+        toast.shown = 0
+        var f = make(boundField)             // no onAccepted: the row still needs OK
+        f.selectAll()
+        type(f, "90")
+        elsewhere.forceActiveFocus()
+        compare(store.weight, 75)
+        verify(f.dirty)
+        compare(toast.shown, 0)
+    }
+
+    function test_text_field_leaving_saves() {
+        textStore.nickname = "anon"
+        toast.shown = 0
+        var f = make(savingTextField)
+        f.selectAll()
+        type(f, "rider")
+        elsewhere.forceActiveFocus()
+        compare(textStore.nickname, "rider")
+        verify(!f.dirty)
+        compare(toast.shown, 1)
+    }
+
     // ---- UiComboBox / ValueComboBox ----
 
     // UiComboBox reads the bar paddings of the app window

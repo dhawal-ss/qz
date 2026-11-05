@@ -3072,7 +3072,7 @@ class QZSettings {
      * @brief Show a confirmation dialog before stopping a workout from the UI.
      */
     static const QString confirm_stop_workout;
-    static constexpr bool default_confirm_stop_workout = false;
+    static constexpr bool default_confirm_stop_workout = true;
 
     /**
      * @brief User height in centimeters for BMR calculation

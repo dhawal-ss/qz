@@ -346,7 +346,8 @@ Page {
                                         } else {
                                             settings.wahoo_rgt_dircon = true
                                         }
-                                        stackViewLocal.push(zwiftComponent)
+                                        // The next step asks for the resistance of a bike: the other devices skip it
+                                        stackViewLocal.push(selectedOptions.step2 === "Bike" ? zwiftComponent : finalStepComponent)
                                     }
                                 }
                             }
@@ -575,9 +576,10 @@ Page {
                     SpinBox {
                         id: spinBoxResistanceOffset
                         Layout.alignment: Qt.AlignHCenter
-                        from: 0
+                        // As the Zwift Resistance Offset row of the settings: its range, the saved value
+                        from: -100
                         to: 100
-                        value: 18
+                        value: settings.bike_resistance_offset
                         editable: true
                     }
 
@@ -590,7 +592,6 @@ Page {
                         text: qsTr("Next")
                         onClicked: {
                             settings.bike_resistance_offset = spinBoxResistanceOffset.value;
-                            settings.speed_power_based = true;
                             stackViewLocal.push(finalStepComponent);
                         }
                     }                    

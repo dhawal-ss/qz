@@ -470,6 +470,12 @@ ApplicationWindow {
     // list) first go back one step there, via their handleBack().
     // Returns false when there is nothing to go back to (home page).
     function navigateBack(stepInsidePage) {
+        // A settings field being edited saves its value when it loses the focus (SettingsNumberField
+        // and the other settings fields). The Android back key takes no focus: it is taken here, so
+        // the restart and profile checks below see the saved value
+        var editedField = window.activeFocusItem
+        if (editedField && editedField.savedText !== undefined)
+            editedField.focus = false
         if (stepInsidePage && stackView.currentItem && typeof stackView.currentItem.handleBack === "function" &&
                 stackView.currentItem.handleBack()) {
             return true

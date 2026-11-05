@@ -51,6 +51,23 @@ TextField {
     onSavedTextChanged: if (savedText !== undefined) text = savedText
     Component.onCompleted: if (savedText !== undefined) text = savedText
 
+    // Leaving the field saves an edited valid value, as OK does (see SettingsNumberField)
+    // Return/Enter emits editingFinished before accepted (Qt 5.15): the row's Enter handler saves
+    // that value, without a toast as before, so the handler below leaves it alone
+    property bool returnPressed: false
+    Keys.onPressed: if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) returnPressed = true
+    onEditingFinished: {
+        if (returnPressed) {
+            returnPressed = false
+            return
+        }
+        if (!valid || !dirty)
+            return
+        field.accepted()
+        if (!dirty)
+            toast.show(qsTranslate("settings", "Setting saved!"))
+    }
+
     // One spelling of a value for `dirty`: "0:8:0" is the saved "00:08:00", 180.0 cm is 180,
     // 5'10 is 5'10"
     function normalized(t) {
