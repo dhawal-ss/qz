@@ -2,6 +2,7 @@ import QtQuick 2.15
 import QtQml 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick.Window 2.15
 import QtCharts 2.15
 import Qt.labs.calendar 1.0
 import Qt.labs.settings 1.0
@@ -21,7 +22,12 @@ Page {
     signal fitfile_preview_clicked(var url)
 
     // a pending offer to recover the workouts of a previous install is made here
-    Component.onCompleted: rootItem.historyPageOpened()
+    Component.onCompleted: {
+        rootItem.historyPageOpened()
+        // the training load follows the date: the page may open on another day than the last load
+        if (workoutModel)
+            workoutModel.refreshTrainingLoad()
+    }
 
     // Helper function to wrap text with emoji font only on Android. Android shows an emoji
     // only with the downloaded font, so until it is there the emoji is left out
@@ -37,6 +43,51 @@ Page {
             emoji = emoji.slice(0, -1);
         }
         return '<font face="' + fontManager.emojiFontFamily + '">' + emoji + '</font>' + space;
+    }
+
+    // Fitness & Form card: the status id (metric::trainingStatus) as words and as a colour
+    function trainingStatusText(status) {
+        switch (status) {
+        case "fading": return qsTr("Well rested – fitness is starting to fade")
+        case "fresh": return qsTr("Fresh – ready for a hard ride")
+        case "balanced": return qsTr("Balanced – ride as planned")
+        case "building": return qsTr("Building fitness – good training load")
+        case "tired": return qsTr("Tired – keep the next ride easy")
+        case "learning": return qsTr("Learning your form – day %1 of 42").arg(workoutModel.trainingLoad.historyDays)
+        case "break": return qsTr("Welcome back – start with an easy ride")
+        }
+        return ""
+    }
+    function trainingStatusDetail(status) {
+        switch (status) {
+        case "tired": return qsTr("An easy ride still counts for your streak.")
+        case "learning": return qsTr("Keep riding, or import older rides with the Import button, to fill in the picture.")
+        case "break": return qsTr("%1 days since your last ride").arg(workoutModel.trainingLoad.daysSinceLastRide)
+        }
+        return ""
+    }
+    function trainingStatusColor(status) {
+        switch (status) {
+        case "fading": return "#8D6E00"
+        case "fresh": return "#1565C0"
+        case "building": return "#2E7D32"
+        case "tired": return "#C62828"
+        }
+        return "#616161"
+    }
+    // a sign on positive numbers, and a real minus sign
+    function signedNumber(n) {
+        return n > 0 ? "+" + n : (n < 0 ? "\u2212" + (-n) : "0")
+    }
+    function spokenNumber(n) {
+        return n > 0 ? qsTr("plus %1").arg(n) : (n < 0 ? qsTr("minus %1").arg(-n) : "0")
+    }
+    function fitnessTrendText(change) {
+        if (change > 0)
+            return qsTr("+%1 this week").arg(change)
+        if (change < 0)
+            return qsTr("\u2212%1 this week").arg(-change)
+        return qsTr("Steady this week")
     }
 
     // Sport type to ShapeIcon name, drawn instead of the emoji on Android
@@ -311,8 +362,322 @@ Page {
             clip: true
             
             onContentYChanged: {
-                // Hide banner when scrolling down, show when at top
-                streakBanner.visible = contentY <= 20
+                // Hide banner when scrolling down, show when at top. With a header the list starts at
+                // originY, below 0
+                streakBanner.visible = contentY - originY <= 20
+            }
+
+            // Fitness & Form: how ready the rider is, from the training load of the bike rides. It
+            // scrolls away with the list; hidden while a day is picked in the calendar
+            header: Item {
+                id: trainingLoadHeader
+                readonly property var load: workoutModel ? workoutModel.trainingLoad : ({})
+                readonly property bool shown: !!workoutModel && !workoutModel.isDateFiltered &&
+                                              (load.available === true || load.updating === true)
+                readonly property bool updating: load.updating === true
+                readonly property bool wide: width >= 600
+                width: workoutListView.width
+                height: shown ? trainingLoadCard.height + 8 : 0
+                visible: shown
+
+                Rectangle {
+                    id: trainingLoadCard
+                    y: 8
+                    x: window.contentSideMargin
+                    width: parent.width - 2 * window.contentSideMargin
+                    height: trainingLoadColumn.height + 24
+                    radius: 10
+                    color: "white"
+                    border.color: "#e0e0e0"
+
+                    // one sentence for a screen reader, and a double tap opens the explanation
+                    Accessible.role: Accessible.Button
+                    Accessible.name: trainingLoadHeader.updating
+                                     ? qsTr("Fitness and form: working out your fitness from your past rides")
+                                     : qsTr("Fitness and form: %1. Fitness %2, fatigue %3, form %4.")
+                                           .arg(trainingStatusText(trainingLoadHeader.load.status))
+                                           .arg(trainingLoadHeader.load.fitness)
+                                           .arg(trainingLoadHeader.load.fatigue)
+                                           .arg(spokenNumber(trainingLoadHeader.load.form))
+                    Accessible.onPressAction: trainingLoadPopup.open()
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: trainingLoadPopup.open()
+                    }
+
+                    // positioners with set widths, not layouts: the card height read from a layout loops
+                    // on the wrapped texts while the list lays the header out
+                    Column {
+                        id: trainingLoadColumn
+                        x: 12
+                        y: 12
+                        width: parent.width - 24
+                        spacing: 8
+
+                        Item {
+                            width: parent.width
+                            height: Math.max(trainingLoadOverline.height, trainingLoadHelpBadge.height)
+                            Text {
+                                id: trainingLoadOverline
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - trainingLoadHelpBadge.width - 8
+                                text: qsTr("FITNESS & FORM")
+                                elide: Text.ElideRight
+                                font.pixelSize: window.fontPx(12)
+                                font.bold: true
+                                font.letterSpacing: 1
+                                color: "#666666"
+                                Accessible.ignored: true
+                            }
+                            Rectangle {
+                                id: trainingLoadHelpBadge
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: window.fontPx(22)
+                                height: width
+                                radius: width / 2
+                                color: "transparent"
+                                border.color: "#bdbdbd"
+                                Accessible.ignored: true
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "?"
+                                    font.pixelSize: window.fontPx(13)
+                                    font.bold: true
+                                    color: "#666666"
+                                    Accessible.ignored: true
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: trainingLoadHeader.updating
+                            text: qsTr("Working out your fitness from your past rides…")
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: window.fontPx(15)
+                            color: "#333333"
+                            Accessible.ignored: true
+                        }
+
+                        Grid {
+                            id: trainingLoadGrid
+                            visible: !trainingLoadHeader.updating && trainingLoadHeader.load.available === true
+                            columns: trainingLoadHeader.wide ? 2 : 1
+                            columnSpacing: 16
+                            rowSpacing: 8
+                            // half the card each when wide
+                            readonly property real cellWidth: trainingLoadHeader.wide ? (trainingLoadColumn.width - columnSpacing) / 2
+                                                                                      : trainingLoadColumn.width
+
+                            Column {
+                                width: trainingLoadGrid.cellWidth
+                                spacing: 8
+
+                                Row {
+                                    width: parent.width
+                                    spacing: 8
+                                    Rectangle {
+                                        width: 10
+                                        height: 10
+                                        radius: 5
+                                        y: (trainingLoadStatusText.font.pixelSize * 1.35 - height) / 2
+                                        color: trainingStatusColor(trainingLoadHeader.load.status)
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        id: trainingLoadStatusText
+                                        width: parent.width - 18
+                                        text: trainingStatusText(trainingLoadHeader.load.status)
+                                        wrapMode: Text.WordWrap
+                                        font.pixelSize: window.fontPx(15)
+                                        font.bold: true
+                                        color: "#212121"
+                                        Accessible.ignored: true
+                                    }
+                                }
+                                Text {
+                                    width: parent.width
+                                    visible: text !== ""
+                                    text: trainingStatusDetail(trainingLoadHeader.load.status)
+                                    wrapMode: Text.WordWrap
+                                    font.pixelSize: window.fontPx(12)
+                                    color: "#666666"
+                                    Accessible.ignored: true
+                                }
+
+                                Row {
+                                    width: parent.width
+                                    Repeater {
+                                        model: [
+                                            { label: qsTr("Fitness"), value: "" + trainingLoadHeader.load.fitness, swatch: "#1565C0" },
+                                            { label: qsTr("Fatigue"), value: "" + trainingLoadHeader.load.fatigue, swatch: "#AD1457" },
+                                            { label: qsTr("Form"), value: signedNumber(trainingLoadHeader.load.form), swatch: "" }
+                                        ]
+                                        Column {
+                                            id: trainingLoadNumber
+                                            width: trainingLoadGrid.cellWidth / 3
+                                            spacing: 2
+                                            Text {
+                                                width: parent.width
+                                                text: modelData.value
+                                                elide: Text.ElideRight
+                                                font.pixelSize: window.fontPx(28)
+                                                font.bold: true
+                                                color: "#212121"
+                                                Accessible.ignored: true
+                                            }
+                                            Row {
+                                                width: parent.width
+                                                spacing: 6
+                                                Rectangle {
+                                                    visible: modelData.swatch !== ""
+                                                    width: 12
+                                                    height: 3
+                                                    y: (trainingLoadNumberLabel.font.pixelSize * 1.35 - height) / 2
+                                                    color: modelData.swatch === "" ? "transparent" : modelData.swatch
+                                                    Accessible.ignored: true
+                                                }
+                                                Text {
+                                                    id: trainingLoadNumberLabel
+                                                    width: trainingLoadNumber.width - (modelData.swatch !== "" ? 18 : 0) - 4
+                                                    text: modelData.label
+                                                    wrapMode: Text.WordWrap
+                                                    font.pixelSize: window.fontPx(12)
+                                                    color: "#666666"
+                                                    Accessible.ignored: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Text {
+                                    width: parent.width
+                                    visible: trainingLoadHeader.load.status !== "learning"
+                                    text: fitnessTrendText(trainingLoadHeader.load.fitnessChange)
+                                    font.pixelSize: window.fontPx(12)
+                                    color: "#666666"
+                                    Accessible.ignored: true
+                                }
+                            }
+
+                            Column {
+                                width: trainingLoadGrid.cellWidth
+                                spacing: 2
+
+                                // Fitness (with a light fill) and Fatigue over the last 6 weeks
+                                Item {
+                                    id: trainingLoadChartBox
+                                    width: parent.width
+                                    height: trainingLoadHeader.wide ? 96 : 56
+                                    Accessible.ignored: true
+
+                                    // drawn at the pixel density of the screen and scaled down, as ShapeIcon does
+                                    Canvas {
+                                        id: trainingLoadChart
+                                        width: trainingLoadChartBox.width * Screen.devicePixelRatio
+                                        height: trainingLoadChartBox.height * Screen.devicePixelRatio
+                                        scale: 1 / Screen.devicePixelRatio
+                                        transformOrigin: Item.TopLeft
+                                        Accessible.ignored: true
+                                        readonly property var fitnessSeries: trainingLoadHeader.load.fitnessSeries || []
+                                        readonly property var fatigueSeries: trainingLoadHeader.load.fatigueSeries || []
+                                        onFitnessSeriesChanged: requestPaint()
+                                        onWidthChanged: requestPaint()
+                                        onHeightChanged: requestPaint()
+                                        onPaint: {
+                                            var ctx = getContext("2d")
+                                            ctx.reset()
+                                            var ratio = Screen.devicePixelRatio
+                                            ctx.scale(ratio, ratio)
+                                            var w = trainingLoadChartBox.width
+                                            var h = trainingLoadChartBox.height - 6
+                                            var n = fitnessSeries.length
+                                            if (n < 2 || w <= 0)
+                                                return
+                                            var top = 10
+                                            for (var i = 0; i < n; i++)
+                                                top = Math.max(top, fitnessSeries[i], fatigueSeries[i])
+                                            top *= 1.15
+                                            var xAt = function(i) { return 4 + (w - 8) * i / (n - 1) }
+                                            var yAt = function(v) { return 3 + h - h * v / top }
+
+                                            ctx.strokeStyle = "#e0e0e0"
+                                            ctx.lineWidth = 1
+                                            ctx.beginPath()
+                                            ctx.moveTo(0, yAt(0) + 0.5)
+                                            ctx.lineTo(w, yAt(0) + 0.5)
+                                            ctx.stroke()
+
+                                            ctx.beginPath()
+                                            ctx.moveTo(xAt(0), yAt(0))
+                                            for (i = 0; i < n; i++)
+                                                ctx.lineTo(xAt(i), yAt(fitnessSeries[i]))
+                                            ctx.lineTo(xAt(n - 1), yAt(0))
+                                            ctx.closePath()
+                                            ctx.fillStyle = Qt.rgba(0x15 / 255, 0x65 / 255, 0xC0 / 255, 0.12)
+                                            ctx.fill()
+
+                                            var line = function(series, color) {
+                                                ctx.strokeStyle = color
+                                                ctx.lineWidth = 2
+                                                ctx.beginPath()
+                                                for (var k = 0; k < n; k++) {
+                                                    if (k === 0)
+                                                        ctx.moveTo(xAt(k), yAt(series[k]))
+                                                    else
+                                                        ctx.lineTo(xAt(k), yAt(series[k]))
+                                                }
+                                                ctx.stroke()
+                                                ctx.fillStyle = color
+                                                ctx.beginPath()
+                                                ctx.arc(xAt(n - 1), yAt(series[n - 1]), 4, 0, 2 * Math.PI)
+                                                ctx.fill()
+                                            }
+                                            line(fatigueSeries, "#AD1457")
+                                            line(fitnessSeries, "#1565C0")
+                                        }
+                                    }
+                                }
+                                Item {
+                                    width: parent.width
+                                    height: trainingLoadWeeksAgo.height
+                                    Text {
+                                        id: trainingLoadWeeksAgo
+                                        anchors.left: parent.left
+                                        text: qsTr("6 weeks ago")
+                                        font.pixelSize: window.fontPx(11)
+                                        color: "#9e9e9e"
+                                        Accessible.ignored: true
+                                    }
+                                    Text {
+                                        anchors.right: parent.right
+                                        text: qsTr("Today")
+                                        font.pixelSize: window.fontPx(11)
+                                        color: "#9e9e9e"
+                                        Accessible.ignored: true
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: !trainingLoadHeader.updating && trainingLoadHeader.load.available === true
+                            text: qsTr("FTP %1 W").arg(trainingLoadHeader.load.ftp) +
+                                  (trainingLoadHeader.load.counted < trainingLoadHeader.load.total
+                                   ? " · " + qsTr("%1 of %2 workouts in the last 6 weeks counted")
+                                                 .arg(trainingLoadHeader.load.counted).arg(trainingLoadHeader.load.total)
+                                   : "")
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: window.fontPx(11)
+                            color: "#9e9e9e"
+                            Accessible.ignored: true
+                        }
+                    }
+                }
             }
 
             delegate: SwipeDelegate {
@@ -1024,6 +1389,119 @@ Page {
             gradient: Gradient {
                 GradientStop { position: 0.0; color: "#40000000" }
                 GradientStop { position: 1.0; color: "#00000000" }
+            }
+        }
+    }
+
+    // What Fitness, Fatigue and Form mean, with this rider's Form zones
+    Popup {
+        id: trainingLoadPopup
+        x: (parent.width - width) / 2
+        y: (parent.height - height) / 2
+        width: Math.min(parent.width - 32, 440)
+        // fitted to the text, and scrolled when the screen is shorter
+        height: Math.min(parent.height - 32, trainingLoadPopupColumn.height + topPadding + bottomPadding)
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        readonly property var load: workoutModel ? workoutModel.trainingLoad : ({})
+        readonly property var limits: load.zoneLimits || [0, 0, 0, 0]
+
+        background: Rectangle {
+            color: "white"
+            radius: 12
+            border.color: "#d0d0d0"
+            border.width: 1
+        }
+
+        Flickable {
+            id: trainingLoadPopupFlickable
+            anchors.fill: parent
+            contentWidth: width
+            contentHeight: trainingLoadPopupColumn.height
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            // positioners, not layouts: a layout's height read in a binding loops on the wrapped texts
+            Column {
+                id: trainingLoadPopupColumn
+                width: trainingLoadPopupFlickable.width
+                spacing: 10
+
+                Text {
+                    width: parent.width
+                    text: qsTr("Fitness & Form")
+                    font.pixelSize: window.fontPx(18)
+                    font.bold: true
+                    color: "#212121"
+                }
+                Repeater {
+                    model: [
+                        { title: qsTr("Fitness"), body: qsTr("Your training over the last 6 weeks. It grows slowly when you ride often and drops slowly when you stop.") },
+                        { title: qsTr("Fatigue"), body: qsTr("Your training over the last 7 days. Hard rides raise it fast; rest days bring it down fast.") },
+                        { title: qsTr("Form"), body: qsTr("Fitness minus fatigue. Below zero you are tired from recent training – that is how you get fitter. Above zero you are rested and ready to go hard.") }
+                    ]
+                    Text {
+                        width: trainingLoadPopupColumn.width
+                        text: "<b>" + modelData.title + "</b> – " + modelData.body
+                        textFormat: Text.StyledText
+                        wrapMode: Text.WordWrap
+                        font.pixelSize: window.fontPx(14)
+                        color: "#333333"
+                    }
+                }
+                Text {
+                    width: parent.width
+                    text: qsTr("Form zones for your fitness")
+                    font.pixelSize: window.fontPx(14)
+                    font.bold: true
+                    color: "#212121"
+                }
+                Repeater {
+                    // the limits are whole numbers: a zone runs from its lower limit to the next one
+                    model: [
+                        { status: "fading", range: qsTr("above %1").arg(signedNumber(trainingLoadPopup.limits[0])) },
+                        { status: "fresh", range: qsTr("%1 to %2").arg(signedNumber(trainingLoadPopup.limits[1] + 1)).arg(signedNumber(trainingLoadPopup.limits[0])) },
+                        { status: "balanced", range: qsTr("%1 to %2").arg(signedNumber(trainingLoadPopup.limits[2])).arg(signedNumber(trainingLoadPopup.limits[1])) },
+                        { status: "building", range: qsTr("%1 to %2").arg(signedNumber(trainingLoadPopup.limits[3])).arg(signedNumber(trainingLoadPopup.limits[2] - 1)) },
+                        { status: "tired", range: qsTr("below %1").arg(signedNumber(trainingLoadPopup.limits[3])) }
+                    ]
+                    Row {
+                        width: trainingLoadPopupColumn.width
+                        spacing: 8
+                        readonly property bool current: trainingLoadPopup.load.status === modelData.status
+                        Rectangle {
+                            width: 10
+                            height: 10
+                            radius: 5
+                            y: (zoneText.font.pixelSize * 1.3 - height) / 2
+                            color: trainingStatusColor(modelData.status)
+                            Accessible.ignored: true
+                        }
+                        Text {
+                            id: zoneText
+                            width: parent.width - 18
+                            text: trainingStatusText(modelData.status) + " (" + modelData.range + ")" +
+                                  (parent.current ? " " + qsTr("(now)") : "")
+                            wrapMode: Text.WordWrap
+                            font.pixelSize: window.fontPx(13)
+                            font.bold: parent.current
+                            color: "#333333"
+                        }
+                    }
+                }
+                Text {
+                    width: parent.width
+                    text: qsTr("Each bike ride with power gets a training stress score (TSS): one hour all-out at your FTP scores 100. QZ uses the FTP you had on the day of the ride. Your FTP now: %1 W (Settings › General Options › FTP value). Tip: 95% of your best 20-minute power is a good FTP estimate. Runs, rows and rides without power are not counted yet.").arg(trainingLoadPopup.load.ftp)
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: window.fontPx(12)
+                    color: "#666666"
+                }
+                Button {
+                    x: parent.width - width
+                    text: qsTr("Close")
+                    onClicked: trainingLoadPopup.close()
+                }
             }
         }
     }

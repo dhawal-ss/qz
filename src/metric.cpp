@@ -426,18 +426,17 @@ double metric::powerPeak(QList<SessionLine> *session, int seconds) {
     return best;
 }
 
-double metric::normalizedPower(const QList<SessionLine> &session, int firstIndex) {
+// NP of 1 Hz power values: 30 s rolling average, fourth power, mean, fourth root
+static double normalizedPowerOf(const QVector<double> &watts) {
     const int window = 30;
-    if (firstIndex < 0)
-        firstIndex = 0;
     double sum30 = 0.0; // sum of the last 30 samples
     double sum4 = 0.0;  // sum of the fourth powers of the 30 s averages
     int averages = 0;
-    for (int i = firstIndex; i < session.count(); i++) {
-        sum30 += session.at(i).watt;
-        if (i - firstIndex >= window)
-            sum30 -= session.at(i - window).watt;
-        if (i - firstIndex >= window - 1) {
+    for (int i = 0; i < watts.count(); i++) {
+        sum30 += watts.at(i);
+        if (i >= window)
+            sum30 -= watts.at(i - window);
+        if (i >= window - 1) {
             double avg = sum30 / window;
             sum4 += avg * avg * avg * avg;
             averages++;
@@ -446,6 +445,16 @@ double metric::normalizedPower(const QList<SessionLine> &session, int firstIndex
     if (averages == 0)
         return 0.0;
     return std::pow(sum4 / averages, 0.25);
+}
+
+double metric::normalizedPower(const QList<SessionLine> &session, int firstIndex) {
+    if (firstIndex < 0)
+        firstIndex = 0;
+    QVector<double> watts;
+    watts.reserve(qMax(0, session.count() - firstIndex));
+    for (int i = firstIndex; i < session.count(); i++)
+        watts.append(session.at(i).watt);
+    return normalizedPowerOf(watts);
 }
 
 double metric::intensityFactor(double normalizedPower, double ftp) {
@@ -458,6 +467,104 @@ double metric::trainingStressScore(double seconds, double normalizedPower, doubl
     if (ftp <= 0 || normalizedPower <= 0 || seconds <= 0)
         return 0.0;
     return (seconds * normalizedPower * intensityFactor(normalizedPower, ftp)) / (ftp * 3600.0) * 100.0;
+}
+
+double metric::rideTrainingStress(const QList<SessionLine> &records, double ftp) {
+    const int pauseSeconds = 30; // the pause cap qfit uses for TRIMP too
+    QVector<double> watts;       // one value per second
+    watts.reserve(records.count());
+    for (int i = 0; i < records.count(); i++) {
+        int seconds = 1;
+        if (i + 1 < records.count()) {
+            seconds = (int)records.at(i).time.secsTo(records.at(i + 1).time);
+            if (seconds <= 0)
+                continue; // the next record of the same second replaces this one
+            if (seconds > pauseSeconds)
+                seconds = 1; // paused or stopped, not riding time
+        }
+        const double watt = records.at(i).watt == 0xFFFF ? 0.0 : records.at(i).watt; // FIT "no value"
+        for (int s = 0; s < seconds; s++)
+            watts.append(watt);
+    }
+    return trainingStressScore(watts.count(), normalizedPowerOf(watts), ftp);
+}
+
+QMap<QDate, double> metric::dailyTrainingStress(const QList<TrainingLoadRide> &ridesByStart) {
+    QMap<QDate, double> daily;
+    bool counted = false; // a ride was counted already
+    QDate countedDay;
+    QDateTime countedEnd;
+    double countedTss = 0;
+    for (const TrainingLoadRide &ride : ridesByStart) {
+        if (ride.tss <= 0 || !ride.start.isValid())
+            continue;
+        const QDateTime start = ride.start.toLocalTime();
+        // an end more than a day after the start is a broken clock (a head unit that reset, or
+        // FIT's "no value" timestamp): trusted, it would swallow every later ride as a duplicate
+        const bool endUsable = ride.end.isValid() && ride.end > ride.start && ride.start.secsTo(ride.end) <= 86400;
+        const QDateTime end = endUsable ? ride.end.toLocalTime() : start;
+        if (counted && start < countedEnd) {
+            // the same ride recorded twice: keep the higher TSS
+            if (ride.tss > countedTss) {
+                daily[countedDay] += ride.tss - countedTss;
+                countedTss = ride.tss;
+            }
+            if (end > countedEnd)
+                countedEnd = end;
+            continue;
+        }
+        counted = true;
+        countedDay = start.date(); // a ride across midnight counts on its start day
+        countedEnd = end;
+        countedTss = ride.tss;
+        daily[countedDay] += ride.tss;
+    }
+    return daily;
+}
+
+QVector<TrainingLoadDay> metric::trainingLoad(const QMap<QDate, double> &dailyTss, const QDate &lastDay) {
+    QVector<TrainingLoadDay> days;
+    if (dailyTss.isEmpty() || !lastDay.isValid() || dailyTss.firstKey() > lastDay)
+        return days;
+    double fitness = 0;
+    double fatigue = 0;
+    // addDays, not seconds: a day is 23 or 25 hours when the clock changes
+    for (QDate date = dailyTss.firstKey(); date <= lastDay; date = date.addDays(1)) {
+        TrainingLoadDay day;
+        day.date = date;
+        day.tss = dailyTss.value(date, 0.0);
+        fitness += (day.tss - fitness) / 42.0;
+        fatigue += (day.tss - fatigue) / 7.0;
+        day.fitness = fitness;
+        day.fatigue = fatigue;
+        days.append(day);
+    }
+    return days;
+}
+
+QList<int> metric::formZoneLimits(int fitness) {
+    // a percentage of Fitness stays right with a wrong FTP; 20 at least, or a new rider at Fitness 3
+    // would change zone with every point
+    const double base = qMax(fitness, 20);
+    return {qRound(0.20 * base), qRound(0.05 * base), qRound(-0.10 * base), qRound(-0.30 * base)};
+}
+
+QString metric::trainingStatus(int fitness, int fatigue, int historyDays, int daysSinceLastRide) {
+    if (daysSinceLastRide >= 14)
+        return QStringLiteral("break");
+    if (historyDays < 42)
+        return QStringLiteral("learning");
+    const int form = fitness - fatigue;
+    const QList<int> limits = formZoneLimits(fitness);
+    if (form > limits.at(0))
+        return QStringLiteral("fading");
+    if (form > limits.at(1))
+        return QStringLiteral("fresh");
+    if (form >= limits.at(2))
+        return QStringLiteral("balanced");
+    if (form >= limits.at(3))
+        return QStringLiteral("building");
+    return QStringLiteral("tired");
 }
 
 // VO2 (L/min) = 0.0108 x power (W) + 0.007 x body mass (kg)

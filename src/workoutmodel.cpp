@@ -3,6 +3,9 @@
 #include "homeform.h"
 #include "trainprogram.h"
 #include "trainingprogrampath.h"
+#include "metric.h"
+#include "qzsettings.h"
+#include <QSettings>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
@@ -54,6 +57,7 @@ WorkoutModel::WorkoutModel(const QString& dbPath, QObject *parent)
     
     // Calculate initial streaks from existing data
     calculateStreaks();
+    refreshTrainingLoad();
 }
 
 WorkoutModel::~WorkoutModel() {
@@ -95,6 +99,7 @@ void WorkoutModel::onWorkoutsLoaded(const QList<QVariantMap>& workouts) {
 
     // Calculate streaks after loading workouts (always use all workouts for streaks)
     calculateStreaks();
+    refreshTrainingLoad();
 
     m_isLoading = false;
     emit loadingStatusChanged();
@@ -103,6 +108,89 @@ void WorkoutModel::onWorkoutsLoaded(const QList<QVariantMap>& workouts) {
         m_refreshPending = false;
         refresh();
     }
+}
+
+QVariantMap WorkoutModel::trainingLoad() const {
+    return m_trainingLoad;
+}
+
+void WorkoutModel::setTrainingLoadUpdating(bool updating) {
+    if (m_trainingLoadUpdating == updating)
+        return;
+    m_trainingLoadUpdating = updating;
+    refreshTrainingLoad();
+}
+
+// Keys: available (a counted ride exists), updating, fitness, fatigue, form (whole numbers, form =
+// fitness - fatigue), fitnessChange (over 7 days), status (metric::trainingStatus), historyDays,
+// daysSinceLastRide, zoneLimits (4 ints), counted and total (workouts of the last 42 days),
+// fitnessSeries and fatigueSeries (the last 42 days, oldest first), ftp (the current FTP)
+void WorkoutModel::refreshTrainingLoad() {
+    QVariantMap load;
+    load[QStringLiteral("available")] = false;
+    load[QStringLiteral("updating")] = m_trainingLoadUpdating;
+    QSettings settings;
+    load[QStringLiteral("ftp")] = qRound(settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble());
+
+    QSqlQuery query(m_db);
+    // fails until the processor has added the tss column, on the first launch after the update
+    if (m_db.isOpen() && query.exec(QStringLiteral("SELECT start_time, end_time, tss FROM workouts ORDER BY start_time"))) {
+        const QDate today = QDate::currentDate();
+        const QDate windowStart = today.addDays(-41); // the last 42 days, today included
+        QList<TrainingLoadRide> rides;
+        int total = 0;
+        int counted = 0;
+        while (query.next()) {
+            TrainingLoadRide ride;
+            ride.start = query.value(0).toDateTime().toLocalTime();
+            ride.end = query.value(1).toDateTime().toLocalTime();
+            ride.tss = query.value(2).toDouble();
+            if (!ride.start.isValid() || ride.start.date() > today)
+                continue; // a wrong clock: counted on its day
+            if (ride.start.date() >= windowStart) {
+                total++;
+                if (ride.tss > 0)
+                    counted++;
+            }
+            if (ride.tss > 0)
+                rides.append(ride);
+        }
+        load[QStringLiteral("counted")] = counted;
+        load[QStringLiteral("total")] = total;
+
+        const QVector<TrainingLoadDay> days = metric::trainingLoad(metric::dailyTrainingStress(rides), today);
+        if (!days.isEmpty()) {
+            const int fitness = qRound(days.last().fitness);
+            const int fatigue = qRound(days.last().fatigue);
+            const int fitnessWeekAgo = days.count() > 7 ? qRound(days.at(days.count() - 8).fitness) : 0;
+            const int historyDays = days.first().date.daysTo(today) + 1;
+            const int daysSinceLastRide = rides.last().start.date().daysTo(today);
+
+            QVariantList fitnessSeries;
+            QVariantList fatigueSeries;
+            for (int i = days.count() - 42; i < days.count(); i++) {
+                fitnessSeries.append(i < 0 ? 0.0 : days.at(i).fitness);
+                fatigueSeries.append(i < 0 ? 0.0 : days.at(i).fatigue);
+            }
+            QVariantList limits;
+            for (int limit : metric::formZoneLimits(fitness))
+                limits.append(limit);
+
+            load[QStringLiteral("available")] = true;
+            load[QStringLiteral("fitness")] = fitness;
+            load[QStringLiteral("fatigue")] = fatigue;
+            load[QStringLiteral("form")] = fitness - fatigue; // the numbers on screen add up
+            load[QStringLiteral("fitnessChange")] = fitness - fitnessWeekAgo;
+            load[QStringLiteral("status")] = metric::trainingStatus(fitness, fatigue, historyDays, daysSinceLastRide);
+            load[QStringLiteral("historyDays")] = historyDays;
+            load[QStringLiteral("daysSinceLastRide")] = daysSinceLastRide;
+            load[QStringLiteral("zoneLimits")] = limits;
+            load[QStringLiteral("fitnessSeries")] = fitnessSeries;
+            load[QStringLiteral("fatigueSeries")] = fatigueSeries;
+        }
+    }
+    m_trainingLoad = load;
+    emit trainingLoadChanged();
 }
 
 bool WorkoutModel::isLoading() const {

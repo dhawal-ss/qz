@@ -8,6 +8,8 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QSettings>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include "../../src/qzsettings.h"
 #include "../../src/fit-sdk/fit_decode.hpp"
 #include "../../src/fit-sdk/fit_record_mesg.hpp"
@@ -343,4 +345,130 @@ TEST(QFitImport, MissingRecordFieldsReadAsNoData) {
     }
     EXPECT_NEAR(records.at(2).distance, 0.3, 1e-6);
     EXPECT_NEAR(records.at(4).distance, 0.3, 1e-6); // a missing distance keeps the total
+}
+
+// Keeps the FTP setting of the test machine around a test
+struct FtpSettingGuard {
+    QSettings settings;
+    const bool existed = settings.contains(QZSettings::ftp);
+    const QVariant previous = settings.value(QZSettings::ftp);
+    explicit FtpSettingGuard(double ftp) {
+        settings.setValue(QZSettings::ftp, ftp);
+        settings.sync();
+    }
+    void set(double ftp) {
+        settings.setValue(QZSettings::ftp, ftp);
+        settings.sync();
+    }
+    ~FtpSettingGuard() {
+        if (existed)
+            settings.setValue(QZSettings::ftp, previous);
+        else
+            settings.remove(QZSettings::ftp);
+        settings.sync();
+    }
+};
+
+// One hour at a steady power, one sample a second, pedaling from the first second
+static QList<SessionLine> steadyRide(uint16_t watt) {
+    QList<SessionLine> workout;
+    const QDateTime start(QDate(2026, 3, 1), QTime(8, 0));
+    for (int i = 0; i < 3600; ++i) {
+        SessionLine line;
+        line.time = start.addSecs(i);
+        line.elapsedTime = i;
+        line.speed = 30.0;
+        line.distance = i * 30.0 / 3600.0;
+        line.cadence = 90;
+        line.heart = 0;
+        line.watt = watt;
+        line.calories = i * 0.2;
+        workout.append(line);
+    }
+    return workout;
+}
+
+TEST(QFitTrainingLoad, WorkoutTssUsesTheFtpOfTheRide) {
+    QList<SessionLine> records;
+    for (const SessionLine &line : steadyRide(200))
+        records.append(line);
+    EXPECT_NEAR(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_CYCLING, 250, 200), 64.0, 0.01);
+    EXPECT_NEAR(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_CYCLING, 0, 200), 100.0, 0.01);
+    // not a real FTP: the current one is used
+    EXPECT_NEAR(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_CYCLING, 20, 200), 100.0, 0.01);
+    EXPECT_NEAR(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_CYCLING, 800, 200), 100.0, 0.01);
+    // a cycling FTP says nothing about a run
+    EXPECT_DOUBLE_EQ(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_RUNNING, 250, 200), 0.0);
+    EXPECT_DOUBLE_EQ(FitDatabaseProcessor::workoutTss(records, FIT_SPORT_CYCLING, 0, 0), 0.0);
+}
+
+TEST(QFitTrainingLoad, TheFileKeepsTheFtpOfTheRide) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+    FtpSettingGuard ftp(250);
+    const QString path = tempDir.filePath("ride.fit");
+    qfit::save(path, steadyRide(200), BIKE, QFIT_PROCESS_NONE, FIT_SPORT_INVALID, QStringLiteral("Test ride"));
+    ftp.set(200); // the rider changed FTP after the ride
+
+    QList<SessionLine> records;
+    FIT_SPORT sport = FIT_SPORT_INVALID;
+    QString name;
+    double rideFtp = 0;
+    qfit::open(path, &records, &sport, &name, nullptr, nullptr, nullptr, nullptr, &rideFtp);
+    EXPECT_DOUBLE_EQ(rideFtp, 250.0);
+    EXPECT_EQ(sport, FIT_SPORT_CYCLING);
+    EXPECT_EQ(records.count(), 3600);
+    EXPECT_NEAR(FitDatabaseProcessor::workoutTss(records, sport, rideFtp, 200), 64.0, 0.1);
+}
+
+TEST(QFitTrainingLoad, NewRidesAreStoredAndOlderOnesFilledOnce) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+    FtpSettingGuard ftp(250);
+    const QString fitPath = tempDir.filePath("ride.fit");
+    qfit::save(fitPath, steadyRide(200), BIKE, QFIT_PROCESS_NONE, FIT_SPORT_INVALID, QStringLiteral("Test ride"));
+    ftp.set(200);
+
+    const QString dbPath = tempDir.filePath("history.sqlite");
+    FitDatabaseProcessor processor(dbPath);
+    processor.processFile(fitPath); // a new ride gets its TSS when it is saved
+
+    const QString connectionName = QStringLiteral("QFitTrainingLoadCheck");
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        check.setDatabaseName(dbPath);
+        ASSERT_TRUE(check.open());
+        QSqlQuery query(check);
+        ASSERT_TRUE(query.exec("SELECT tss FROM workouts"));
+        ASSERT_TRUE(query.next());
+        EXPECT_NEAR(query.value(0).toDouble(), 64.0, 0.5);
+        query.finish();
+
+        // as if the rows were saved before the training load existed, plus a run and a lost file
+        ASSERT_TRUE(query.exec("UPDATE workouts SET tss = NULL"));
+        ASSERT_TRUE(query.exec("INSERT INTO workouts (file_hash, file_path, sport_type, start_time) "
+                               "VALUES ('run', 'fit/run.fit', 1, '2026-03-02T08:00:00')"));
+        ASSERT_TRUE(query.exec("INSERT INTO workouts (file_hash, file_path, sport_type, start_time) "
+                               "VALUES ('lost', 'fit/missing.fit', 2, '2026-03-03T08:00:00')"));
+        query.finish();
+
+        EXPECT_EQ(processor.backfillTss(20), 2); // the ride and the lost file; the run is set to 0 at once
+        EXPECT_EQ(processor.backfillTss(20), 0); // each row is worked out once
+
+        ASSERT_TRUE(query.exec("SELECT file_hash, tss FROM workouts ORDER BY id"));
+        QMap<QString, QVariant> tss;
+        while (query.next())
+            tss[query.value(0).toString()] = query.value(1);
+        query.finish();
+        ASSERT_EQ(tss.count(), 3);
+        EXPECT_FALSE(tss.value(QStringLiteral("run")).isNull());
+        EXPECT_DOUBLE_EQ(tss.value(QStringLiteral("run")).toDouble(), 0.0);
+        EXPECT_FALSE(tss.value(QStringLiteral("lost")).isNull());
+        EXPECT_DOUBLE_EQ(tss.value(QStringLiteral("lost")).toDouble(), 0.0);
+        tss.remove(QStringLiteral("run"));
+        tss.remove(QStringLiteral("lost"));
+        EXPECT_NEAR(tss.first().toDouble(), 64.0, 0.5); // the FTP of the ride, not today's
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
 }

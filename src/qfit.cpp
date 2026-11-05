@@ -1212,6 +1212,7 @@ class Listener : public fit::FileIdMesgListener,
     QString *pelotonWorkoutId = nullptr;
     QString *pelotonUrl = nullptr;
     QString *trainingProgramFile = nullptr;
+    double *rideFtp = nullptr;
 
     static void PrintValues(const fit::FieldBase &field) {
         for (FIT_UINT8 j = 0; j < (FIT_UINT8)field.GetNumValues(); j++) {
@@ -1278,6 +1279,8 @@ class Listener : public fit::FileIdMesgListener,
                     std::wstring wTrainingProgramFile = devField.GetSTRINGValue(0);
                     *trainingProgramFile = fromFitString(wTrainingProgramFile);
                     printf("   Found Training Program File in workout: %s\n", qUtf8Printable(*trainingProgramFile));
+                } else if (fieldName == "FTP" && rideFtp != nullptr && *rideFtp <= 0) {
+                    *rideFtp = devField.GetFLOAT64Value(0);
                 }
             }
         }
@@ -1480,6 +1483,11 @@ class Listener : public fit::FileIdMesgListener,
     void OnMesg(fit::SessionMesg &mesg) override {
         printf("Session Message:\n");
         
+        // the FTP the rider had: QZ and Garmin write it here, and it wins over the developer field
+        if (rideFtp != nullptr && mesg.IsThresholdPowerValid() && mesg.GetThresholdPower() > 0) {
+            *rideFtp = mesg.GetThresholdPower();
+        }
+
         // Extract sport type from SessionMesg
         if (sport != nullptr && mesg.IsSportValid()) {
             *sport = mesg.GetSport();
@@ -1509,6 +1517,8 @@ class Listener : public fit::FileIdMesgListener,
                     std::wstring wTrainingProgramFile = devField.GetSTRINGValue(0);
                     *trainingProgramFile = fromFitString(wTrainingProgramFile);
                     printf("   Found Training Program File: %s\n", qUtf8Printable(*trainingProgramFile));
+                } else if (fieldName == "FTP" && rideFtp != nullptr && *rideFtp <= 0) {
+                    *rideFtp = devField.GetFLOAT64Value(0);
                 } else if (fieldName == "Instructor Name" || fieldName == "Coach Name") {
                     // Future: handle instructor name if needed
                     printf("   Found Instructor/Coach field: %s\n", fieldName.c_str());
@@ -1532,7 +1542,8 @@ void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *
 
 
 void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *sport, QString *workoutName, 
-                QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile) {
+                QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile,
+                double *rideFtp) {
     std::fstream file;
 #ifdef _WIN32
     file.open(QString(filename).toLocal8Bit().constData(), std::ios::in | std::ios::binary);
@@ -1558,6 +1569,7 @@ void qfit::open(const QString &filename, QList<SessionLine> *output, FIT_SPORT *
     listener.pelotonWorkoutId = pelotonWorkoutId;
     listener.pelotonUrl = pelotonUrl;
     listener.trainingProgramFile = trainingProgramFile;
+    listener.rideFtp = rideFtp;
     mesgBroadcaster.AddListener((fit::FileIdMesgListener &)listener);
     mesgBroadcaster.AddListener((fit::UserProfileMesgListener &)listener);
     mesgBroadcaster.AddListener((fit::MonitoringMesgListener &)listener);

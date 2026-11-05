@@ -1134,6 +1134,9 @@ homeform::homeform(QQmlApplicationEngine *engine, bluetooth *bl) {
             });
     workoutModel = new WorkoutModel(m_historyDatabasePath);
     engine->rootContext()->setContextProperty("workoutModel", workoutModel);
+    // the one-time TSS fill of older workouts runs in the processor's thread
+    connect(fitProcessor, &FitDatabaseProcessor::tssBackfillRunning, workoutModel,
+            &WorkoutModel::setTrainingLoadUpdating);
     
     connect(fitProcessor, &FitDatabaseProcessor::processingStopped,
             this, [this]() {

@@ -219,3 +219,179 @@ TEST(MetricTrainingStressTest, MissingFtpOrPowerGivesZero) {
     EXPECT_DOUBLE_EQ(metric::trainingStressScore(3600.0, 0.0, 200.0), 0.0);
     EXPECT_DOUBLE_EQ(metric::trainingStressScore(0.0, 200.0, 200.0), 0.0);
 }
+
+// Records n seconds apart (FIT records of a ride), starting at a fixed time
+static QList<SessionLine> recordsEvery(int seconds, int count, uint16_t watt) {
+    const QDateTime start(QDate(2026, 3, 1), QTime(8, 0));
+    QList<SessionLine> records;
+    for (int i = 0; i < count; i++) {
+        SessionLine line;
+        line.watt = watt;
+        line.time = start.addSecs((qint64)i * seconds);
+        line.elapsedTime = i * seconds;
+        records.append(line);
+    }
+    return records;
+}
+
+TEST(MetricRideTrainingStressTest, OneHourAtFtpIsOneHundred) {
+    EXPECT_NEAR(metric::rideTrainingStress(recordsEvery(1, 3600, 250), 250.0), 100.0, 0.01);
+}
+
+TEST(MetricRideTrainingStressTest, SmartRecordingIsSpreadToEverySecond) {
+    // 720 records 5 s apart: 3596 s of riding, not 720 (which gave TSS 20)
+    EXPECT_NEAR(metric::rideTrainingStress(recordsEvery(5, 720, 250), 250.0), 100.0 * 3596.0 / 3600.0, 0.01);
+}
+
+TEST(MetricRideTrainingStressTest, APauseIsNotRidingTime) {
+    QList<SessionLine> records = recordsEvery(1, 1500, 250);
+    QList<SessionLine> after = recordsEvery(1, 1500, 250);
+    for (SessionLine &line : after)
+        line.time = line.time.addSecs(1500 + 600); // 10 minutes stopped
+    records.append(after);
+    EXPECT_NEAR(metric::rideTrainingStress(records, 250.0), 100.0 * 3000.0 / 3600.0, 0.01);
+}
+
+TEST(MetricRideTrainingStressTest, MissingPowerAndShortRidesCountNothing) {
+    EXPECT_DOUBLE_EQ(metric::rideTrainingStress(recordsEvery(1, 3600, 0xFFFF), 250.0), 0.0);
+    EXPECT_DOUBLE_EQ(metric::rideTrainingStress(recordsEvery(1, 20, 250), 250.0), 0.0);
+    EXPECT_DOUBLE_EQ(metric::rideTrainingStress(recordsEvery(1, 3600, 250), 0.0), 0.0);
+}
+
+TEST(MetricRideTrainingStressTest, TheLastRecordOfASecondIsKept) {
+    QList<SessionLine> records;
+    for (const SessionLine &line : recordsEvery(1, 3600, 250)) {
+        SessionLine first = line;
+        first.watt = 1000;
+        records.append(first); // replaced by the next record of the same second
+        records.append(line);
+    }
+    EXPECT_NEAR(metric::rideTrainingStress(records, 250.0), 100.0, 0.01);
+}
+
+static QMap<QDate, double> everyDay(const QDate &first, int days, double tss) {
+    QMap<QDate, double> daily;
+    for (int i = 0; i < days; i++)
+        daily[first.addDays(i)] = tss;
+    return daily;
+}
+
+TEST(MetricTrainingLoadTest, OneRideAndTheRestDaysAfterIt) {
+    const QDate d0(2026, 3, 1);
+    QMap<QDate, double> daily;
+    daily[d0] = 100;
+
+    QVector<TrainingLoadDay> days = metric::trainingLoad(daily, d0);
+    ASSERT_EQ(days.count(), 1);
+    EXPECT_NEAR(days.last().fitness, 100.0 / 42.0, 0.001);
+    EXPECT_NEAR(days.last().fatigue, 100.0 / 7.0, 0.001);
+
+    // rest days still run through the recursion
+    days = metric::trainingLoad(daily, d0.addDays(7));
+    ASSERT_EQ(days.count(), 8);
+    EXPECT_NEAR(days.last().fitness, 2.011, 0.001);
+    EXPECT_NEAR(days.last().fatigue, 4.856, 0.001);
+    EXPECT_DOUBLE_EQ(days.last().tss, 0.0);
+}
+
+TEST(MetricTrainingLoadTest, SteadyTrainingConverges) {
+    const QDate d0(2026, 1, 1);
+    QVector<TrainingLoadDay> days = metric::trainingLoad(everyDay(d0, 7, 100), d0.addDays(6));
+    EXPECT_NEAR(days.last().fitness, 15.52, 0.01);
+    EXPECT_NEAR(days.last().fatigue, 66.01, 0.01);
+
+    days = metric::trainingLoad(everyDay(d0, 42, 100), d0.addDays(41));
+    EXPECT_NEAR(days.last().fitness, 63.66, 0.01);
+    EXPECT_NEAR(days.last().fatigue, 99.85, 0.01);
+
+    days = metric::trainingLoad(everyDay(d0, 400, 100), d0.addDays(399));
+    EXPECT_NEAR(days.last().fitness, 100.0, 0.1);
+    EXPECT_NEAR(days.last().fatigue, 100.0, 0.1);
+}
+
+TEST(MetricTrainingLoadTest, DaysAfterTheLastDayAreLeftOut) {
+    const QDate d0(2026, 3, 1);
+    QMap<QDate, double> daily;
+    daily[d0] = 100;
+    daily[d0.addDays(5)] = 100;
+    QVector<TrainingLoadDay> days = metric::trainingLoad(daily, d0.addDays(2));
+    ASSERT_EQ(days.count(), 3);
+    EXPECT_DOUBLE_EQ(days.last().tss, 0.0);
+
+    QMap<QDate, double> future;
+    future[d0.addDays(5)] = 100;
+    EXPECT_TRUE(metric::trainingLoad(future, d0).isEmpty());
+    EXPECT_TRUE(metric::trainingLoad(QMap<QDate, double>(), d0).isEmpty());
+}
+
+static TrainingLoadRide ride(const QDate &day, const QTime &start, const QTime &end, double tss, int endDayOffset = 0) {
+    TrainingLoadRide r;
+    r.start = QDateTime(day, start);
+    r.end = QDateTime(day.addDays(endDayOffset), end);
+    r.tss = tss;
+    return r;
+}
+
+TEST(MetricDailyTrainingStressTest, RidesOfADayAddUp) {
+    const QDate day(2026, 3, 1);
+    QMap<QDate, double> daily = metric::dailyTrainingStress(
+        {ride(day, QTime(8, 0), QTime(9, 0), 50), ride(day, QTime(18, 0), QTime(19, 0), 50)});
+    EXPECT_DOUBLE_EQ(daily.value(day), 100.0);
+}
+
+TEST(MetricDailyTrainingStressTest, TheSameRideRecordedTwiceCountsOnce) {
+    // QZ and a watch on the same ride, imported both: the higher TSS is kept
+    const QDate day(2026, 3, 1);
+    QMap<QDate, double> daily = metric::dailyTrainingStress(
+        {ride(day, QTime(8, 0), QTime(9, 0), 60), ride(day, QTime(8, 5), QTime(9, 2), 70)});
+    EXPECT_DOUBLE_EQ(daily.value(day), 70.0);
+
+    // a ride that starts when the other ends is another ride
+    daily = metric::dailyTrainingStress(
+        {ride(day, QTime(8, 0), QTime(9, 0), 60), ride(day, QTime(9, 0), QTime(10, 0), 40)});
+    EXPECT_DOUBLE_EQ(daily.value(day), 100.0);
+}
+
+TEST(MetricDailyTrainingStressTest, ARideAcrossMidnightCountsOnItsStartDay) {
+    const QDate day(2026, 3, 1);
+    QMap<QDate, double> daily = metric::dailyTrainingStress({ride(day, QTime(23, 30), QTime(0, 30), 80, 1)});
+    EXPECT_DOUBLE_EQ(daily.value(day), 80.0);
+    EXPECT_FALSE(daily.contains(day.addDays(1)));
+}
+
+TEST(MetricDailyTrainingStressTest, ABrokenEndTimeDoesNotSwallowLaterRides) {
+    // a head unit whose clock reset: the ride ends 400 days after it starts
+    const QDate day(2026, 3, 1);
+    TrainingLoadRide broken = ride(day, QTime(8, 0), QTime(9, 0), 60);
+    broken.end = broken.end.addDays(400);
+    QMap<QDate, double> daily =
+        metric::dailyTrainingStress({broken, ride(day.addDays(1), QTime(8, 0), QTime(9, 0), 50)});
+    EXPECT_DOUBLE_EQ(daily.value(day), 60.0);
+    EXPECT_DOUBLE_EQ(daily.value(day.addDays(1)), 50.0);
+}
+
+TEST(MetricFormZoneTest, LimitsArePercentagesOfFitness) {
+    EXPECT_EQ(metric::formZoneLimits(100), QList<int>({20, 5, -10, -30}));
+    EXPECT_EQ(metric::formZoneLimits(10), QList<int>({4, 1, -2, -6})); // fitness 20 at least
+    EXPECT_EQ(metric::formZoneLimits(30), QList<int>({6, 2, -3, -9}));
+}
+
+TEST(MetricFormZoneTest, StatusFromFitnessAndFatigue) {
+    EXPECT_EQ(metric::trainingStatus(60, 40, 100, 0), QStringLiteral("fading"));
+    EXPECT_EQ(metric::trainingStatus(60, 55, 100, 0), QStringLiteral("fresh"));
+    EXPECT_EQ(metric::trainingStatus(60, 57, 100, 0), QStringLiteral("balanced")); // +3 is not above 3
+    EXPECT_EQ(metric::trainingStatus(60, 63, 100, 0), QStringLiteral("balanced"));
+    EXPECT_EQ(metric::trainingStatus(60, 66, 100, 0), QStringLiteral("balanced"));
+    EXPECT_EQ(metric::trainingStatus(60, 67, 100, 0), QStringLiteral("building"));
+    EXPECT_EQ(metric::trainingStatus(60, 75, 100, 0), QStringLiteral("building"));
+    EXPECT_EQ(metric::trainingStatus(60, 80, 100, 0), QStringLiteral("tired"));
+    EXPECT_EQ(metric::trainingStatus(5, 11, 100, 0), QStringLiteral("building"));
+    EXPECT_EQ(metric::trainingStatus(5, 12, 100, 0), QStringLiteral("tired"));
+}
+
+TEST(MetricFormZoneTest, LearningAndBreakComeFirst) {
+    EXPECT_EQ(metric::trainingStatus(60, 40, 41, 0), QStringLiteral("learning"));
+    EXPECT_EQ(metric::trainingStatus(60, 40, 42, 0), QStringLiteral("fading"));
+    EXPECT_EQ(metric::trainingStatus(60, 40, 10, 14), QStringLiteral("break"));
+    EXPECT_EQ(metric::trainingStatus(60, 40, 10, 13), QStringLiteral("learning"));
+}

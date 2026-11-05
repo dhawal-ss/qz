@@ -23,7 +23,10 @@ class qfit : public QObject {
     static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport);
     static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport, QString *workoutName);
     static void open(const QString &filename, QList<SessionLine>* output, FIT_SPORT *sport, QString *workoutName, 
-                     QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile);
+                     QString *workoutSource, QString *pelotonWorkoutId, QString *pelotonUrl, QString *trainingProgramFile,
+                     // the FTP of the rider when the file was recorded: the session threshold_power, else
+                     // QZ's "FTP" developer field; left as it is when the file has neither
+                     double *rideFtp = nullptr);
     
   signals:
 };

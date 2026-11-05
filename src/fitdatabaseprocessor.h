@@ -23,6 +23,13 @@ class FitDatabaseProcessor : public QObject {
 
     static const QString DB_CONNECTION_NAME;
 
+    // TSS of a workout for the training load: bike rides only, with the FTP the rider had (the one
+    // in the file, if it is a real FTP), else currentFtp. 0 when it cannot be known.
+    static double workoutTss(const QList<SessionLine>& records, FIT_SPORT sport, double fileFtp, double currentFtp);
+    // Works out the TSS of up to maxRows workouts saved before the training load existed (tss NULL),
+    // from their files, on its own connection; returns how many rows it wrote
+    int backfillTss(int maxRows);
+
   public slots:
     // Adds the given .fit files to the history, in the worker thread (call it queued);
     // reports the outcome with importFinished().
@@ -34,9 +41,12 @@ class FitDatabaseProcessor : public QObject {
     void fileProcessed(const QString& filename);
     void progress(int processedFiles, int totalFiles);
     void error(const QString& errorMessage);
+    // the one-time fill of the TSS of older workouts runs (true) or has ended (false)
+    void tssBackfillRunning(bool running);
 
   private slots:
     void doWork();
+    void backfillNextChunk();
 
   private:
     bool initializeDatabase();
@@ -50,6 +60,7 @@ class FitDatabaseProcessor : public QObject {
                      FIT_SPORT sport,
                      const QString& workoutName,
                      int elapsedSeconds,
+                     double tss,
                      qint64& workoutId,
                      const QString& workoutSource = "QZ",
                      const QString& pelotonWorkoutId = "",

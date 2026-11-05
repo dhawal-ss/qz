@@ -23,6 +23,8 @@ class WorkoutModel : public QAbstractListModel {
     Q_PROPERTY(QString streakMessage READ streakMessage NOTIFY streakChanged)
     Q_PROPERTY(bool isDateFiltered READ isDateFiltered NOTIFY dateFilterChanged)
     Q_PROPERTY(QDate filteredDate READ filteredDate NOTIFY dateFilterChanged)
+    // Fitness, Fatigue and Form of the bike rides (see refreshTrainingLoad for the keys)
+    Q_PROPERTY(QVariantMap trainingLoad READ trainingLoad NOTIFY trainingLoadChanged)
 
   public:
     enum WorkoutRoles {
@@ -53,6 +55,8 @@ class WorkoutModel : public QAbstractListModel {
     Q_INVOKABLE bool hasTrainingProgram(int workoutId);
     Q_INVOKABLE bool openPelotonUrl(int workoutId);
     Q_INVOKABLE bool loadTrainingProgram(int workoutId);
+    // Works out trainingLoad again from the database (it follows the date, so the page calls it)
+    Q_INVOKABLE void refreshTrainingLoad();
 
     Q_INVOKABLE bool canWriteAppleHealth(int workoutId) const {
 #if defined(Q_OS_IOS) && !defined(IO_UNDER_QT)
@@ -110,9 +114,12 @@ class WorkoutModel : public QAbstractListModel {
     QString streakMessage() const;
     bool isDateFiltered() const;
     QDate filteredDate() const;
+    QVariantMap trainingLoad() const;
 
   public slots:
     void setDatabaseProcessing(bool processing);
+    // the TSS of older workouts is being worked out: the panel says so instead of showing low numbers
+    void setTrainingLoadUpdating(bool updating);
 
   signals:
     void loadWorkoutsRequested();
@@ -120,6 +127,7 @@ class WorkoutModel : public QAbstractListModel {
     void databaseProcessingChanged();
     void streakChanged();
     void dateFilterChanged();
+    void trainingLoadChanged();
 
   private slots:
     void onWorkoutsLoaded(const QList<QVariantMap>& workouts);
@@ -146,6 +154,8 @@ class WorkoutModel : public QAbstractListModel {
     int m_longestStreak;
     bool m_isDateFiltered;
     QDate m_filteredDate;
+    QVariantMap m_trainingLoad;
+    bool m_trainingLoadUpdating = false;
 };
 
 #endif // WORKOUTMODEL_H

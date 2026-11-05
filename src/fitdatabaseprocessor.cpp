@@ -1,4 +1,7 @@
 #include "fitdatabaseprocessor.h"
+#include "metric.h"
+#include "qzsettings.h"
+#include <QSettings>
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
@@ -85,6 +88,7 @@ bool FitDatabaseProcessor::initializeDatabase() {
                         "peloton_workout_id TEXT,"
                         "peloton_url TEXT,"
                         "training_program_file TEXT,"
+                        "tss REAL,"  // training load: NULL not worked out yet, 0 not counted
                         "processed_at DATETIME DEFAULT CURRENT_TIMESTAMP"
                         ")")) {
             db.rollback();
@@ -103,6 +107,9 @@ bool FitDatabaseProcessor::initializeDatabase() {
         query.exec("ALTER TABLE workouts ADD COLUMN peloton_workout_id TEXT");
         query.exec("ALTER TABLE workouts ADD COLUMN peloton_url TEXT");
         query.exec("ALTER TABLE workouts ADD COLUMN training_program_file TEXT");
+        // training load of the workout: NULL not worked out yet, 0 not counted (not a bike ride with
+        // power, or no FTP), else its TSS
+        query.exec("ALTER TABLE workouts ADD COLUMN tss REAL");
 
         if (!db.commit()) {
             emit error("Failed to commit database initialization: " + db.lastError().text());
@@ -214,6 +221,7 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
                                        FIT_SPORT sport,
                                        const QString& workoutName,
                                        int elapsedSeconds,
+                                       double tss,
                                        qint64& workoutId,
                                        const QString& workoutSource,
                                        const QString& pelotonWorkoutId,
@@ -288,9 +296,9 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
                   "avg_heart_rate, max_heart_rate, avg_cadence, max_cadence, "
                   "avg_speed, max_speed, avg_power, max_power, "
                   "total_ascent, total_descent, avg_stride_length, total_strides, "
-                  "workout_source, peloton_workout_id, peloton_url, training_program_file"
+                  "workout_source, peloton_workout_id, peloton_url, training_program_file, tss"
                   ") VALUES ("
-                  "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
+                  "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?"
                   ")");
 
     query.addBindValue(fileHash);
@@ -318,6 +326,7 @@ bool FitDatabaseProcessor::saveWorkout(const QString& filePath,
     query.addBindValue(pelotonWorkoutId.isEmpty() ? QVariant() : pelotonWorkoutId);
     query.addBindValue(pelotonUrl.isEmpty() ? QVariant() : pelotonUrl);
     query.addBindValue(trainingProgramFile.isEmpty() ? QVariant() : trainingProgramFile);
+    query.addBindValue(tss);
 
     if (!query.exec()) {
         emit error("Failed to save workout: " + query.lastError().text());
@@ -342,7 +351,9 @@ bool FitDatabaseProcessor::processFitFile(const QString& filePath) {
     QString trainingProgramFile = "";
 
     try {
-        qfit::open(filePath, &session, &sport, &workoutName, &workoutSource, &pelotonWorkoutId, &pelotonUrl, &trainingProgramFile);
+        double rideFtp = 0;
+        qfit::open(filePath, &session, &sport, &workoutName, &workoutSource, &pelotonWorkoutId, &pelotonUrl, &trainingProgramFile,
+                   &rideFtp);
 
         if (session.isEmpty()) {
             emit error("No data found in file: " + filePath);
@@ -398,12 +409,22 @@ bool FitDatabaseProcessor::processFitFile(const QString& filePath) {
         db.transaction();
 
         qint64 workoutId;
-        if (!saveWorkout(filePath, session, sport, workoutName, elapsedSeconds, workoutId, workoutSource, pelotonWorkoutId, pelotonUrl, trainingProgramFile)) {
+        QSettings settings;
+        const double tss = workoutTss(session, sport, rideFtp,
+                                      settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble());
+        if (!saveWorkout(filePath, session, sport, workoutName, elapsedSeconds, tss, workoutId, workoutSource, pelotonWorkoutId, pelotonUrl, trainingProgramFile)) {
             db.rollback();
             return false;
         }
 
-        return db.commit();
+        // a failed commit (the database busy) left the transaction open, and its lock kept every
+        // other connection out for the rest of the session
+        if (!db.commit()) {
+            emit error("Failed to save workout: " + db.lastError().text());
+            db.rollback();
+            return false;
+        }
+        return true;
 
     } catch (const std::exception& e) {
         emit error(QString("Error processing file %1: %2").arg(filePath, e.what()));
@@ -418,6 +439,16 @@ void FitDatabaseProcessor::doWork() {
         emit processingStopped();
         return;
     }
+
+    // Workouts saved before the training load existed (or left by a fill that was interrupted) get
+    // their TSS after the scan: say so now, so the history page does not show the load as final
+    bool backfill = false;
+    {
+        QSqlQuery pending(db);
+        backfill = pending.exec("SELECT 1 FROM workouts WHERE tss IS NULL LIMIT 1") && pending.next();
+    }
+    if (backfill)
+        emit tssBackfillRunning(true);
 
     QDir dir(currentDirPath);
     QStringList fitFiles = dir.entryList(QStringList() << "*.fit" << "*.FIT", QDir::Files);
@@ -439,7 +470,101 @@ void FitDatabaseProcessor::doWork() {
         emit progress(processedFiles, totalFiles);
     }
 
+    // the TSS fill runs after the scan, so the history list does not wait for it
     emit processingStopped();
+    if (backfill)
+        QMetaObject::invokeMethod(this, "backfillNextChunk", Qt::QueuedConnection);
+}
+
+void FitDatabaseProcessor::backfillNextChunk() {
+    // a chunk at a time through the event loop, so a queued importFiles() runs in between and
+    // quitting the app stops it; what is left is done at the next launch
+    if (!stopRequested.loadAcquire() && backfillTss(20) > 0) {
+        QMetaObject::invokeMethod(this, "backfillNextChunk", Qt::QueuedConnection);
+        return;
+    }
+    emit tssBackfillRunning(false);
+}
+
+double FitDatabaseProcessor::workoutTss(const QList<SessionLine>& records, FIT_SPORT sport, double fileFtp,
+                                        double currentFtp) {
+    if (sport != FIT_SPORT_CYCLING)
+        return 0; // a cycling FTP says nothing about a run or a row
+    // a value outside 50-700 W is not a real FTP
+    const double ftp = (fileFtp >= 50 && fileFtp <= 700) ? fileFtp : currentFtp;
+    return metric::rideTrainingStress(records, ftp);
+}
+
+int FitDatabaseProcessor::backfillTss(int maxRows) {
+    // its own connection: db is also used from the UI thread (processFile after each workout)
+    const QString connectionName = DB_CONNECTION_NAME + "_tss";
+    int written = 0;
+    {
+        QSqlDatabase tssDb = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+        tssDb.setDatabaseName(dbPath);
+        if (tssDb.open()) {
+            QSqlQuery query(tssDb);
+            // only bike rides can be counted
+            query.exec("UPDATE workouts SET tss = 0 WHERE tss IS NULL AND (sport_type IS NULL OR sport_type != 2)");
+
+            // the rows are read first and the statement closed before any file is parsed: an open
+            // SELECT holds a read lock, and the UI thread's writes (a ride just saved, a workout
+            // deleted) would wait for the whole chunk
+            QList<QPair<qint64, QString>> rows;
+            query.prepare("SELECT id, file_path FROM workouts WHERE tss IS NULL ORDER BY id LIMIT ?");
+            query.addBindValue(maxRows);
+            if (query.exec()) {
+                while (query.next())
+                    rows.append(qMakePair(query.value(0).toLongLong(), query.value(1).toString()));
+            }
+            query.finish();
+
+            QList<QPair<qint64, double>> results;
+            if (!rows.isEmpty()) {
+                QSettings settings;
+                const double currentFtp = settings.value(QZSettings::ftp, QZSettings::default_ftp).toDouble();
+                for (const QPair<qint64, QString> &row : qAsConst(rows)) {
+                    const QString path = makeAbsolutePath(row.second);
+                    QList<SessionLine> records;
+                    FIT_SPORT sport = FIT_SPORT_INVALID;
+                    QString name; // qfit reads the session developer fields (FTP) only with a name
+                    double rideFtp = 0;
+                    if (QFile::exists(path)) {
+                        try {
+                            qfit::open(path, &records, &sport, &name, nullptr, nullptr, nullptr, nullptr, &rideFtp);
+                        } catch (...) {
+                            records.clear();
+                        }
+                    }
+                    // a missing or unreadable file gets 0 too, so every chunk moves on
+                    results.append(qMakePair(row.first, workoutTss(records, sport, rideFtp, currentFtp)));
+                }
+            }
+
+            if (!results.isEmpty() && tssDb.transaction()) {
+                QSqlQuery update(tssDb);
+                update.prepare("UPDATE workouts SET tss = ? WHERE id = ?");
+                bool ok = true;
+                for (const QPair<qint64, double> &result : qAsConst(results)) {
+                    update.addBindValue(result.second);
+                    update.addBindValue(result.first);
+                    if (!update.exec()) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok && tssDb.commit())
+                    written = results.count();
+                else
+                    tssDb.rollback();
+            }
+            tssDb.close();
+        } else {
+            emit error("Failed to open the database for the training load: " + tssDb.lastError().text());
+        }
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    return written;
 }
 
 QString FitDatabaseProcessor::makeRelativePath(const QString& absolutePath) {
