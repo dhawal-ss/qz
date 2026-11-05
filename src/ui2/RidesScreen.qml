@@ -11,7 +11,8 @@ import "rides/Analysis.js" as Analysis
 // hairline with its own small Pulse in the zone it counts in, its day, a tiny power line and a
 // mark for every record. On phones a tapped row grows into the ride (the row is the container
 // the ride opens from) and going back slides the ride away as a predictive back does; on wide
-// windows the ride sits beside the list and changes with a fade through.
+// windows the ride sits beside the list and changes with a fade through. Rides that don't count
+// (under a minute, or no pedaling recorded) stay out of the list until asked for at its end.
 Item {
     id: rides
     objectName: "ridesScreen"
@@ -21,6 +22,13 @@ Item {
     property bool showYou: true
     property string initial: "B"
     property int selectedId: -1
+    // the ride beside the list was picked by the window going wide, not by the rider: it goes
+    // again when the window narrows (a phone turned back upright), so the list is what shows
+    property bool autoPicked: false
+    // rides that don't count (under a minute, or no pedaling recorded) are left out of the list
+    // until the rider asks for them at its end
+    property bool showShort: false
+    property int shortCount: 0
     // the power of the rides is estimated (a bike without a power meter)
     property bool powerEstimated: false
     // rootItem, for the folder a shared picture is saved in
@@ -54,6 +62,7 @@ Item {
 
     // the ride open now became another one (merged into the ride before it)
     function swapTo(id) {
+        autoPicked = false
         swapping = true
         selectedId = id
         swapping = false
@@ -63,6 +72,7 @@ Item {
         if (id === selectedId)
             return
         origin = rowRect(id)
+        autoPicked = false
         selectedId = id
     }
 
@@ -72,6 +82,7 @@ Item {
             var p = item.mapToItem(rides, 0, 0)
             origin = Qt.rect(p.x, p.y, item.width, item.height)
         }
+        autoPicked = false
         selectedId = id
     }
 
@@ -159,26 +170,31 @@ Item {
             monthTotals = {}
             return
         }
-        // every ride is listed; one that does not count (no pedaling, under a minute) says so and
-        // stays out of the month's totals and of what a ride is compared with
+        // a ride that does not count (no pedaling, under a minute) stays out of the month's
+        // totals and of what a ride is compared with, and out of the list unless asked for
         var list = library.rides(0, 5000, true)
         var counted = list.filter(function (r) { return r.counted !== false })
         allRides = counted
         monthTotals = Analysis.monthTotals(counted)
+        shortCount = list.length - counted.length
         for (var i = 0; i < list.length; i++) {
             var r = list[i]
+            if (r.counted === false && !showShort)
+                continue
             var day = Format.day(r.start) + ", " + Format.time(r.start)
             rideModel.append({
                 rideId: r.id, start: r.start, month: Format.month(r.start), title: Format.title(r),
-                // without the time, so "Not counted" is not cut off next to the spark line
-                day: r.counted === false ? qsTr("%1 · Not counted").arg(Format.day(r.start)) : day,
+                // without the time, so the words are not cut off next to the spark line
+                day: r.counted === false ? (r.duration < 60 ? qsTr("%1 · Too short to count") : qsTr("%1 · No pedalling recorded")).arg(Format.day(r.start)) : day,
                 length: Analysis.shortDuration(r.duration),
                 zone: Analysis.rideZone(r.intensity), spark: JSON.stringify(r.spark || []),
                 records: (r.records || []).length
             })
         }
-        if (twoPane && selectedId < 0 && list.length > 0)
-            selectedId = list[0].id
+        if (twoPane && selectedId < 0 && rideModel.count > 0) {
+            selectedId = rideModel.get(0).rideId
+            autoPicked = true
+        }
     }
 
     function monthLine(name) {
@@ -194,12 +210,21 @@ Item {
     onLibraryChanged: refresh()
     Component.onCompleted: refresh()
     onTwoPaneChanged: {
-        if (twoPane && selectedId < 0 && rideModel.count > 0)
+        if (twoPane && selectedId < 0 && rideModel.count > 0) {
             selectedId = rideModel.get(0).rideId
-        else if (twoPane) {
+            autoPicked = true
+        } else if (twoPane) {
             openness = 1
             leave = 0
             shownId = selectedId
+        } else if (autoPicked) {
+            // the window's pick, not the rider's: back to the list at once, no ride sliding away
+            autoPicked = false
+            swapping = true
+            selectedId = -1
+            swapping = false
+            openness = 0
+            leave = 0
         }
     }
     // a burst of changes (a first scan, a merge) reads the list once
@@ -356,6 +381,51 @@ Item {
                 font.pixelSize: Theme.fs(13)
                 elide: Text.ElideRight
                 Accessible.ignored: true
+            }
+        }
+
+        // the rides that don't count, on request
+        footer: Item {
+            x: list.margin
+            width: list.width - list.margin * 2
+            height: rides.shortCount > 0 ? shortColumn.height + 24 : 0
+            visible: rides.shortCount > 0
+            Column {
+                id: shortColumn
+                y: 16
+                width: parent.width
+                spacing: 2
+                PulseButton {
+                    x: -12
+                    width: Math.min(parent.width + 12, shortText.implicitWidth + 24)
+                    height: 48
+                    topInset: 2
+                    bottomInset: 2
+                    fill: pressed ? Theme.pressed : "transparent"
+                    Accessible.name: shortText.text
+                    onClicked: {
+                        rides.showShort = !rides.showShort
+                        rides.refresh()
+                    }
+                    contentItem: Text {
+                        id: shortText
+                        text: rides.showShort ? qsTr("Hide rides that don't count")
+                              : (rides.shortCount === 1 ? qsTr("Show 1 ride that doesn't count") : qsTr("Show %1 rides that don't count").arg(rides.shortCount))
+                        color: Theme.accent
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Theme.fs(14)
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+                Text {
+                    width: parent.width
+                    text: qsTr("Under a minute, or no pedalling. They count toward nothing.")
+                    color: Theme.text2
+                    font.family: Theme.bodyMedium
+                    font.pixelSize: Theme.fs(13)
+                    wrapMode: Text.WordWrap
+                }
             }
         }
 

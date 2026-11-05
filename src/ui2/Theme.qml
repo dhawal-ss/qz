@@ -54,6 +54,12 @@ QtObject {
         property int weekStart: 1
         property bool heartZonesSet: false
         property bool ftpConfirmed: false
+        // "More detail" on Progress, for the whole app: "pro" shows the numbers beside the words
+        property string detailLevel: "simple"
+    }
+    readonly property bool moreDetail: savedLook.detailLevel === "pro"
+    function setMoreDetail(on) {
+        savedLook.detailLevel = on ? "pro" : "simple"
     }
     // QZ's FTP. Its default, 200 W, is not the rider's own until they set or confirm it (ui2/
     // ftpConfirmed): until then training load, form and power zones say "set your FTP" instead

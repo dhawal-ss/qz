@@ -18,8 +18,11 @@ HabitPage {
     property real goal: 3
     property var week: null              // this week, from Streak.perWeek()
     property bool miles: false
+    // opened as Edit goal (a goal is set): the way to take a break is here too
+    property bool offerBreak: false
 
     signal chosen(string goalKind, real goalValue)
+    signal takeBreak()
 
     property string pickedKind: "rides"
     property real pickedValue: 3
@@ -326,6 +329,27 @@ HabitPage {
                 font.pixelSize: Theme.fs(14)
                 lineHeight: 1.1
                 wrapMode: Text.WordWrap
+            }
+            // Edit goal: the goal and the break in one place
+            PulseButton {
+                visible: setup.offerBreak
+                x: -8
+                width: breakText.implicitWidth + 24
+                height: 48
+                topInset: 2
+                bottomInset: 2
+                fill: pressed ? Theme.pressed : "transparent"
+                Accessible.name: qsTr("Take a break from your goals")
+                onClicked: setup.takeBreak()
+                contentItem: Text {
+                    id: breakText
+                    text: qsTr("Take a break")
+                    color: Theme.accent
+                    font.family: Theme.bodySemibold
+                    font.pixelSize: Theme.fs(14)
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
         }
     }

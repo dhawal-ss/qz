@@ -4,6 +4,7 @@ import "."
 import "sig"
 import "calendar"
 import "today"
+import "goals"
 import "learn"
 import "Format.js" as Format
 import "progress/Progress.js" as Progress
@@ -18,25 +19,29 @@ import "today/Patterns.js" as Patterns
 import "progress/Fitness.js" as Fitness
 import "learn/Learn.js" as Learn
 
-// Home, in the Signature language: the date and You at the top, the rider's form as one number
-// in the breathing Pulse (today/Coach.js says how it is worked out), what a coach would say about
-// it, ONE raised card with the ride to do now, and then the week as Pulse shapes and quiet
-// sections on hairlines that the rider can hide and reorder (Customize): insights, the latest
+// Home, in the Signature language, with one job: the ride. The title with the date under it and
+// the bike as a chip (a tap opens bike setup), then the card to ride now (today/SuggestionCard.qml:
+// Start ride, the form as a word, the idea for today as a smaller choice), then the week's one
+// home (goals/WeekHome.qml: the week against the goal, the streak, Edit goal), and then quiet
+// sections on hairlines that the rider can hide and reorder (Edit sections): insights, the latest
 // ride, a record within reach, best power, this day last year, all the rides so far and the
 // year, and three pictures of the rider: this week against the usual week, the effort mix of
 // 30 days and when the rider rides best (today/Patterns.js). Everything rises in, one block after
 // the other, each time the screen shows. A rider with no rides yet sees those pictures as
 // samples in graphite, labelled "After your first ride".
-// Tap to learn: the hero, every picture and every section label open a Learn sheet
+// The goal setup, Taking a break and Welcome back open over Today (the shared goals model).
+// Tap to learn: the form, the week, every picture and every section label open a Learn sheet
 // (learn/LearnSheet.qml) that says what it is, what the rider's own numbers say, why it matters
 // and one thing to try.
-// On wide windows the hero and the card stay on the left and the rest goes to a right column.
+// On wide windows the two cards stay on the left and the rest goes to a right column.
 // A ride paused and left shows as a slim banner under the date: how long ago, Resume and End.
 Item {
     id: todayPage
     objectName: "todayScreen"
 
     property var library: null
+    // the shared goals (goals/GoalsModel.qml), null in previews
+    property var goals: null
     // rootItem, for Health Connect (null in previews)
     property var core: null
     // readiness from the body (today/Body.js): the rider said yes (ui2/healthRead) or not now
@@ -71,14 +76,15 @@ Item {
     signal demoRequested()
     signal searchAgain()
     signal openYou()
+    // the bike chip: You, at bike setup
+    signal openBike()
     signal openRide(int id)
     signal openTab(string name)
     // each time the screen shows: the blocks rise in again
     signal entered()
 
-    readonly property var cardIds: ["week", "usual", "insights", "latest", "mix", "reach", "bests", "whenbest", "onthisday", "lifetime", "year"]
+    readonly property var cardIds: ["usual", "insights", "latest", "mix", "reach", "bests", "whenbest", "onthisday", "lifetime", "year"]
     readonly property var cardTitles: ({
-        week: qsTr("This week"),
         usual: qsTr("This week vs your usual"),
         mix: qsTr("Effort mix"),
         whenbest: qsTr("When you ride best"),
@@ -108,10 +114,9 @@ Item {
     // the insights no shown section already tells
     property var feed: []
     // the sections under the card, in order
-    property var shownIds: ["week", "first"]
-    // Coach.readiness(), Coach.words(), Coach.suggest(), Coach.weekDays()
+    property var shownIds: ["first"]
+    // Coach.readiness(), Coach.suggest(), Coach.weekDays()
     property var ready: Coach.readiness([], 0, Date.now())
-    property var coachWords: Coach.words(ready)
     property var suggestion: Coach.suggest(ready, null, "")
     property bool swapped: false
     // the training levels (train/Levels.js), the plan under way (train/Plans.js, null for none) and
@@ -136,12 +141,16 @@ Item {
     property string learnTab: ""
     readonly property var learnIds: ["readiness", "fitness", "fatigue", "form", "week", "usual", "whenbest", "mix", "reach",
                                      "bests", "lifetime", "heatmap", "streak", "freezes", "zones", "tss", "if"]
-    // a sheet covers the page: the shell can move the floating navigation aside
-    readonly property bool covering: customizing || learnOpen
+    // a sheet covers the page: the shell can move the navigation aside; a full page of the goals
+    // covers the rail too
+    readonly property bool fullPage: goals !== null && goals.weekPageOpen
+    readonly property bool covering: customizing || learnOpen || fullPage
 
     readonly property var plan: swapped ? suggestion.other : suggestion.main
     readonly property bool formShown: ready.hasForm === true
-    readonly property var heroWeek: Coach.weekHero(weekValue, goalValue, goalKind, miles)
+    // where the bike is, for the ride card
+    readonly property string bikeWords: connected ? (deviceName !== "" ? qsTr("%1 is connected.").arg(deviceName) : qsTr("Your bike is connected."))
+                                                  : qsTr("Start ride finds your bike.")
 
     // A headline on two lines that read well: after a full stop when there is one in the middle,
     // else at the space nearest the middle. Plain string work, no patterns.
@@ -168,8 +177,6 @@ Item {
             return firstComponent
         if (cardId === "unlock")
             return unlockComponent
-        if (cardId === "week")
-            return weekComponent
         if (cardId === "usual")
             return usualComponent
         if (cardId === "mix")
@@ -271,7 +278,7 @@ Item {
     // opens the Learn sheet of an entry with the rider's own numbers
     function openLearn(id) {
         learnEntry = Learn.entry(id, factsFor(id))
-        learnTab = id === "week" || id === "lifetime" || id === "streak" || id === "freezes" ? "goals" : ""
+        learnTab = id === "lifetime" ? "progress" : ""
         learnOpen = true
     }
 
@@ -283,6 +290,8 @@ Item {
             rideRequested()
         else if (action.kind === "openRide")
             openRide(action.rideId)
+        else if (action.kind === "tab" && action.tab === "goals")
+            openLearn("streak")
         else if (action.kind === "tab")
             openTab(action.tab)
     }
@@ -411,11 +420,23 @@ Item {
         ftpTest = null
     }
 
-    function readSettings() {
+    function readGoal() {
+        if (goals !== null) {
+            goalKind = goals.goalKind
+            goalValue = goals.goalValue
+            restWeeks = goals.restWeeks
+            return
+        }
         var kind = String(uiStore.value("goalKind", "minutes"))
         goalKind = Streak.kinds.indexOf(kind) >= 0 ? kind : "minutes"
         goalValue = Number(uiStore.value(Streak.settingKeys[goalKind], Streak.defaults[goalKind])) || Streak.defaults[goalKind]
         restWeeks = Streak.parseList(String(uiStore.value("restWeeks", "[]")))
+    }
+
+    function readSettings() {
+        if (goals !== null)
+            goals.readSettings()
+        readGoal()
         levels = Levels.levels(Levels.parse(String(uiStore.value("workoutLog", "[]"))), Date.now())
         trainingPlan = Plans.parse(String(uiStore.value("trainingPlan", "")))
         healthAsked = String(uiStore.value("healthRead", "false")) === "true"
@@ -457,6 +478,8 @@ Item {
 
     // Android back closes the sheet first
     function goBack() {
+        if (goals !== null && goals.goBackWeek())
+            return true
         if (learnOpen) {
             learnOpen = false
             return true
@@ -492,10 +515,11 @@ Item {
     function layout() {
         var ids = []
         // the coach line already welcomes the rider back
-        var told = ["welcome"]
+        // and the week's card the streak
+        var told = ["welcome"].concat(found.goalStreak >= 2 ? ["streak"] : [])
         if (rideCount === 0) {
             // what fills in as the rider rides, as chips; the history being read in first
-            ids = library && library.busy ? ["week", "first", "unlock"] : ["week", "unlock"]
+            ids = library && library.busy ? ["first", "unlock"] : ["unlock"]
         } else {
             // a calm page: the week, then the first three cards of the rider's order that have
             // something to say (Customize picks them)
@@ -504,11 +528,9 @@ Item {
                 var cardId = cards[i].id
                 if (!cards[i].shown || !hasContent(cardId))
                     continue
-                if (cardId !== "week") {
-                    if (others >= maxCards)
-                        continue
-                    others++
-                }
+                if (others >= maxCards)
+                    continue
+                others++
                 ids.push(cardId)
                 if (cardId === "reach")
                     told.push("reach")
@@ -516,8 +538,6 @@ Item {
                     told.push("onThisDay")
                 else if (cardId === "lifetime")
                     told.push("milestone")
-                else if (cardId === "week" && found.goalStreak >= 2)
-                    told.push("streak")
             }
         }
         feed = Insights.without(found.list, told)
@@ -538,7 +558,6 @@ Item {
             goalStreak = 0
             found = Insights.build({}, now)
             ready = Coach.readiness([], 0, now)
-            coachWords = Coach.words(ready)
             suggestion = Coach.suggest(ready, null, "", levels)
             applyPlan([], now)
             applyBody()
@@ -581,7 +600,6 @@ Item {
             ftpSet: Theme.ftpSet
         }, now)
         ready = Coach.readiness(allDays, latest ? latest.start : 0, now, Theme.ftpSet)
-        coachWords = Coach.words(ready)
         // an FTP to offer while it is still the guess: 95% of the best 20 min of the last 90 days
         var best20 = 0
         if (!Theme.ftpSet) {
@@ -613,8 +631,20 @@ Item {
             return
         }
         readSettings()
+        if (goals !== null)
+            goals.refreshWeek()
         refresh()
         entered()
+        if (goals !== null)
+            goals.offer()
+    }
+    // a goal changed from the week's card: the week, the insights and the widget follow
+    Connections {
+        target: todayPage.goals
+        ignoreUnknownSignals: true
+        function onGoalValueChanged() { todayPage.readGoal(); refreshLater.restart() }
+        function onGoalKindChanged() { todayPage.readGoal(); refreshLater.restart() }
+        function onRestWeeksChanged() { todayPage.readGoal(); refreshLater.restart() }
     }
     Component.onCompleted: {
         readSettings()
@@ -741,15 +771,6 @@ Item {
     }
 
     Component {
-        id: weekComponent
-        WeekCard {
-            days: todayPage.weekDays
-            summary: Coach.goalText(todayPage.weekValue, todayPage.goalValue, todayPage.goalKind, todayPage.miles)
-            met: todayPage.goalValue > 0 && todayPage.weekValue >= todayPage.goalValue - 1e-9
-            onLearn: todayPage.openLearn("week")
-        }
-    }
-    Component {
         id: usualComponent
         UsualCard {
             id: usualCard
@@ -858,24 +879,6 @@ Item {
         }
     }
 
-    // the glow of the hero, outside the Flickable so it reaches into the top of the screen; it
-    // follows the hero as the page scrolls
-    HeroGlow {
-        // mapToItem tells no change: name what moves the hero, so the binding runs again
-        readonly property point center: {
-            var moved = flick.contentY + flick.contentX + content.x + content.width + lead.y + hero.x
-            return hero.mapToItem(todayPage, hero.width / 2, hero.height / 2)
-        }
-        width: 480
-        height: 480
-        x: center.x - width / 2
-        y: center.y - height / 2
-        tint: hero.tint
-        // three breaths each time Today shows, then it rests so the screen can idle
-        breaths: 3
-        Accessible.ignored: true
-    }
-
     Flickable {
         id: flick
         objectName: "todayFlick"
@@ -894,69 +897,53 @@ Item {
             width: Math.min(todayPage.width - margin * 2, wide ? 1120 : 560)
             height: Math.max(lead.y + lead.height, feedColumn.y + feedColumn.height)
 
-            // the date, the bike once it is there, and You where the navigation has none
+            // the title and the date, and the bike as a chip on the title line: a tap opens bike setup
             Item {
                 id: header
-                y: 24
-                width: content.leftWidth
-                height: 44
-                Text {
-                    width: parent.width - (youButton.visible ? youButton.width + 8 : 0) - (bikeStatus.visible ? bikeStatus.width + 12 : 0)
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: new Date().toLocaleDateString(Qt.locale(), "dddd, d MMMM")
-                    color: Theme.text
-                    font.family: Theme.bodyMedium
-                    font.pixelSize: Theme.fs(14)
-                    elide: Text.ElideRight
-                }
-                Row {
-                    id: bikeStatus
-                    visible: todayPage.connected
-                    anchors.right: youButton.visible ? youButton.left : parent.right
-                    anchors.rightMargin: youButton.visible ? 10 : 0
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 7
-                    Accessible.role: Accessible.StaticText
-                    Accessible.name: bikeName.text
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 8
-                        height: 8
-                        radius: 4
-                        color: Theme.zoneColors[1]
-                    }
-                    Text {
-                        id: bikeName
-                        width: Math.min(implicitWidth, 150)
-                        text: todayPage.deviceName !== "" ? todayPage.deviceName : qsTr("Bike ready")
-                        color: Theme.text2
-                        font.family: Theme.bodyMedium
-                        font.pixelSize: Theme.fs(13)
-                        elide: Text.ElideRight
-                    }
+                width: content.width
+                height: pageHeader.height
+                PageHeader {
+                    id: pageHeader
+                    width: parent.width - bikeChip.width - 12
+                    title: qsTr("Today")
+                    subtitle: new Date().toLocaleDateString(Qt.locale(), "dddd, d MMMM")
                 }
                 PulseButton {
-                    id: youButton
-                    visible: todayPage.showYou
+                    id: bikeChip
+                    objectName: "bikeChip"
                     anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    // 48 to touch, 44 to see
-                    width: 48
+                    y: 22
+                    width: Math.min(chipRow.implicitWidth + 28, 190)
                     height: 48
-                    topInset: 2
-                    bottomInset: 2
-                    leftInset: 2
-                    rightInset: 2
-                    fill: pressed ? Theme.pressed : Theme.control
-                    Accessible.name: qsTr("You, profile and settings")
-                    onClicked: todayPage.openYou()
-                    contentItem: Text {
-                        text: todayPage.initial
-                        color: Theme.accent
-                        font.family: Theme.bodySemibold
-                        font.pixelSize: Theme.fs(17)
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    topInset: 4
+                    bottomInset: 4
+                    radius: 20
+                    fill: pressed ? Theme.pressed : Theme.chip
+                    Accessible.name: todayPage.connected ? qsTr("%1, connected. Bike setup").arg(bikeName.text) : qsTr("No bike connected. Bike setup")
+                    onClicked: todayPage.openBike()
+                    contentItem: Item {
+                        Row {
+                            id: chipRow
+                            anchors.centerIn: parent
+                            spacing: 7
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 8
+                                height: 8
+                                radius: 4
+                                color: todayPage.connected ? Theme.zoneColors[1] : Theme.text3
+                            }
+                            Text {
+                                id: bikeName
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.min(implicitWidth, 140)
+                                text: todayPage.connected ? (todayPage.deviceName !== "" ? todayPage.deviceName : qsTr("Bike ready")) : qsTr("No bike")
+                                color: Theme.text
+                                font.family: Theme.bodyMedium
+                                font.pixelSize: Theme.fs(13)
+                                elide: Text.ElideRight
+                            }
+                        }
                     }
                 }
             }
@@ -966,7 +953,7 @@ Item {
             Item {
                 id: pausedBanner
                 objectName: "pausedBanner"
-                y: header.y + header.height + 8
+                y: header.y + header.height + 4
                 width: content.leftWidth
                 height: todayPage.ridePaused || todayPage.showRecover ? bannerBody.height : 0
                 visible: todayPage.ridePaused || todayPage.showRecover
@@ -1096,40 +1083,32 @@ Item {
                 }
             }
 
-            // the hero, the coach and the ride to do now
+            // the ride to do now and the week, then what needs an answer
             Column {
                 id: lead
-                y: pausedBanner.y + pausedBanner.height + (pausedBanner.height > 0 ? 14 : 0)
+                y: pausedBanner.y + pausedBanner.height + (pausedBanner.height > 0 ? 14 : 4)
                 width: content.leftWidth
 
                 Rise {
-                    objectName: "heroRise"
                     cue: todayPage
                     order: 0
                     width: parent.width
-                    // the hero is the button to its Learn sheet
-                    LearnTap {
+                    SuggestionCard {
                         width: parent.width
-                        height: 136
-                        fill: "transparent"
-                        pressedScale: 0.96
-                        name: hero.summary
-                        onClicked: todayPage.openLearn("readiness")
-                        PulseHero {
-                            id: hero
-                            Accessible.ignored: true
-                            objectName: "todayHero"
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: 136
-                            height: 136
-                            glow: false
-                            breaths: 3
-                            zone: 2
-                            value: todayPage.formShown ? String(todayPage.ready.ready) : todayPage.heroWeek.value
-                            word: todayPage.formShown ? todayPage.ready.word : todayPage.heroWeek.word
-                            summary: todayPage.formShown ? qsTr("%1, ready %2 of 100").arg(todayPage.ready.word).arg(todayPage.ready.ready)
-                                                         : qsTr("This week %1 %2").arg(todayPage.heroWeek.value).arg(todayPage.heroWeek.word)
-                        }
+                        plan: todayPage.plan
+                        kicker: todayPage.kicker
+                        showLoad: Theme.ftpSet
+                        detailed: Theme.moreDetail
+                        status: todayPage.bikeWords
+                        bikeReady: todayPage.connected
+                        readiness: todayPage.formShown ? todayPage.ready.word : ""
+                        swapLabel: todayPage.swapped ? qsTr("Back to %1").arg(todayPage.suggestion.main.name) : todayPage.suggestion.otherLabel
+                        firstRide: todayPage.rideCount === 0
+                        onRideRequested: todayPage.rideRequested()
+                        onWorkoutRequested: todayPage.workoutRequested(todayPage.plan)
+                        onSwap: todayPage.swapped = !todayPage.swapped
+                        onDemoRequested: todayPage.demoRequested()
+                        onLearnReadiness: todayPage.openLearn("readiness")
                     }
                 }
                 Item { width: 1; height: 14 }
@@ -1137,32 +1116,15 @@ Item {
                     cue: todayPage
                     order: 1
                     width: parent.width
-                    Column {
+                    WeekHome {
+                        objectName: "weekHome"
                         width: parent.width
-                        spacing: 10
-                        Text {
-                            width: parent.width
-                            text: todayPage.balanced(todayPage.coachWords.headline)
-                            color: Theme.text
-                            font.family: Theme.display
-                            font.pixelSize: content.wide || todayPage.width >= 400 ? 30 : 28
-                            font.letterSpacing: -0.6
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: Math.round(font.pixelSize * 1.08)
-                            wrapMode: Text.WordWrap
-                            Accessible.role: Accessible.Heading
-                            Accessible.name: todayPage.coachWords.headline
-                        }
-                        Text {
-                            width: parent.width
-                            text: todayPage.coachWords.line
-                            color: Theme.text2
-                            font.family: Theme.bodyMedium
-                            font.pixelSize: Theme.fs(14)
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: 20
-                            wrapMode: Text.WordWrap
-                        }
+                        goals: todayPage.goals
+                        days: todayPage.weekDays
+                        miles: todayPage.miles
+                        onLearn: todayPage.openLearn(id)
+                        onEditGoal: if (todayPage.goals !== null) todayPage.goals.setupOpen = true
+                        onResume: if (todayPage.goals !== null) todayPage.goals.resumeGoals()
                     }
                 }
                 Item { width: 1; height: 14 }
@@ -1365,24 +1327,6 @@ Item {
                         }
                     }
                 }
-                Item { width: 1; height: todayPage.askFtp ? 14 : 0 }
-                Rise {
-                    cue: todayPage
-                    order: 2
-                    width: parent.width
-                    SuggestionCard {
-                        width: parent.width
-                        plan: todayPage.plan
-                        kicker: todayPage.kicker
-                        showLoad: Theme.ftpSet
-                        swapLabel: todayPage.swapped ? qsTr("Back to %1").arg(todayPage.suggestion.main.name) : todayPage.suggestion.otherLabel
-                        firstRide: todayPage.rideCount === 0
-                        onRideRequested: todayPage.rideRequested()
-                        onWorkoutRequested: todayPage.workoutRequested(todayPage.plan)
-                        onSwap: todayPage.swapped = !todayPage.swapped
-                        onDemoRequested: todayPage.demoRequested()
-                    }
-                }
             }
 
             // the week and the quiet sections: under the card, or in the right column
@@ -1422,11 +1366,11 @@ Item {
                             topInset: 2
                             bottomInset: 2
                             fill: pressed ? Theme.pressed : "transparent"
-                            Accessible.name: qsTr("Customize Today")
+                            Accessible.name: qsTr("Edit the sections of Today")
                             onClicked: todayPage.customizing = true
                             contentItem: Text {
                                 id: customizeText
-                                text: qsTr("Customize Today")
+                                text: qsTr("Edit sections")
                                 color: Theme.accent
                                 font.family: Theme.bodySemibold
                                 font.pixelSize: Theme.fs(14)
@@ -1467,12 +1411,60 @@ Item {
         entry: todayPage.learnEntry
         known: todayPage.learnIds
         bottomInset: todayPage.sheetClearance
-        actionLabel: todayPage.learnTab === "goals" ? qsTr("See your goals") : ""
+        actionLabel: todayPage.learnTab === "progress" ? qsTr("See Progress") : ""
         onClose: todayPage.learnOpen = false
         onRelated: todayPage.openLearn(id)
         onAct: {
             todayPage.learnOpen = false
             todayPage.openTab(todayPage.learnTab)
+        }
+    }
+
+    GoalSetup {
+        objectName: "goalSetup"
+        anchors.fill: parent
+        z: 3
+        bottomClearance: todayPage.sheetClearance
+        open: todayPage.goals !== null && todayPage.goals.setupOpen
+        kind: todayPage.goals !== null && todayPage.goals.goalChosen ? todayPage.goals.goalKind : "rides"
+        goal: todayPage.goals !== null && todayPage.goals.goalChosen ? todayPage.goals.goalValue : 3
+        week: todayPage.goals !== null ? todayPage.goals.thisWeek : null
+        miles: todayPage.miles
+        offerBreak: todayPage.goals !== null && todayPage.goals.goalChosen && !todayPage.goals.paused
+        onBack: todayPage.goals.setupOpen = false
+        onChosen: todayPage.goals.chooseGoal(goalKind, goalValue)
+        onTakeBreak: {
+            todayPage.goals.setupOpen = false
+            todayPage.goals.pauseOpen = true
+        }
+    }
+
+    PauseSheet {
+        objectName: "pauseSheet"
+        anchors.fill: parent
+        z: 3
+        bottomClearance: todayPage.sheetClearance
+        open: todayPage.goals !== null && todayPage.goals.pauseOpen
+        nowMs: todayPage.goals !== null ? todayPage.goals.nowMs : Date.now()
+        onBack: todayPage.goals.pauseOpen = false
+        onPauseGoals: todayPage.goals.pauseGoals(reason, until)
+    }
+
+    WelcomeBack {
+        objectName: "welcomeBack"
+        anchors.fill: parent
+        z: 3
+        bottomClearance: todayPage.sheetClearance
+        open: todayPage.goals !== null && todayPage.goals.welcomeOpen
+        streak: todayPage.goals !== null && todayPage.goals.streakResult ? todayPage.goals.streakResult.streak : 0
+        covered: todayPage.goals !== null && todayPage.goals.welcomeCovered !== "" ? todayPage.goals.welcomeCovered : "frozen"
+        weeks: todayPage.goals !== null && todayPage.goals.streakResult ? Streak.lastWeeks(todayPage.goals.streakResult.timeline, 8, todayPage.goals.nowMs) : []
+        nowMs: todayPage.goals !== null ? todayPage.goals.nowMs : Date.now()
+        onBack: todayPage.goals.welcomeOpen = false
+        onPrimary: todayPage.goals.welcomeOpen = false
+        onRideRequested: {
+            todayPage.goals.welcomeOpen = false
+            todayPage.rideRequested()
         }
     }
 

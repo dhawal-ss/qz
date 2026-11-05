@@ -260,8 +260,7 @@ Item {
         if (id === "zones")
             return qsTr("7 power zones, 5 heart zones")
         if (id === "units")
-            return (qzStore.miles_unit ? qsTr("Miles") : qsTr("Kilometers")) + ", "
-                    + (look.detailLevel === "pro" ? qsTr("Pro detail") : qsTr("Simple detail"))
+            return qzStore.miles_unit ? qsTr("Miles") : qsTr("Kilometers")
         if (id === "connections") {
             var names = []
             if (ask("isStravaLoggedIn", false))

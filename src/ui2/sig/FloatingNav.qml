@@ -1,119 +1,124 @@
 import QtQuick 2.15
 import ".."
 
-// The M3 Expressive floating toolbar of the app: a pill floating over the content with the
-// destinations in it, the open one expanded into a filled accent pill with its name, and the
-// round Ride button beside it. Across on phones held upright, upright as a floating rail on
-// wider windows. The shell places it clear of the system bars; `available` is the room it has
-// (its width across, its height upright), and it packs tighter when the room is short.
+// The navigation of the app, every destination named. On phones held upright a bar across the
+// bottom, edge to edge, with five slots of the same width: Today, Rides, Ride in the middle (the
+// round button in the accent), Progress and You. Upright on wider windows (a phone on its side,
+// a tablet) a rail down the left edge: Ride on top, then the four destinations, each name under
+// its icon. The open destination has its icon in a filled pill. The bar keeps clear of the
+// bottom inset and the rail of the left one (the camera cutout); both paint under them.
+// `available` is the room across (bar) or upright (rail); a short rail packs tighter.
 Item {
     id: floatingNav
 
     property string tab: "today"
-    // [{ name, label, icon }]
+    // [{ name, label, icon }]: four, Ride goes in the middle of them
     property var destinations: []
     property bool vertical: false
     property real available: 1000
-    // a ride is paused and waits: the Ride button carries a dot and resumes it
+    property int insetBottom: 0
+    property int insetLeft: 0
+    property int insetTop: 0
+    // a ride is paused and waits: the Ride button carries a dot and says Resume
     property bool ridePaused: false
 
     signal picked(string name)
     signal rideRequested()
 
-    // across: the widest name decides if the comfortable sizes fit
-    readonly property real widestLabel: widest.advanceWidth
-    readonly property real comfortableWidth: 16 + (destinations.length - 1) * (52 + 4) + (16 + 22 + 8 + widestLabel + 20) + 10 + 64
-    readonly property bool dense: vertical ? available < 380 : comfortableWidth > available
-    readonly property int slot: vertical ? (dense ? 44 : 48) : (dense ? 42 : 52)
-    readonly property int fabSize: dense ? 56 : 64
-    readonly property int padding: vertical ? 6 : (dense ? 4 : 8)
-    readonly property int gap: dense ? 8 : 10
-    // what is left for the name of the open destination, so the group never outgrows the room
-    readonly property real labelRoom: available - padding * 2 - (destinations.length - 1) * (slot + (dense ? 2 : 4))
-                                      - (dense ? 14 + 22 + 6 + 16 : 16 + 22 + 8 + 20) - gap - fabSize
-
-    implicitWidth: vertical ? 72 : pill.width + gap + fabSize
-    implicitHeight: vertical ? fabSize + gap + pill.height : 64
-
-    TextMetrics {
-        id: widest
-        font.family: Theme.bodySemibold
-        font.pixelSize: Theme.fs(14)
-        text: {
-            var longest = ""
-            for (var i = 0; i < floatingNav.destinations.length; i++)
-                if (floatingNav.destinations[i].label.length > longest.length)
-                    longest = floatingNav.destinations[i].label
-            return longest
+    // the bar: 76 high over the bottom inset; the rail: 80 wide right of the left inset
+    readonly property int barHeight: 76
+    readonly property int railWidth: 80
+    readonly property bool dense: vertical && available < 380
+    readonly property int railSlot: dense ? 56 : 64
+    readonly property real slotWidth: (available) / Math.max(1, destinations.length + 1)
+    readonly property var slots: {
+        var out = []
+        var half = Math.ceil(destinations.length / 2)
+        for (var i = 0; i < destinations.length; i++) {
+            if (i === half)
+                out.push({ name: "ride" })
+            out.push(destinations[i])
         }
+        if (destinations.length < 2)
+            out.push({ name: "ride" })
+        return out
     }
 
-    Item {
-        id: pill
-        x: floatingNav.vertical ? 0 : 0
-        y: floatingNav.vertical ? floatingNav.fabSize + floatingNav.gap : 0
-        width: floatingNav.vertical ? 72 : across.implicitWidth + floatingNav.padding * 2
-        height: floatingNav.vertical ? upright.implicitHeight + floatingNav.padding * 2 : 64
+    implicitWidth: vertical ? insetLeft + railWidth : available
+    implicitHeight: vertical ? available : barHeight + insetBottom
 
-        Shadow {
-            anchors.fill: parent
-            radius: surface.radius
-        }
-        Rectangle {
-            id: surface
-            anchors.fill: parent
-            radius: floatingNav.vertical ? 36 : 32
-            color: Theme.floating
-            border.width: 1
-            border.color: Theme.raisedBorder
-        }
+    // the surface, under the insets too
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.floating
+    }
+    Rectangle {
+        visible: !floatingNav.vertical
+        width: parent.width
+        height: 1
+        color: Theme.hairline
+    }
+    Rectangle {
+        visible: floatingNav.vertical
+        x: parent.width - 1
+        width: 1
+        height: parent.height
+        color: Theme.hairline
+    }
 
-        Row {
-            id: across
-            visible: !floatingNav.vertical
-            x: floatingNav.padding
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: floatingNav.dense ? 2 : 4
-            Repeater {
-                model: floatingNav.vertical ? [] : floatingNav.destinations
+    // across: five slots of the same width
+    Row {
+        id: across
+        visible: !floatingNav.vertical
+        x: floatingNav.insetLeft
+        y: 0
+        Repeater {
+            model: floatingNav.vertical ? [] : floatingNav.slots
+            Item {
+                width: floatingNav.slotWidth
+                height: floatingNav.barHeight
                 NavButton {
-                    text: modelData.label
-                    iconName: modelData.icon
+                    visible: modelData.name !== "ride"
+                    anchors.fill: parent
+                    text: modelData.label || ""
+                    iconName: modelData.icon || "today"
                     current: floatingNav.tab === modelData.name
-                    slot: floatingNav.slot
-                    labelSize: floatingNav.dense ? 13 : 14
-                    dense: floatingNav.dense
-                    maxLabelWidth: Math.max(24, floatingNav.labelRoom)
                     onClicked: floatingNav.picked(modelData.name)
                 }
-            }
-        }
-
-        Column {
-            id: upright
-            visible: floatingNav.vertical
-            x: floatingNav.padding
-            y: floatingNav.padding
-            spacing: floatingNav.dense ? 2 : 4
-            Repeater {
-                model: floatingNav.vertical ? floatingNav.destinations : []
-                NavButton {
-                    vertical: true
-                    text: modelData.label
-                    iconName: modelData.icon
-                    current: floatingNav.tab === modelData.name
-                    slot: floatingNav.slot
-                    onClicked: floatingNav.picked(modelData.name)
+                RideSlot {
+                    visible: modelData.name === "ride"
+                    anchors.fill: parent
+                    paused: floatingNav.ridePaused
+                    onClicked: floatingNav.rideRequested()
                 }
             }
         }
     }
 
-    RideFab {
-        x: floatingNav.vertical ? (72 - width) / 2 : pill.width + floatingNav.gap
-        y: floatingNav.vertical ? 0 : (64 - height) / 2
-        size: floatingNav.fabSize
-        paused: floatingNav.ridePaused
-        onClicked: floatingNav.rideRequested()
+    // upright: Ride on top, the destinations under it, the group in the middle of the height
+    Column {
+        id: upright
+        visible: floatingNav.vertical
+        x: floatingNav.insetLeft
+        y: floatingNav.insetTop + Math.max(8, Math.round((floatingNav.height - floatingNav.insetTop - height) / 2))
+        spacing: floatingNav.dense ? 0 : 4
+        RideSlot {
+            width: floatingNav.railWidth
+            height: floatingNav.dense ? 72 : 80
+            paused: floatingNav.ridePaused
+            onClicked: floatingNav.rideRequested()
+        }
+        Item { width: 1; height: floatingNav.dense ? 4 : 12 }
+        Repeater {
+            model: floatingNav.vertical ? floatingNav.destinations : []
+            NavButton {
+                width: floatingNav.railWidth
+                height: floatingNav.railSlot
+                text: modelData.label
+                iconName: modelData.icon
+                current: floatingNav.tab === modelData.name
+                onClicked: floatingNav.picked(modelData.name)
+            }
+        }
     }
 }

@@ -1,16 +1,17 @@
 import QtQuick 2.15
 import "."
 import "sig"
+import "goals"
 
-// The app around the ride: Today, Rides, Progress, Goals and You, with Ride always one tap away.
-// The navigation floats over the content (sig/FloatingNav): on compact windows (phones held
-// upright) a pill at the bottom with Today, Rides, Progress and Goals and the round Ride button
-// beside it, You behind the round button in each header; on wider windows a floating rail on the
-// left with Ride on top and You in it. A tab switch fades through: the open page fades out
-// quickly, then the new one fades in as it grows from 96%. The pages stay alive.
+// The app around the ride: Today, Rides, Progress and You, with Ride always one tap away, every
+// one of them named (sig/FloatingNav): on compact windows (phones held upright) a bar across the
+// bottom with Today, Rides, Ride in the middle, Progress and You; on wider windows a rail down the
+// left with Ride on top. A tab switch fades through: the open page fades out quickly, then the
+// new one fades in as it grows from 96%. The pages stay alive. The goals are one shared model
+// (goals/GoalsModel.qml): the week lives on Today, the rest of the goals on Progress.
 // The shell keeps clear of the system bars and the camera cutout with the insets it is given.
 // Whenever a sheet or a full page covers the open tab (each page says so with `covering`), or the
-// keyboard is up, the bottom pill steps aside: it fades and slides down, and comes back after.
+// keyboard is up, the bottom bar steps aside: it slides down, and comes back after.
 Item {
     id: shell
 
@@ -51,16 +52,15 @@ Item {
     signal unitsPicked(bool miles)
 
     readonly property bool rail: width >= 600
-    // the room the floating rail takes on the left: its margin, its width and a gap
-    readonly property int railWidth: 12 + 72 + 12
-    // how high the bottom pill floats over the bottom inset
-    readonly property int navLift: insetBottom > 0 ? 10 : 20
-    // what a page that scrolls under the bottom pill keeps free at its end, over the bottom inset
-    readonly property int navClearance: rail ? 16 : 64 + navLift + 16
+    // the room the rail takes on the left, right of the left inset
+    readonly property int railWidth: nav.railWidth
+    // what a page that scrolls under the bottom bar keeps free at its end, over the bottom inset:
+    // the bar and a little room, so the last thing on a page is never under it
+    readonly property int navClearance: rail ? 16 : nav.barHeight + 16
     readonly property string initial: nickname !== "" ? nickname.charAt(0).toUpperCase() : "B"
 
     // a sheet or a full page over the open tab. Pages say so with `covering`; Today and Progress
-    // also count while they customize, Goals while a badge or the weekly recap is open, Rides
+    // also count while they customize, or while a page of the goals is open over them, Rides
     // while a ride fills a phone screen. A page that lacks a property simply does not cover.
     function covers(page) {
         return page !== null && page !== undefined && (page.covering === true || page.customizing === true)
@@ -72,24 +72,24 @@ Item {
             return covers(rides) || (!rail && rides.detailOpen === true)
         if (shownTab === "progress")
             return covers(progressScreen)
-        if (shownTab === "goals")
-            return covers(goalsScreen) || goalsScreen.recapOpen === true
-                   || (goalsScreen.badgeId !== undefined && goalsScreen.badgeId !== "")
         if (shownTab === "you")
             return covers(youLoader.item)
         return false
     }
 
-    readonly property var destinations: {
-        var list = [
-            { name: "today", label: qsTr("Today"), icon: "today" },
-            { name: "rides", label: qsTr("Rides"), icon: "rides" },
-            { name: "progress", label: qsTr("Progress"), icon: "progress" },
-            { name: "goals", label: qsTr("Goals"), icon: "goals" }
-        ]
-        if (rail)
-            list.push({ name: "you", label: qsTr("You"), icon: "you" })
-        return list
+    // Ride goes in the middle of them (sig/FloatingNav)
+    readonly property var destinations: [
+        { name: "today", label: qsTr("Today"), icon: "today" },
+        { name: "rides", label: qsTr("Rides"), icon: "rides" },
+        { name: "progress", label: qsTr("Progress"), icon: "progress" },
+        { name: "you", label: qsTr("You"), icon: "you" }
+    ]
+
+    // the goals, shared by Today and Progress
+    GoalsModel {
+        id: goalsModel
+        library: shell.library
+        miles: shell.miles
     }
 
     // the fade through between tabs: the page on screen, the page fading out, and how far each is
@@ -98,7 +98,71 @@ Item {
     property real leaveFade: 1
     property real enterFade: 1
 
+    // Only the page on screen follows a window change (a rotation) at once; each hidden page keeps
+    // its layout and catches up after, one at a time once the window has settled, or when it is
+    // opened. Laying out all five pages at once kept the first frame after a turn from coming.
+    property size todaySize: Qt.size(0, 0)
+    property size ridesSize: Qt.size(0, 0)
+    property size progressSize: Qt.size(0, 0)
+    property size youSize: Qt.size(0, 0)
+    readonly property var pageNames: ["today", "rides", "progress", "you"]
+
+    function sizeOf(name) {
+        return name === "today" ? todaySize : name === "rides" ? ridesSize : name === "progress" ? progressSize : youSize
+    }
+    function syncPage(name) {
+        var now = Qt.size(pages.width, pages.height)
+        var old = sizeOf(name)
+        if (old.width === now.width && old.height === now.height)
+            return false
+        setSizeOf(name, now)
+        return true
+    }
+    // behind a ride or the start screen no page is on screen: all of them catch up after
+    // (a ride's live numbers never wait for them)
+    onVisibleChanged: {
+        if (!visible) {
+            catchUp.stop()
+            return
+        }
+        syncPage(shownTab !== "" ? shownTab : tab)
+        catchUp.interval = 700
+        catchUp.restart()
+    }
+    function pagesResized() {
+        if (!visible)
+            return
+        catchUp.interval = 700
+        catchUp.restart()
+        syncPage(shownTab !== "" ? shownTab : tab)
+        if (leavingTab !== "")
+            syncPage(leavingTab)
+    }
+    // the hidden pages, one per tick once a rotation has settled
+    Timer {
+        id: catchUp
+        interval: 700
+        repeat: true
+        onTriggered: {
+            interval = 150
+            for (var i = 0; i < shell.pageNames.length; i++) {
+                if (shell.syncPage(shell.pageNames[i]))
+                    return
+            }
+            interval = 700
+            stop()
+        }
+    }
+
+    function setSizeOf(name, size) {
+        if (name === "today") todaySize = size
+        else if (name === "rides") ridesSize = size
+        else if (name === "progress") progressSize = size
+        else youSize = size
+    }
+
     onTabChanged: {
+        syncPage(tab)
         if (tab === shownTab)
             return
         if (Theme.reduceMotion) {
@@ -160,8 +224,10 @@ Item {
     }
 
     Component.onCompleted: {
+        for (var p = 0; p < pageNames.length; p++)
+            syncPage(pageNames[p])
         shownTab = tab
-        var list = [todayScreen, rides, progressScreen, goalsScreen]
+        var list = [todayScreen, rides, progressScreen]
         for (var i = 0; i < list.length; i++)
             bindSheetClearance(list[i])
     }
@@ -171,10 +237,20 @@ Item {
         rides.open(id)
     }
 
-    // Android back: step back inside the section, then to Today, then let the app close
+    // the goal setup, over Today
     function openGoalSetup() {
-        goalsScreen.openSetup()
+        tab = "today"
+        goalsModel.setupOpen = true
     }
+
+    // the bike chip of Today: You, at bike setup
+    function openBike() {
+        tab = "you"
+        if (youLoader.item)
+            youLoader.item.open("bike")
+    }
+
+    // Android back: step back inside the section, then to Today, then let the app close
 
     function goBack() {
         if (tab === "rides" && rides.goBack())
@@ -184,8 +260,6 @@ Item {
         if (tab === "today" && todayScreen.goBack())
             return true
         if (tab === "you" && youLoader.item && youLoader.item.goBack())
-            return true
-        if (tab === "goals" && goalsScreen.goBack())
             return true
         if (tab !== "today") {
             tab = "today"
@@ -199,22 +273,23 @@ Item {
         color: Theme.bg
     }
 
-    // The pages, under the status bar and beside the rail. Today scrolls under the floating pill
-    // (it keeps navClearance free at its end); the other pages end above it.
+    // The pages, under the status bar and beside the rail. Each keeps navClearance free at its
+    // end, so it scrolls behind the bottom bar but its last line ends above it.
     Item {
         id: pages
         x: shell.rail ? shell.insetLeft + shell.railWidth : shell.insetLeft
         y: shell.insetTop
         width: shell.width - x - shell.insetRight
         height: shell.height - y
-        readonly property real shortHeight: height - shell.insetBottom - (shell.rail ? 0 : shell.navClearance - 8)
         readonly property bool fading: fadeThrough.running
+        onWidthChanged: shell.pagesResized()
+        onHeightChanged: shell.pagesResized()
 
         TodayScreen {
             id: todayScreen
             core: shell.core
-            width: parent.width
-            height: parent.height
+            width: shell.todaySize.width
+            height: shell.todaySize.height
             visible: shell.pageShown("today")
             opacity: shell.pageOpacity("today")
             scale: shell.pageScale("today")
@@ -227,7 +302,7 @@ Item {
             searchStatus: shell.searchStatus
             miles: shell.miles
             nickname: shell.nickname
-            showYou: !shell.rail
+            showYou: false
             initial: shell.initial
             ridePaused: shell.ridePaused
             pausedAt: shell.pausedAt
@@ -237,13 +312,15 @@ Item {
             onDemoRequested: shell.demoRequested()
             onSearchAgain: shell.searchAgain()
             onOpenYou: shell.tab = "you"
+            onOpenBike: shell.openBike()
             onOpenRide: shell.openRide(id)
             onOpenTab: shell.tab = name
+            goals: goalsModel
         }
         RidesScreen {
             id: rides
-            width: parent.width
-            height: parent.height
+            width: shell.ridesSize.width
+            height: shell.ridesSize.height
             bottomClearance: shell.navClearance + shell.insetBottom
             core: shell.core
             visible: shell.pageShown("rides")
@@ -253,14 +330,14 @@ Item {
             layer.enabled: pages.fading && visible
             library: shell.library
             miles: shell.miles
-            showYou: !shell.rail
+            showYou: false
             initial: shell.initial
             onOpenYou: shell.tab = "you"
         }
         ProgressScreen {
             id: progressScreen
-            width: parent.width
-            height: parent.height
+            width: shell.progressSize.width
+            height: shell.progressSize.height
             bottomClearance: shell.navClearance + shell.insetBottom
             visible: shell.pageShown("progress")
             opacity: shell.pageOpacity("progress")
@@ -269,37 +346,21 @@ Item {
             layer.enabled: pages.fading && visible
             library: shell.library
             miles: shell.miles
-            showYou: !shell.rail
+            showYou: false
             initial: shell.initial
             onOpenYou: shell.tab = "you"
             onOpenRide: shell.openRide(id)
-        }
-        GoalsScreen {
-            id: goalsScreen
-            width: parent.width
-            height: parent.height
-            bottomClearance: shell.navClearance + shell.insetBottom
-            onRideRequested: shell.rideRequested()
+            goals: goalsModel
             onWorkoutRequested: shell.workoutRequested(workout)
             onWorkoutFileRequested: shell.workoutFileRequested()
             onIntervalsRequested: shell.intervalsRequested()
             onRouteRequested: shell.routeRequested(route)
             onRouteFileRequested: shell.routeFileRequested()
-            visible: shell.pageShown("goals")
-            opacity: shell.pageOpacity("goals")
-            scale: shell.pageScale("goals")
-            enabled: shell.shownTab === "goals"
-            layer.enabled: pages.fading && visible
-            library: shell.library
-            miles: shell.miles
-            showYou: !shell.rail
-            initial: shell.initial
-            onOpenYou: shell.tab = "you"
         }
         Loader {
             id: youLoader
-            width: parent.width
-            height: parent.height
+            width: shell.youSize.width
+            height: shell.youSize.height
             visible: shell.pageShown("you")
             opacity: shell.pageOpacity("you")
             scale: shell.pageScale("you")
@@ -330,7 +391,7 @@ Item {
         }
     }
 
-    // the floating navigation: a pill at the bottom, or a rail on the left
+    // the navigation: a bar across the bottom, or a rail down the left, edge to edge
     FloatingNav {
         id: nav
         objectName: "floatingNav"
@@ -338,27 +399,25 @@ Item {
         tab: shell.tab
         destinations: shell.destinations
         ridePaused: shell.ridePaused
-        available: shell.rail ? shell.height - shell.insetTop - shell.insetBottom - 24
-                              : shell.width - shell.insetLeft - shell.insetRight - 32
-        x: shell.rail ? shell.insetLeft + 12
-                      : shell.insetLeft + Math.round((shell.width - shell.insetLeft - shell.insetRight - width) / 2)
-        y: shell.rail ? shell.insetTop + Math.max(12, Math.round((shell.height - shell.insetTop - shell.insetBottom - height) / 2))
-                      : shell.height - shell.insetBottom - shell.navLift - height
-        width: implicitWidth
+        insetBottom: shell.insetBottom
+        insetLeft: shell.insetLeft
+        insetTop: shell.insetTop
+        available: shell.rail ? shell.height : shell.width - shell.insetLeft - shell.insetRight
+        x: 0
+        y: shell.rail ? 0 : shell.height - height
+        width: shell.rail ? implicitWidth : shell.width
         height: implicitHeight
-        // the nav never covers what the rider needs: a sheet or a full page over the tab (the ride
-        // analysis on a phone, Customize, the goal setup...) or the keyboard moves the pill aside.
-        // The rail sits beside the pages, so it only leaves for the full pages of Goals.
-        readonly property bool stepAside: shell.rail ? (shell.shownTab === "goals" && goalsScreen.covering === true)
-                                                     : (shell.covering || Qt.inputMethod.visible)
-        // how far it slides: off the bottom edge, or off the left edge for the rail
+        // the bar never covers what the rider needs: a sheet or a full page over the tab (the ride
+        // analysis on a phone, Edit sections, the goal setup...) or the keyboard moves it aside.
+        // The rail sits beside the pages, so it stays.
+        readonly property bool stepAside: !shell.rail && (shell.covering || Qt.inputMethod.visible)
+        // how far it slides off the bottom edge
         property real away: stepAside ? 1 : 0
         opacity: 1 - away
         visible: opacity > 0
         enabled: !stepAside
         transform: Translate {
-            x: nav.vertical ? -nav.away * (nav.width + 12 + shell.insetLeft) : 0
-            y: nav.vertical ? 0 : nav.away * (nav.height + shell.navLift + shell.insetBottom)
+            y: nav.vertical ? 0 : nav.away * nav.height
         }
         Behavior on away { NumberAnimation { duration: Theme.reduceMotion ? 0 : Theme.effectsTime + 50; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve } }
         onPicked: shell.tab = name

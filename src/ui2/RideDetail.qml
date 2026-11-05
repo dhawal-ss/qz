@@ -83,7 +83,8 @@ Item {
     property var changes: []
     property var blocks: ({ blocks: [], work: false })
     property int pickedLap: -1
-    property bool pro: false
+    // the numbers beside the words: More detail on Progress, for the whole app
+    readonly property bool pro: Theme.moreDetail
     property bool sharing: false
     // the share card: one bar per minute (or few minutes) of power, and where it was saved
     property var shareBars: []
@@ -117,7 +118,6 @@ Item {
         if (rideId === loadedId)
             return
         loadedId = rideId
-        readLevel()
         sharing = false
         pickedLap = -1
         asking = ""
@@ -338,20 +338,8 @@ Item {
         return false
     }
 
-    // Simple or Pro, shared with Progress and You; Qt.labs.settings does not tell the others,
-    // so it is read each time a ride shows
-    function readLevel() {
-        pro = String(uiStore.value("detailLevel", "simple")) === "pro"
-    }
-    function setPro(on) {
-        if (on === pro)
-            return
-        pro = on
-        uiStore.setValue("detailLevel", on ? "pro" : "simple")
-        if (on)
-            proCue.entered()
-    }
-    onProChanged: levelToggle.currentIndex = pro ? 1 : 0
+    // More detail turned on: its blocks rise in
+    onProChanged: if (pro) proCue.entered()
 
     // a lap picked in the blocks or the lap views zooms the charts to it; -1 shows the whole ride
     function pickLap(index) {
@@ -463,11 +451,8 @@ Item {
     }
 
     onRideIdChanged: load()
-    // You may have changed the level while the ride stayed open (tablets)
     onVisibleChanged: {
-        if (visible) {
-            readLevel()
-        } else {
+        if (!visible) {
             learnOpen = false
             asking = ""
         }
@@ -496,11 +481,7 @@ Item {
         loadedId = -1
         load()
     }
-    Component.onCompleted: {
-        readLevel()
-        levelToggle.currentIndex = pro ? 1 : 0
-        load()
-    }
+    Component.onCompleted: load()
 
     ChartView { id: chartView }
 
@@ -610,16 +591,6 @@ Item {
                             contentItem: Item {
                                 LineIcon { anchors.centerIn: parent; name: "back"; size: 20 }
                             }
-                        }
-                        SegmentedToggle {
-                            id: levelToggle
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 171
-                            height: 40
-                            options: [qsTr("Simple"), qsTr("Pro")]
-                            name: qsTr("Detail level")
-                            onPicked: detail.setPro(index === 1)
                         }
                     }
                     Item { width: 1; height: 12 }

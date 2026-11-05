@@ -947,7 +947,6 @@ ApplicationWindow {
                 }
                 onPlanWeek: {
                     window.mode = "home"
-                    shell.tab = "goals"
                     shell.openGoalSetup()
                 }
             }

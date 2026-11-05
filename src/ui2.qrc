@@ -56,7 +56,6 @@
         <file>ui2/today/ReachCard.qml</file>
         <file>ui2/today/RideCard.qml</file>
         <file>ui2/today/TodaySheet.qml</file>
-        <file>ui2/today/WeekCard.qml</file>
         <file>ui2/goals/Badges.js</file>
         <file>ui2/goals/BadgeEmblem.qml</file>
         <file>ui2/goals/BadgeGrid.qml</file>
@@ -68,7 +67,6 @@
         <file>ui2/goals/Journeys.js</file>
         <file>ui2/goals/LaddersCard.qml</file>
         <file>ui2/goals/Streak.js</file>
-        <file>ui2/goals/StreakCard.qml</file>
         <file>ui2/goals/WeeklyRecap.qml</file>
         <file>ui2/sig/Spring.qml</file>
         <file>ui2/sig/CapLabel.qml</file>
@@ -86,6 +84,7 @@
         <file>ui2/sig/RideFab.qml</file>
         <file>ui2/sig/NavIcon.qml</file>
         <file>ui2/sig/FloatingNav.qml</file>
+        <file>ui2/sig/RideSlot.qml</file>
         <file>ui2/today/Coach.js</file>
         <file>ui2/today/SuggestionCard.qml</file>
         <file>ui2/today/WorkoutShape.qml</file>
@@ -111,6 +110,8 @@
         <file>ui2/goals/GoalRing.qml</file>
         <file>ui2/goals/HabitPage.qml</file>
         <file>ui2/goals/GoalSetup.qml</file>
+        <file>ui2/goals/GoalsModel.qml</file>
+        <file>ui2/goals/WeekHome.qml</file>
         <file>ui2/goals/PauseSheet.qml</file>
         <file>ui2/onboarding/Onboarding.qml</file>
         <file>ui2/train/Workout.js</file>
@@ -149,7 +150,6 @@
         <file>ui2/BarChart.qml</file>
         <file>ui2/Card.qml</file>
         <file>ui2/Format.js</file>
-        <file>ui2/GoalsScreen.qml</file>
         <file>ui2/NavButton.qml</file>
         <file>ui2/PageHeader.qml</file>
         <file>ui2/ProgressScreen.qml</file>

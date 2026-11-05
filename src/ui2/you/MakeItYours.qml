@@ -60,15 +60,6 @@ Column {
     }
 
     YouChoice {
-        title: qsTr("Detail level")
-        detail: prefs.look.detailLevel === "pro" ? qsTr("Pro shows every number and chart there is.")
-                : qsTr("Simple shows the numbers most rides need.")
-        options: [["simple", qsTr("Simple")], ["pro", qsTr("Pro")]]
-        current: prefs.look.detailLevel
-        onPicked: prefs.you.setLook("detailLevel", value)
-    }
-
-    YouChoice {
         title: qsTr("Look")
         detail: prefs.look.appearance === "light" ? qsTr("Light, for bright rooms. Changes after a ride, never during one.")
                 : prefs.look.appearance === "dark" ? qsTr("Dark, whatever the phone uses.")
