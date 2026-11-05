@@ -12,6 +12,8 @@
 #include "../../src/fit-sdk/fit_decode.hpp"
 #include "../../src/fit-sdk/fit_record_mesg.hpp"
 #include "../../src/fit-sdk/fit_session_mesg.hpp"
+#include "../../src/fit-sdk/fit_encode.hpp"
+#include "../../src/fit-sdk/fit_file_id_mesg.hpp"
 #include <fstream>
 #include <vector>
 
@@ -289,4 +291,56 @@ TEST(QFitExport, HalfCadenceSessionStatistics) {
     else
         settings.remove(key);
     settings.sync();
+}
+
+// A ride recorded by another device without a power meter, an HR strap or a cadence sensor: its
+// records have no power, heart rate, cadence or calories field, and Garmin-style enhanced_speed.
+// Those fields read as FIT's "invalid" values (65535 W, 255 bpm...), which the history showed as
+// the averages and maximums of the ride.
+TEST(QFitImport, MissingRecordFieldsReadAsNoData) {
+    QTemporaryDir tempDir;
+    ASSERT_TRUE(tempDir.isValid());
+    const QString path = tempDir.filePath("no_sensors.fit");
+
+    const FIT_DATE_TIME start = 1100000000; // seconds since the FIT epoch
+    {
+        std::fstream file(path.toStdString(), std::ios::in | std::ios::out | std::ios::binary | std::ios::trunc);
+        ASSERT_TRUE(file.is_open());
+        fit::Encode encode(fit::ProtocolVersion::V20);
+        encode.Open(file);
+        fit::FileIdMesg fileId;
+        fileId.SetType(FIT_FILE_ACTIVITY);
+        fileId.SetTimeCreated(start);
+        encode.Write(fileId);
+        for (int i = 0; i < 5; i++) {
+            fit::RecordMesg record;
+            record.SetTimestamp(start + i);
+            record.SetEnhancedSpeed(8.0f); // m/s
+            if (i < 3)
+                record.SetDistance(100.0f * (i + 1)); // the last two records have no distance
+            encode.Write(record);
+        }
+        fit::SessionMesg session;
+        session.SetTimestamp(start);
+        session.SetSport(FIT_SPORT_CYCLING);
+        encode.Write(session);
+        ASSERT_TRUE(encode.Close());
+    }
+
+    QList<SessionLine> records;
+    FIT_SPORT sport = FIT_SPORT_INVALID;
+    qfit::open(path, &records, &sport);
+
+    ASSERT_EQ(records.count(), 5);
+    EXPECT_EQ(sport, FIT_SPORT_CYCLING);
+    for (const SessionLine &line : records) {
+        EXPECT_EQ(line.watt, 0);
+        EXPECT_EQ(line.heart, 0);
+        EXPECT_EQ(line.cadence, 0);
+        EXPECT_EQ(line.resistance, 0);
+        EXPECT_DOUBLE_EQ(line.calories, 0.0);
+        EXPECT_NEAR(line.speed, 8.0 * 3.6, 1e-4); // from enhanced_speed
+    }
+    EXPECT_NEAR(records.at(2).distance, 0.3, 1e-6);
+    EXPECT_NEAR(records.at(4).distance, 0.3, 1e-6); // a missing distance keeps the total
 }

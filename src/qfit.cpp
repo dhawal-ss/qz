@@ -1438,13 +1438,21 @@ class Listener : public fit::FileIdMesgListener,
     void OnMesg(fit::RecordMesg &record) override {
         if (sessionOpening != nullptr) {
             SessionLine s;
-            s.heart = record.GetHeartRate();
-            s.cadence = record.GetCadence();
-            s.distance = record.GetDistance() / 1000;
-            s.speed = record.GetSpeed() * 3.6;
-            s.watt = record.GetPower();
-            s.resistance = record.GetResistance();
-            s.calories = record.GetCalories();
+            // A field the record does not have reads as FIT's "invalid" value (255 bpm, 65535 W,
+            // 65535 kcal, NaN speed): a ride imported from a device without a power meter or an HR
+            // strap showed those as its averages and maximums in the history. Missing means no
+            // data: 0, or the previous record's distance and calories, which are running totals.
+            // Garmin devices record enhanced_speed instead of speed.
+            const SessionLine *previous = sessionOpening->isEmpty() ? nullptr : &sessionOpening->last();
+            s.heart = record.IsHeartRateValid() ? record.GetHeartRate() : 0;
+            s.cadence = record.IsCadenceValid() ? record.GetCadence() : 0;
+            s.distance = record.IsDistanceValid() ? record.GetDistance() / 1000 : (previous ? previous->distance : 0);
+            s.speed = record.IsSpeedValid()           ? record.GetSpeed() * 3.6
+                      : record.IsEnhancedSpeedValid() ? record.GetEnhancedSpeed() * 3.6
+                                                      : 0;
+            s.watt = record.IsPowerValid() ? record.GetPower() : 0;
+            s.resistance = record.IsResistanceValid() ? record.GetResistance() : 0;
+            s.calories = record.IsCaloriesValid() ? record.GetCalories() : (previous ? previous->calories : 0);
             if (record.IsCoreTemperatureValid()) {
                 s.coreTemp = record.GetCoreTemperature();
             }
