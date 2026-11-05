@@ -11,6 +11,8 @@ const Coach = ui2("today/Coach.js")
 const Body = ui2("today/Body.js")
 const Pro = ui2("progress/Analytics.js")
 const Format = ui2("Format.js")
+const Share = ui2("moments/Share.js")
+const Moments = ui2("moments/Moments.js")
 
 const dayMs = 86400000
 const starts = [0.555, 0.755, 0.905, 1.055, 1.205, 1.505]
@@ -187,4 +189,47 @@ test("pro: decoupling only on steady rides", () => {
     assert.ok(Pro.steady({ duration: 3600, avgPower: 200, np: 205 }))
     assert.ok(!Pro.steady({ duration: 3600, avgPower: 150, np: 220 }))
     assert.ok(!Pro.steady({ duration: 1200, avgPower: 200, np: 202 }))
+})
+
+// ---- Share card
+
+test("share: a bar a minute, a bar per few minutes past two hours", () => {
+    assert.strictEqual(Share.barCount(41 * 60), 41)
+    assert.strictEqual(Share.minutesPerBar(41 * 60), 1)
+    assert.strictEqual(Share.barCount(240 * 60), 120)
+    assert.strictEqual(Share.minutesPerBar(240 * 60), 2)
+})
+
+test("share: before the ride is read, the 30 s zones make a bar a minute, the higher zone of each", () => {
+    const bars = Share.zoneBars([1, 2, 3, 3, 5, 2], 3 * 60, true)
+    assert.deepStrictEqual(bars.map(b => b.zone), [2, 3, 5])
+    assert.deepStrictEqual(bars.map(b => b.watts), [2, 3, 5])
+    // without an FTP the bars keep their lengths and take the tint
+    assert.deepStrictEqual(Share.zoneBars([1, 2, 3, 3], 2 * 60, false).map(b => b.zone), [0, 0])
+    assert.deepStrictEqual(Share.zoneBars([], 600, true), [])
+})
+
+test("share: zones only once the rider has set an FTP", () => {
+    const zoneOf = (w, ftp) => (w >= ftp ? 4 : 2)
+    assert.deepStrictEqual(Share.bars([100, 250], 200, true, zoneOf).map(b => b.zone), [2, 4])
+    assert.deepStrictEqual(Share.bars([100, 250], 200, false, zoneOf).map(b => b.zone), [0, 0])
+})
+
+test("share: time, distance, power, calories, then load with an FTP or work without", () => {
+    const ride = { elapsed: 2444, distance: 14.24, miles: false, avgPower: 58.4, calories: 311.6, tss: 29.2, kilojoules: 142, powerEstimated: true }
+    const withFtp = Share.numbers(ride, true)
+    assert.deepStrictEqual(withFtp.map(n => n.label), ["Time", "Distance", "Avg power", "Calories", "Load"])
+    assert.deepStrictEqual(withFtp.map(n => n.value), ["40:44", "14.2", "58", "312", "29"])
+    assert.strictEqual(withFtp[2].est, true)
+    assert.strictEqual(Share.numbers(ride, false)[4].label, "Work")
+    assert.strictEqual(Share.numbers(Object.assign({}, ride, { miles: true }), true)[1].unit, "mi")
+    assert.strictEqual(Share.numbers(Object.assign({}, ride, { powerEstimated: false }), true)[2].est, false)
+})
+
+test("share: the card lights a new best and the weekly goal, two at most, nothing for a plain ride", () => {
+    const records = Moments.recordMoments([1800], [{ seconds: 1800, watts: 62 }], [{ seconds: 1800, watts: 55 }])
+    const goal = { kind: "streak", title: "Week closed", value: 3, unit: "weeks", tone: 5 }
+    const lines = Share.achievements(records.concat([goal, { kind: "longest", title: "Your longest ride", tone: 3 }]))
+    assert.deepStrictEqual(lines.map(l => l.text), ["New 30 minute best, 62 W", "Weekly goal met, 3 weeks in a row"])
+    assert.deepStrictEqual(Share.achievements([{ kind: "kind", title: "Every ride adds up." }]), [])
 })

@@ -33,6 +33,7 @@
         <file>ui2/calendar/CalendarHeatmap.qml</file>
         <file>ui2/calendar/MonthCalendar.qml</file>
         <file>ui2/moments/Moments.js</file>
+        <file>ui2/moments/Share.js</file>
         <file>ui2/moments/MomentHero.qml</file>
         <file>ui2/moments/MomentCard.qml</file>
         <file>ui2/moments/ShareCard.qml</file>

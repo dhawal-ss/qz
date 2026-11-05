@@ -5,7 +5,9 @@ import "../sig"
 
 // Share ride: the card as it will be saved, Share (when the app can hand a picture to Android),
 // Save, and Post to Strava, shown but not there yet. On a phone on its side the card is on the
-// left and the buttons on the right.
+// left and the buttons on the right. On Android the picture goes into the phone's Photos
+// (Pictures/Bikemodo, bikemodoBridge.saveToPhotos), once for each card: Share hands that picture
+// to Android's share sheet. Elsewhere it is saved as a file in folder.
 Item {
     id: sheet
 
@@ -16,14 +18,67 @@ Item {
     property int minutesPerBar: 1
     property string name: ""
     property real when: Date.now()
-    property bool canShare: false
+    // the lit lines of the card, Share.achievements()
+    property var achievements: []
+    // where the picture is written first (rootItem.getWritableAppDir())
+    property string folder: ""
+    // the phone's Photos can take the picture, and so the share sheet can too
+    readonly property bool photos: typeof bikemodoBridge !== "undefined" && bikemodoBridge !== null && bikemodoBridge.canSaveToPhotos()
+    readonly property bool canShare: photos
+    // where the card was saved: its file, or its content:// address in Photos
     property string savedImage: ""
+    property string savedUri: ""
     property bool failed: false
     property alias card: card
 
     signal close()
-    signal save()
-    signal share()
+
+    // a card that changes (its minutes read from the saved ride) is saved again
+    onBarsChanged: forget()
+    onAchievementsChanged: forget()
+    function forget() {
+        savedImage = ""
+        savedUri = ""
+        failed = false
+    }
+
+    // the card saved once, then(uri) after: uri is "" off Android or when it failed
+    function store(then) {
+        if (savedUri !== "") {
+            then(savedUri)
+            return
+        }
+        var name = "bikemodo-" + Qt.formatDateTime(new Date(), "yyyyMMdd-hhmmss") + ".png"
+        card.save(folder + name, function (ok, where) {
+            if (!ok) {
+                sheet.failed = true
+                then("")
+                return
+            }
+            if (!sheet.photos) {
+                sheet.failed = false
+                sheet.savedImage = where
+                then("")
+                return
+            }
+            var uri = bikemodoBridge.saveToPhotos(where, name)
+            sheet.failed = uri === ""
+            sheet.savedUri = uri
+            sheet.savedImage = uri
+            then(uri)
+        })
+    }
+
+    function save() {
+        store(function () {})
+    }
+
+    function share() {
+        store(function (uri) {
+            if (uri !== "")
+                sheet.failed = !bikemodoBridge.sharePicture(uri, qsTr("Share ride"))
+        })
+    }
 
     readonly property bool sideways: width > height
     readonly property real controlsHeight: (canShare ? 64 + 10 : 0) + 52 + 44 + statusText.height + 12
@@ -98,6 +153,7 @@ Item {
                 minutesPerBar: sheet.minutesPerBar
                 name: sheet.name
                 when: sheet.when
+                achievements: sheet.achievements
             }
         }
     }
@@ -114,7 +170,8 @@ Item {
             width: parent.width
             visible: text !== ""
             text: sheet.failed ? qsTr("The image could not be saved.")
-                  : (sheet.savedImage !== "" ? qsTr("Saved to %1").arg(sheet.savedImage) : "")
+                  : (sheet.savedUri !== "" ? qsTr("Saved to Photos, in Pictures/Bikemodo")
+                     : (sheet.savedImage !== "" ? qsTr("Saved to %1").arg(sheet.savedImage) : ""))
             color: sheet.failed ? Theme.danger : Theme.text2
             font.family: Theme.bodyMedium
             font.pixelSize: Theme.fs(13)

@@ -179,3 +179,40 @@ bool BikemodoBridge::systemNightMode() {
     return true;
 #endif
 }
+
+bool BikemodoBridge::canSaveToPhotos() {
+#ifdef Q_OS_ANDROID
+    return true;
+#else
+    return false;
+#endif
+}
+
+QString BikemodoBridge::saveToPhotos(const QString &path, const QString &name) {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticObjectMethod("org/cagnulen/qdomyoszwift/BikemodoShare", "saveToPictures",
+                                                     "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                                                     QtAndroid::androidContext().object(),
+                                                     QAndroidJniObject::fromString(path).object<jstring>(),
+                                                     QAndroidJniObject::fromString(name).object<jstring>())
+        .toString();
+#else
+    Q_UNUSED(path)
+    Q_UNUSED(name)
+    return QString();
+#endif
+}
+
+bool BikemodoBridge::sharePicture(const QString &uri, const QString &title) {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticMethod<jboolean>("org/cagnulen/qdomyoszwift/BikemodoShare", "share",
+                                                         "(Landroid/app/Activity;Ljava/lang/String;Ljava/lang/String;)Z",
+                                                         QtAndroid::androidActivity().object(),
+                                                         QAndroidJniObject::fromString(uri).object<jstring>(),
+                                                         QAndroidJniObject::fromString(title).object<jstring>());
+#else
+    Q_UNUSED(uri)
+    Q_UNUSED(title)
+    return false;
+#endif
+}

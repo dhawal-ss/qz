@@ -10,6 +10,8 @@ import "Format.js" as Format
 import "rides/Analysis.js" as Analysis
 import "progress/Analytics.js" as Pro
 import "learn/Learn.js" as Learn
+import "moments/Moments.js" as Moments
+import "moments/Share.js" as Share
 
 // One ride in depth, in the Signature language: the ride's name and day, what a coach would
 // say about it (the record it set, else the most notable thing) with that one number big in its
@@ -37,7 +39,7 @@ Item {
     property bool showBack: true
     // the power of the rides is estimated (a bike without a power meter): numbers from it say "est."
     property bool powerEstimated: false
-    // rootItem, for the folder a shared picture is saved in
+    // rootItem, for the folder a shared picture is written in before it goes to Photos
     property var core: null
     // the rides of the library, newest first, when the caller has them (else read here)
     property var rideList: []
@@ -86,11 +88,10 @@ Item {
     // the numbers beside the words: More detail on Progress, for the whole app
     readonly property bool pro: Theme.moreDetail
     property bool sharing: false
-    // the share card: one bar per minute (or few minutes) of power, and where it was saved
+    // the share card: one bar per minute (or few minutes) of power, and the new bests it set
     property var shareBars: []
     property int shareMinutes: 1
-    property string savedImage: ""
-    property bool saveFailed: false
+    property var shareAchievements: []
     // the charts and bars wipe in, 0 to 1
     property real reveal: 1
 
@@ -363,30 +364,17 @@ Item {
         scrollTo.restart()
     }
 
-    // the ride as the share card draws it: one bar per minute of power, 120 at most
+    // the ride as the share card draws it (moments/Share.js): one bar per minute of power, 120 at
+    // most, and the power bests it set against every ride before it
     function openShare() {
-        var minutes = Math.max(1, Math.round((ride.duration || 0) / 60))
-        var count = Math.min(120, minutes)
-        shareMinutes = Math.max(1, Math.round(minutes / count))
+        var count = Share.barCount(ride.duration)
+        shareMinutes = Share.minutesPerBar(ride.duration)
         var power = Analysis.buckets(samples.power || [], count)
         if (power.length < 2)
             power = ride.spark || []
-        var ftp = ride.ftp || 0
-        shareBars = power.map(function (w) { return { watts: w, zone: ftp > 0 && Theme.ftpSet ? Theme.powerZone(w, ftp) : 0 } })
-        savedImage = ""
-        saveFailed = false
+        shareBars = Share.bars(power, ride.ftp || 0, Theme.ftpSet, function (w, f) { return Theme.powerZone(w, f) })
+        shareAchievements = Share.achievements(Moments.recordMoments(ride.records || [], ride.best || [], curveBefore))
         sharing = true
-    }
-
-    function saveImage() {
-        if (!shareLoader.item)
-            return
-        var folder = core !== null && core !== undefined ? core.getWritableAppDir() : ""
-        var path = folder + "bikemodo-" + Qt.formatDateTime(new Date(), "yyyyMMdd-hhmmss") + ".png"
-        shareLoader.item.card.save(path, function (ok, where) {
-            detail.savedImage = ok ? where : ""
-            detail.saveFailed = !ok
-        })
     }
 
     // A headline on two lines that read well: after a full stop when there is one in the middle,
@@ -1438,7 +1426,8 @@ Item {
             sheet.ride = Qt.binding(function () {
                 return { elapsed: detail.ride.duration || 0, avgPower: detail.ride.avgPower || 0,
                          distance: (detail.ride.distance || 0) * (detail.miles ? 0.621371 : 1), miles: detail.miles,
-                         kilojoules: detail.ride.kj || 0, tss: detail.ride.tss || 0, powerEstimated: detail.estimated }
+                         kilojoules: detail.ride.kj || 0, tss: detail.ride.tss || 0, calories: detail.ride.kcal || 0,
+                         powerEstimated: detail.estimated }
             })
             sheet.moment = Qt.binding(function () {
                 return { tone: detail.tintZone, title: detail.story.sentence, value: detail.story.value, unit: detail.story.unit,
@@ -1450,14 +1439,13 @@ Item {
             sheet.minutesPerBar = Qt.binding(function () { return detail.shareMinutes })
             sheet.name = Qt.binding(function () { return detail.ride.start ? Format.title(detail.ride) : "" })
             sheet.when = Qt.binding(function () { return detail.ride.start || Date.now() })
-            sheet.savedImage = Qt.binding(function () { return detail.savedImage })
-            sheet.failed = Qt.binding(function () { return detail.saveFailed })
+            sheet.achievements = Qt.binding(function () { return detail.shareAchievements })
+            sheet.folder = Qt.binding(function () { return detail.core !== null && detail.core !== undefined ? detail.core.getWritableAppDir() : "" })
         }
     }
     Connections {
         target: shareLoader.item
         ignoreUnknownSignals: true
         function onClose() { detail.sharing = false }
-        function onSave() { detail.saveImage() }
     }
 }

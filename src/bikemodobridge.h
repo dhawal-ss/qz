@@ -51,6 +51,12 @@ class BikemodoBridge : public QObject {
     Q_INVOKABLE bool systemAnimationsOff();
     // the phone's dark theme, for Bikemodo's Look: Phone (main2.qml)
     Q_INVOKABLE bool systemNightMode();
+    // A ride's share card into the phone's Photos (BikemodoShare.java): the PNG at path is copied
+    // into Pictures/Bikemodo as name, and its content:// address comes back ("" when it could
+    // not be saved, and always off Android); share opens Android's share sheet with it
+    Q_INVOKABLE bool canSaveToPhotos();
+    Q_INVOKABLE QString saveToPhotos(const QString &path, const QString &name);
+    Q_INVOKABLE bool sharePicture(const QString &uri, const QString &title);
 
   private:
     RideLibrary *m_library = nullptr;

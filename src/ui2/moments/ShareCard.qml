@@ -2,12 +2,13 @@ import QtQuick 2.15
 import QtQuick.Shapes 1.15
 import ".."
 import "../sig"
-import "../Metrics.js" as Metrics
+import "Share.js" as Share
 
 // The picture of a ride to share, the "ride fingerprint" of the Moments board: the mark and the
-// name, one bar per minute round a ring in the colors of the zones, the ride's name and day, and
-// three key numbers on a hairline. It is laid out at 1080 x 1350 (a 4:5 post), shown scaled down
-// and saved full size.
+// name, one bar per minute round a ring in the colors of the zones, the ride's name and day, what
+// the ride achieved (a new best, the weekly goal) as lit lines, and its numbers in two rows on a
+// hairline. It is laid out at 1080 x 1350 (a 4:5 post), shown scaled down and saved full size.
+// The end of a ride and a ride in Rides both share this card (moments/Share.js).
 Rectangle {
     id: share
 
@@ -19,11 +20,11 @@ Rectangle {
     property var bars: []
     property int minutesPerBar: 1
     property string name: ""
+    // the lit lines, Share.achievements(): [{ text, tone }], at most two
+    property var achievements: []
 
     readonly property int tone: moment.tone || 1
     readonly property color tint: Theme.zoneColors[tone - 1]
-    readonly property bool estimated: ride.powerEstimated === true
-    readonly property bool record: moment.kind === "record"
     // the bars, or the power line of the ride when there are no minutes yet
     readonly property var shownBars: {
         if (bars.length > 0)
@@ -31,21 +32,7 @@ Rectangle {
         return spark.map(function (w) { return { watts: w, zone: 0 } })
     }
     readonly property real k: 1080 / 364
-    readonly property var numbers: [
-        { label: qsTr("Time"), value: Metrics.clock(ride.elapsed || 0), unit: "", est: false, lit: false },
-        record ? { label: qsTr("%1 best").arg(effortShort(moment.seconds || 0)), value: moment.value || "", unit: "W", est: estimated, lit: true }
-               : { label: qsTr("Avg power"), value: Metrics.whole(ride.avgPower), unit: "W", est: estimated, lit: false },
-        // training load is always worked out, so always estimated
-        { label: qsTr("Load"), value: Metrics.whole(ride.tss), unit: "", est: true, lit: false }
-    ]
-
-    function effortShort(seconds) {
-        if (seconds < 60)
-            return qsTr("%1 s").arg(seconds)
-        if (seconds < 3600)
-            return qsTr("%1 min").arg(Math.round(seconds / 60))
-        return qsTr("%1 h").arg(seconds / 3600)
-    }
+    readonly property var numbers: Share.numbers(ride, Theme.ftpSet)
 
     width: 1080
     height: 1350
@@ -116,21 +103,26 @@ Rectangle {
 
     Fingerprint {
         id: fingerprint
+        // as big as the space between the top line and the name allows
+        readonly property real roomTop: 40 * share.k
+        readonly property real room: titleBlock.y - 8 * share.k - roomTop
         x: (share.width - width) / 2
-        y: 128
-        width: 720
-        height: 720
+        y: roomTop + (room - height) / 2
+        width: Math.min(720, room)
+        height: width
         bars: share.shownBars
         tint: share.tint
         centerValue: String(Math.max(1, Math.round((share.ride.elapsed || 0) / 60)))
         centerWord: qsTr("minutes")
     }
 
+    // the name and the day
     Column {
+        id: titleBlock
         x: 24 * share.k
-        y: 872
+        y: (share.achievements.length > 0 ? achievementsColumn.y - 12 * share.k : numbersBlock.y - 16 * share.k) - height
         width: share.width - 48 * share.k
-        spacing: 5 * share.k
+        spacing: 4 * share.k
         Text {
             width: parent.width
             text: share.name
@@ -148,40 +140,81 @@ Rectangle {
         }
     }
 
-    // the key numbers on a hairline
+    // what the ride achieved, each line lit in the color of its moment
+    Column {
+        id: achievementsColumn
+        x: 24 * share.k
+        y: numbersBlock.y - 14 * share.k - height
+        spacing: 5 * share.k
+        Repeater {
+            model: share.achievements
+            Rectangle {
+                readonly property color lit: Theme.zoneColors[Math.max(1, Math.min(7, modelData.tone)) - 1]
+                width: achievementRow.width + 20 * share.k
+                height: 26 * share.k
+                radius: height / 2
+                color: Qt.rgba(lit.r, lit.g, lit.b, 0.14)
+                Row {
+                    id: achievementRow
+                    x: 9 * share.k
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 6 * share.k
+                    Pulse {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 11 * share.k
+                        height: width
+                        zone: Math.max(1, Math.min(7, modelData.tone))
+                        color: parent.parent.lit
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.text
+                        color: Theme.text
+                        font.family: Theme.bodySemibold
+                        font.pixelSize: Math.round(12.5 * share.k)
+                    }
+                }
+            }
+        }
+    }
+
+    // the numbers on a hairline, two rows of three
     Item {
+        id: numbersBlock
         x: 24 * share.k
         width: share.width - 48 * share.k
-        y: share.height - 24 * share.k - height
-        height: 14 * share.k + numbersRow.height
+        y: share.height - 22 * share.k - height
+        height: 12 * share.k + numbersGrid.height
         Rectangle {
             width: parent.width
             height: 3
             color: Theme.hairline
         }
-        Row {
-            id: numbersRow
-            y: 14 * share.k
+        Grid {
+            id: numbersGrid
+            y: 12 * share.k
             width: parent.width
-            spacing: 12 * share.k
+            columns: 3
+            columnSpacing: 12 * share.k
+            rowSpacing: 10 * share.k
             Repeater {
                 model: share.numbers
                 Column {
-                    width: (numbersRow.width - 24 * share.k) * [1, 1.2, 1][index] / 3.2
-                    spacing: 6 * share.k
+                    width: (numbersGrid.width - 24 * share.k) / 3
+                    spacing: 3 * share.k
                     Text {
                         text: modelData.label
                         color: Theme.text2
                         font.family: Theme.bodyMedium
-                        font.pixelSize: Math.round(12.5 * share.k)
+                        font.pixelSize: Math.round(12 * share.k)
                     }
                     Row {
                         spacing: 10
                         Numeral {
                             id: keyValue
                             text: modelData.value
-                            color: modelData.lit ? share.tint : Theme.text
-                            font.pixelSize: Math.round(24 * share.k)
+                            color: Theme.text
+                            font.pixelSize: Math.round(22 * share.k)
                         }
                         Text {
                             visible: modelData.unit !== ""
@@ -189,7 +222,7 @@ Rectangle {
                             text: modelData.unit
                             color: Theme.text2
                             font.family: Theme.bodyMedium
-                            font.pixelSize: Math.round(12.5 * share.k)
+                            font.pixelSize: Math.round(12 * share.k)
                         }
                         Text {
                             visible: modelData.est
@@ -197,7 +230,7 @@ Rectangle {
                             text: qsTr("est.")
                             color: Theme.text3
                             font.family: Theme.bodyMedium
-                            font.pixelSize: Math.round(12 * share.k)
+                            font.pixelSize: Math.round(11 * share.k)
                         }
                     }
                 }

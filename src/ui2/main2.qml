@@ -589,6 +589,8 @@ ApplicationWindow {
             elapsed: source.elapsed, avgPower: source.avgPower, normalizedPower: source.normalizedPower,
             tss: source.tss, kilojoules: source.kilojoules, calories: source.calories,
             distance: source.distance, miles: source.miles, powerEstimated: source.powerEstimated,
+            // the zone of each 30 s, for the share card's fingerprint until the saved ride is read
+            zoneHistory: source.zoneHistory ? Array.prototype.slice.call(source.zoneHistory) : [],
             endedAt: source.paused === true && source.pausedAt > 0 ? source.pausedAt : 0
         }
     }

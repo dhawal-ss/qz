@@ -6,6 +6,7 @@ import "moments"
 import "Format.js" as Format
 import "Metrics.js" as Metrics
 import "moments/Moments.js" as Moments
+import "moments/Share.js" as Share
 import "goals/Streak.js" as Streak
 
 // After the ride, in the Signature language. The biggest moments come full screen first: a new
@@ -28,15 +29,11 @@ Item {
     property bool demo: false
     property var library: null
     property var core: null
-    // the app can hand a saved picture to Android's share sheet (see shareImage)
-    property bool canShare: false
 
     signal done()
     signal openRide(int id)
     // Plan next week on Week closed: the goals
     signal planWeek()
-    // Share on the share view: the picture is saved at path, ready to hand to the share sheet
-    signal shareImage(string path)
     // the summary rises in: when it opens and when a full-screen moment settles
     signal entered()
 
@@ -90,8 +87,6 @@ Item {
     property var spark: []
     property bool recordsAdded: false
     property bool sharing: false
-    property string savedImage: ""
-    property bool saveFailed: false
     // the fingerprint of the share card: [{ watts, zone }] and the minutes a bar stands for
     property var bars: []
     property int minutesPerBar: 1
@@ -166,8 +161,6 @@ Item {
         spark = []
         recordsAdded = false
         sharing = false
-        savedImage = ""
-        saveFailed = false
         bars = []
         rideName = ""
         overlayQueue = []
@@ -330,49 +323,28 @@ Item {
         return { x: p.x, y: p.y, size: b.width }
     }
 
-    // one bar per minute of the saved ride, at most 120 (longer rides get a bar per few minutes)
+    // the fingerprint of the share card (moments/Share.js): one bar per minute of the saved ride,
+    // and until the library has read it, the zones the ride screen kept
     function fingerprint() {
-        var minutes = Math.max(1, Math.round((ride.elapsed || 0) / 60))
-        var count = Math.min(120, minutes)
-        minutesPerBar = Math.max(1, Math.round(minutes / count))
+        var count = Share.barCount(ride.elapsed)
+        minutesPerBar = Share.minutesPerBar(ride.elapsed)
         var power = []
         var ftp = 0
         if (savedId > 0 && library !== null) {
-            var detail = library.ride(savedId)
-            ftp = Number(detail.ftp) || 0
-            var samples = library.samples(savedId, count)
-            power = Moments.buckets(samples.power || [], count)
+            ftp = Number(library.ride(savedId).ftp) || 0
+            power = Moments.buckets(library.samples(savedId, count).power || [], count)
         }
-        if (power.length < 2)
-            power = spark
-        bars = power.map(function (w) { return { watts: w, zone: ftp > 0 ? Theme.powerZone(w, ftp) : 0 } })
+        if (power.length >= 2) {
+            bars = Share.bars(power, ftp, Theme.ftpSet, function (w, f) { return Theme.powerZone(w, f) })
+            return
+        }
+        var zones = Share.zoneBars(ride.zoneHistory || [], ride.elapsed, Theme.ftpSet)
+        bars = zones.length >= 2 ? zones : Share.bars(spark, 0, false, null)
     }
 
     function openShare() {
         fingerprint()
-        savedImage = ""
-        saveFailed = false
         sharing = true
-    }
-
-    function imagePath() {
-        var folder = core !== null ? core.getWritableAppDir() : ""
-        return folder + "bikemodo-" + Qt.formatDateTime(new Date(), "yyyyMMdd-hhmmss") + ".png"
-    }
-
-    function saveImage() {
-        shareLoader.item.card.save(imagePath(), function (ok, where) {
-            summary.savedImage = ok ? where : ""
-            summary.saveFailed = !ok
-        })
-    }
-
-    function shareNow() {
-        shareLoader.item.card.save(imagePath(), function (ok, where) {
-            summary.saveFailed = !ok
-            if (ok)
-                summary.shareImage(where)
-        })
     }
 
     Timer {
@@ -628,12 +600,9 @@ Item {
             minutesPerBar: summary.minutesPerBar
             name: summary.rideName !== "" ? summary.rideName : Format.title({ title: "", start: summary.finishedAt - (summary.ride.elapsed || 0) * 1000 })
             when: summary.finishedAt
-            canShare: summary.canShare
-            savedImage: summary.savedImage
-            failed: summary.saveFailed
+            achievements: Share.achievements(summary.moments)
+            folder: summary.core !== null ? summary.core.getWritableAppDir() : ""
             onClose: summary.sharing = false
-            onSave: summary.saveImage()
-            onShare: summary.shareNow()
         }
     }
 }
