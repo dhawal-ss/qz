@@ -9,11 +9,17 @@ import QtMultimedia 5.15
 
 HomeForm {
     objectName: "home"
+    // The dashboard colours (ThemeTokens.qml); a colour of the rider's own stays
+    readonly property color pageColor: window.theme.pick(settings.theme_background_color, "#303030", window.theme.bg)
+    readonly property color tileColor: window.theme.pick(settings.theme_tile_background_color, "#303030", window.theme.surface)
+    // the glow only for a shadow colour of the rider's own: the stock purple was louder than the data
+    readonly property bool legacyShadow: settings.theme_tile_shadow_enabled &&
+                                         String(settings.theme_tile_shadow_color).toLowerCase() !== "#9c27b0"
     background: Rectangle {
         anchors.fill: parent
         width: parent.fill
         height: parent.fill
-        color: settings.theme_background_color
+        color: pageColor
 
         // VoiceOver accessibility - ignore decorative background
         Accessible.role: Accessible.Pane
@@ -81,35 +87,6 @@ HomeForm {
         onYesClicked: {rootItem.pelotonAskStart = false; peloton_start_workout();}
         onNoClicked: {rootItem.pelotonAskStart = false; peloton_abort_workout();}
         visible: rootItem.pelotonAskStart
-    }
-
-    Popup {
-        id: popupLap
-         parent: Overlay.overlay
-
-         x: Math.round((parent.width - width) / 2)
-         y: Math.round((parent.height - height) / 2)
-         width: 380
-         height: 60
-         modal: true
-         focus: true
-         palette.text: "white"
-         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-         enter: Transition
-         {
-             NumberAnimation { property: "opacity"; from: 0.0; to: 1.0 }
-         }
-         exit: Transition
-         {
-             NumberAnimation { property: "opacity"; from: 1.0; to: 0.0 }
-         }
-         Column {
-             anchors.horizontalCenter: parent.horizontalCenter
-         Label {
-             anchors.horizontalCenter: parent.horizontalCenter
-             text: qsTr("New lap started!")
-            }
-        }
     }
 
     MessageDialog {
@@ -222,12 +199,6 @@ HomeForm {
     }
 
     Timer {
-        id: popupLapAutoClose
-        interval: 2000; running: false; repeat: false
-        onTriggered: popupLap.close();
-    }
-
-    Timer {
         id: searchStatusTimer
         // Always running: rootItem.device blinks while no device is connected (it drives the icon),
         // and bluetoothSearchStatus() is empty once a device is connected
@@ -330,7 +301,7 @@ HomeForm {
             inner_stop();
         }
     }
-    lap.onClicked: { lap_clicked(); popupLap.open(); popupLapAutoClose.running = true; }
+    lap.onClicked: { lap_clicked(); toast.show(qsTr("New lap started!"), 1500); }
 
     Component.onCompleted: {
         console.log("home.qml completed");
@@ -353,7 +324,7 @@ HomeForm {
         // Every tile is narrower than its cell by tileGap and sits at the cell's left edge, so the
         // last column ends with the gap: the grid is shifted by half the gap, so the outer margins
         // are equal
-        readonly property real tileGap: 5 * settings.ui_zoom / 100
+        readonly property real tileGap: (parent.width >= 600 ? 12 : 8) * settings.ui_zoom / 100
         anchors.horizontalCenterOffset: tileGap / 2
         cellHeight: 130 * settings.ui_zoom / 100
         focus: true
@@ -362,7 +333,8 @@ HomeForm {
         interactive: !window.lockTiles
         id: gridView
         objectName: "gridview"
-        onMovementEnded: { headerToolbar.visible = (contentY == 0) || window.lockTiles; }
+        // the tiles scroll under the ride bar, not over it
+        clip: true
         Screen.orientationUpdateMask:  Qt.LandscapeOrientation | Qt.PortraitOrientation | Qt.InvertedLandscapeOrientation | Qt.InvertedPortraitOrientation
         Screen.onPrimaryOrientationChanged:{
             // Nothing to recompute: cellWidth and the grid width follow the page width
@@ -400,13 +372,14 @@ HomeForm {
 
             transitions: Transition { NumberAnimation { property: "opacity"; duration: 200} }
 
+            // a flat surface, a shade lighter than the page, with a hairline edge
             Rectangle {
                 width: id1.width - 2 * settings.ui_zoom / 100
                 height: 123 * settings.ui_zoom / 100
-                radius: 3
+                radius: window.theme.tileRadius * settings.ui_zoom / 100
                 border.width: 1
-                border.color: (settings.theme_tile_shadow_enabled ? settings.theme_tile_shadow_color : settings.theme_tile_background_color)
-                color: settings.theme_tile_background_color
+                border.color: legacyShadow ? settings.theme_tile_shadow_color : window.theme.stroke
+                color: tileColor
                 id: rect
 
                 // Ignore for VoiceOver - decorative background only
@@ -414,7 +387,7 @@ HomeForm {
             }
 
             DropShadow {
-                visible: settings.theme_tile_shadow_enabled
+                visible: legacyShadow
                 anchors.fill: rect
                 cached: true
                 horizontalOffset: 3
@@ -448,7 +421,7 @@ HomeForm {
             Text {
                 objectName: "value"
                 id: myValue
-                color: valueFontColor
+                color: window.theme.valueColor(valueFontColor)
                 y: 0
                 anchors {
                     horizontalCenter: parent.horizontalCenter
@@ -469,7 +442,7 @@ HomeForm {
             Text {
                 objectName: "secondLine"
                 id: secondLineText
-                color: "white"
+                color: window.theme.textSecondary
                 y: myValue.bottom
                 anchors {
                     top: myValue.bottom
@@ -499,7 +472,7 @@ HomeForm {
                 font.pointSize: labelFontSize
                 fontSizeMode: Text.Fit
                 minimumPointSize: 8
-                color: "white"
+                color: window.theme.textPrimary
                 text: name
                 horizontalAlignment: settings.theme_tile_icon_enabled ? Text.AlignLeft : Text.AlignHCenter
                 anchors.leftMargin: settings.theme_tile_icon_enabled ? 55 * settings.ui_zoom / 100 : 0
@@ -587,29 +560,23 @@ HomeForm {
         clip: true
         visible: rootItem.chartFooterVisible || rootItem.videoVisible
 
+        // the handle that resizes the chart or video: a small pill, the touch area stays as wide
         Rectangle {
             id: dragHandle
             width: parent.width / 5
-            height: 10
-            color: "#9C27B0"
+            height: 24
+            color: "transparent"
             anchors.top: parent.top
             anchors.horizontalCenter: parent.horizontalCenter
             visible: rootItem.chartFooterVisible || rootItem.videoVisible
 
-            Canvas {
-                anchors.fill: parent
-                onPaint: {
-                    var ctx = getContext("2d");
-                    ctx.strokeStyle = "#FFFFFF";
-                    ctx.lineWidth = 2;
-
-                    for (var i = 0; i < 3; i++) {
-                        ctx.beginPath();
-                        ctx.moveTo(0, (i + 1) * parent.height / 4);
-                        ctx.lineTo(parent.width, (i + 1) * parent.height / 4);
-                        ctx.stroke();
-                    }
-                }
+            Rectangle {
+                width: 36
+                height: 4
+                radius: 2
+                anchors.centerIn: parent
+                color: window.theme.textSecondary
+                Accessible.ignored: true
             }
 
             MouseArea {

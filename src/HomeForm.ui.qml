@@ -47,7 +47,7 @@ Page {
             Rectangle {
                 width: 50
                 height: row.height
-					 color: settings.theme_background_color
+					 color: "transparent"
                 Accessible.ignored: true
 
                 Column {
@@ -63,7 +63,7 @@ Page {
                     Rectangle {
                         width: 50
                         height: row.height
-                        color: settings.theme_background_color
+                        color: "transparent"
                         Accessible.ignored: true
 
                         Image {
@@ -114,7 +114,7 @@ Page {
             Rectangle {
                 width: 120
                 height: row.height
-					 color: settings.theme_background_color
+					 color: "transparent"
                 Accessible.ignored: true
 
                 RoundButton {
@@ -135,18 +135,12 @@ Page {
                     Accessible.description: qsTr("Start workout")
                     Accessible.focusable: true
                 }
-                ColorOverlay {
-                    anchors.fill: start
-                    source: start
-                    color: rootItem.startColor
-                    enabled: rootItem.startColor === "red" ? true : false
-                }
             }
 
             Rectangle {
                 width: 120
                 height: row.height
-					 color: settings.theme_background_color
+					 color: "transparent"
                 Accessible.ignored: true
 
                 RoundButton {
@@ -166,19 +160,13 @@ Page {
                     Accessible.description: qsTr("Stop workout")
                     Accessible.focusable: true
                 }
-                ColorOverlay {
-                    anchors.fill: stop
-                    source: stop
-                    color: rootItem.stopColor
-                    enabled: rootItem.stopColor === "red" ? true : false
-                }
             }
 
             Rectangle {
                 id: item2
                 width: 50
                 height: row.height
-					 color: settings.theme_background_color
+					 color: "transparent"
                 Accessible.ignored: true
 
                 RoundButton {

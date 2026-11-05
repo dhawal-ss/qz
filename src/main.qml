@@ -361,6 +361,9 @@ ApplicationWindow {
         id: toast
     }
 
+    // The colours of the dashboard (ThemeTokens.qml)
+    property ThemeTokens theme: ThemeTokens {}
+
     property bool lapPromptVisible: false
     property string lapPromptText: ""
 
@@ -1257,7 +1260,9 @@ ApplicationWindow {
 
     header: ToolBar {
         contentHeight: toolButton.implicitHeight
-        Material.primary: settings.theme_status_bar_background_color
+        // the stock purple gives way to the dashboard chrome; a colour of the rider's own stays
+        Material.primary: window.theme.pick(settings.theme_status_bar_background_color, "#800080", window.theme.chrome)
+        Material.elevation: 0
         id: headerToolbar
         // Opacity, not visible: some pages set headerToolbar.visible themselves
         opacity: window.rootReady ? 1 : 0
@@ -1271,7 +1276,9 @@ ApplicationWindow {
         ToolButton {
             id: toolButton
             icon.source: "icons/icons/icon.png"
-            text: stackView.depth > 1 ? "◄" : "◄"
+            // a menu at the home page, back on the others
+            text: stackView.depth > 1 ? "◄" : "≡"
+            Accessible.name: stackView.depth > 1 ? qsTr("Back") : qsTr("Menu")
             // The header is as tall as this button. On iOS the app font already carries the system
             // text size (53 px at the largest one), so the arrow is scaled from the body size, as
             // the rest of the text, and keeps the same cap
@@ -1296,82 +1303,6 @@ ApplicationWindow {
             // the icon buttons stay in its middle, in line with the arrow and the title
             anchors.verticalCenter: parent.verticalCenter
             visible: OS_VERSION === "Android" ? true : false
-        }
-
-        Popup {
-            id: popupAutoResistance
-             parent: Overlay.overlay
-
-             x: Math.round((parent.width - width) / 2)
-             y: Math.round((parent.height - height) / 2)
-             width: window.textScale !== 1 ? Math.min(380, parent.width - 32) : 380
-             height: window.textScale !== 1 ? Math.max(60, popupAutoResistanceText.height + topPadding + bottomPadding) : 60
-             modal: true
-             focus: true
-             palette.text: "white"
-             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-             enter: Transition
-             {
-                 NumberAnimation { property: "opacity"; from: 0.0; to: 1.0 }
-             }
-             exit: Transition
-             {
-                 NumberAnimation { property: "opacity"; from: 1.0; to: 0.0 }
-             }
-             Column {
-                 anchors.horizontalCenter: parent.horizontalCenter
-             Label {
-                 id: popupAutoResistanceText
-                 anchors.horizontalCenter: parent.horizontalCenter
-                 text: rootItem.autoResistance ? qsTr("Auto Resistance enabled") : qsTr("Auto Resistance disabled")
-                 width: window.textScale !== 1 ? popupAutoResistance.availableWidth : implicitWidth
-                 wrapMode: window.labelWrap
-                }
-             }
-        }
-
-        Timer {
-            id: popupAutoResistanceAutoClose
-            interval: 2000; running: false; repeat: false
-            onTriggered: popupAutoResistance.close();
-        }
-
-        Popup {
-            id: popuplockTiles
-             parent: Overlay.overlay
-
-             x: Math.round((parent.width - width) / 2)
-             y: Math.round((parent.height - height) / 2)
-             width: window.textScale !== 1 ? Math.min(380, parent.width - 32) : 380
-             height: window.textScale !== 1 ? Math.max(60, popuplockTilesText.height + topPadding + bottomPadding) : 60
-             modal: true
-             focus: true
-             palette.text: "white"
-             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-             enter: Transition
-             {
-                 NumberAnimation { property: "opacity"; from: 0.0; to: 1.0 }
-             }
-             exit: Transition
-             {
-                 NumberAnimation { property: "opacity"; from: 1.0; to: 0.0 }
-             }
-             Column {
-                 anchors.horizontalCenter: parent.horizontalCenter
-             Label {
-                 id: popuplockTilesText
-                 anchors.horizontalCenter: parent.horizontalCenter
-                 text: window.lockTiles ? qsTr("You can move the tiles!") : qsTr("The tiles are locked now")
-                 width: window.textScale !== 1 ? popuplockTiles.availableWidth : implicitWidth
-                 wrapMode: window.labelWrap
-                }
-             }
-        }
-
-        Timer {
-            id: popuplockTilesAutoClose
-            interval: 2000; running: false; repeat: false
-            onTriggered: popuplockTiles.close();
         }
 
         ToolButton {
@@ -1500,7 +1431,8 @@ ApplicationWindow {
         ToolButton {
             id: toolButtonLockTiles
             icon.source: ( window.lockTiles ? "icons/icons/unlock.png" : "icons/icons/lock.png")
-            onClicked: { window.lockTiles = !window.lockTiles; console.log("lock tiles toggled " + window.lockTiles); popuplockTiles.open(); popuplockTilesAutoClose.running = true; }
+            onClicked: { window.lockTiles = !window.lockTiles; console.log("lock tiles toggled " + window.lockTiles); toast.show(window.lockTiles ? qsTr("You can move the tiles!") : qsTr("The tiles are locked now"), 1500); }
+            Accessible.name: window.lockTiles ? qsTr("Lock tiles") : qsTr("Move tiles")
             anchors.right: toolButtonAutoResistance.left
             anchors.verticalCenter: parent.verticalCenter
             visible: !toolButtonSaveSettings.visible
@@ -1508,8 +1440,11 @@ ApplicationWindow {
 
         ToolButton {
             id: toolButtonAutoResistance
-            icon.source: ( rootItem.autoResistance ? "icons/icons/resistance.png" : "icons/icons/pause.png")
-            onClicked: { rootItem.autoResistance = !rootItem.autoResistance; console.log("auto resistance toggled " + rootItem.autoResistance); popupAutoResistance.open(); popupAutoResistanceAutoClose.running = true; }
+            // dimmed when off: a pause icon here read as a second Pause button next to the ride's own
+            icon.source: "icons/icons/resistance.png"
+            opacity: rootItem.autoResistance ? 1 : 0.45
+            onClicked: { rootItem.autoResistance = !rootItem.autoResistance; console.log("auto resistance toggled " + rootItem.autoResistance); toast.show(rootItem.autoResistance ? qsTr("Auto Resistance enabled") : qsTr("Auto Resistance disabled"), 1500); }
+            Accessible.name: qsTr("Auto resistance") + ": " + (rootItem.autoResistance ? qsTr("on") : qsTr("off"))
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             visible: !headerToolbar.settingsPageActive
