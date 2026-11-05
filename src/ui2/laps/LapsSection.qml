@@ -282,7 +282,7 @@ Item {
                             color: laps.zoneColor(segment.lap)
                             opacity: laps.selectedLap < 0 || segment.picked ? 1 : 0.32
                             Behavior on height {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 NumberAnimation { duration: Theme.fast; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
                             }
                             Behavior on opacity {
@@ -384,7 +384,7 @@ Item {
                             color: laps.zoneColor(barSlot.lap)
                             opacity: laps.selectedLap < 0 || laps.selectedLap === index ? 1 : 0.32
                             Behavior on height {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 NumberAnimation { duration: Theme.medium; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
                             }
                             Behavior on opacity {

@@ -69,7 +69,7 @@ Item {
         radius: 28
 
         Behavior on y {
-            enabled: !Theme.reduceMotion
+            enabled: Theme.layoutMotion
             Spring { token: "default" }
         }
 

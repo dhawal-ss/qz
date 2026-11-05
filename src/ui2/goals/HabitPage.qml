@@ -34,7 +34,7 @@ Item {
     opacity: open ? 1 : 0
     enabled: open
     Accessible.ignored: !open
-    transform: Translate { y: page.open ? 0 : 24; Behavior on y { enabled: !Theme.reduceMotion; Spring { token: "default" } } }
+    transform: Translate { y: page.open ? 0 : 24; Behavior on y { enabled: Theme.layoutMotion; Spring { token: "default" } } }
     Behavior on opacity {
         enabled: !Theme.reduceMotion
         NumberAnimation { duration: Theme.effectsTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.effectsCurve }

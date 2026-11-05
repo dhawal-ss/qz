@@ -71,11 +71,11 @@ PulseButton {
                 x: row.isOn ? parent.width - width - 4 : 8
                 color: row.isOn ? Theme.accentInk : Theme.text3
                 Behavior on x {
-                    enabled: !Theme.reduceMotion
+                    enabled: Theme.layoutMotion
                     NumberAnimation { duration: Theme.fast; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
                 }
                 Behavior on width {
-                    enabled: !Theme.reduceMotion
+                    enabled: Theme.layoutMotion
                     NumberAnimation { duration: Theme.fast; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
                 }
             }

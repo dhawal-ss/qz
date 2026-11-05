@@ -498,7 +498,7 @@ Item {
         border.color: Theme.hairline
 
         Behavior on y {
-            enabled: !Theme.reduceMotion
+            enabled: Theme.layoutMotion
             NumberAnimation { duration: Theme.medium; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
         }
 

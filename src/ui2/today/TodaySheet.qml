@@ -39,7 +39,7 @@ Item {
         radius: 28
 
         Behavior on y {
-            enabled: !Theme.reduceMotion
+            enabled: Theme.layoutMotion
             NumberAnimation { duration: 450; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
         }
 

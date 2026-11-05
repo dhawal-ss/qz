@@ -37,7 +37,7 @@ Item {
                     color: index === bars.highlight ? bars.color
                            : (bars.values[index] > 0 ? Qt.rgba(bars.color.r, bars.color.g, bars.color.b, 0.38) : Theme.chip)
                     Behavior on height {
-                        enabled: !Theme.reduceMotion
+                        enabled: Theme.layoutMotion
                         NumberAnimation { duration: Theme.medium; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
                     }
                 }

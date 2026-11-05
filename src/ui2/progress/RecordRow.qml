@@ -32,7 +32,7 @@ Item {
     clip: true
 
     Behavior on height {
-        enabled: !Theme.reduceMotion
+        enabled: Theme.layoutMotion
         Spring { token: "default" }
     }
 

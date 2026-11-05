@@ -239,7 +239,7 @@ PulseButton {
             color: row.tint
             width: parent.width * Math.max(0, Math.min(1, row.info.frac || 0))
             Behavior on width {
-                enabled: !Theme.reduceMotion
+                enabled: Theme.layoutMotion
                 NumberAnimation { duration: Theme.colorTime; easing.type: Easing.Bezier; easing.bezierCurve: Theme.springCurve }
             }
         }

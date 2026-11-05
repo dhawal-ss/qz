@@ -83,7 +83,7 @@ Column {
                 radius: 4
                 color: challengeCard.tint
                 Behavior on width {
-                    enabled: !Theme.reduceMotion
+                    enabled: Theme.layoutMotion
                     Spring { token: "default" }
                 }
             }

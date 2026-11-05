@@ -409,6 +409,13 @@ public class CustomQtActivity extends QtActivity {
         // API 31+ only, like the QML paddings (main.qml getTopPadding() and the others):
         // below 31 they are 0, so on Android 11 (API 30) the system bars covered the app (#5484).
         getWindow().setBackgroundDrawable(new ColorDrawable(Color.BLACK));
+        // Bikemodo: a turn of the phone fades from the old picture to the new one. The default
+        // rotates a snapshot that does not hold Qt's surface, so it turned as a black frame.
+        if (getPackageName().contains("bikemodo")) {
+            WindowManager.LayoutParams attributes = getWindow().getAttributes();
+            attributes.rotationAnimation = WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE;
+            getWindow().setAttributes(attributes);
+        }
         if (Build.VERSION.SDK_INT >= 31) {
             getWindow().setDecorFitsSystemWindows(false);
             getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;

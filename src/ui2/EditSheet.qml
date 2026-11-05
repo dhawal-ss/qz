@@ -91,7 +91,7 @@ Item {
         radius: 32
 
         Behavior on x {
-            enabled: !Theme.reduceMotion
+            enabled: Theme.layoutMotion
             Spring { token: "default" }
         }
 

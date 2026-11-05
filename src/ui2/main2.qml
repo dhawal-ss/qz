@@ -215,6 +215,34 @@ ApplicationWindow {
         lookApplied = true
     }
     property bool lookApplied: false
+    // the phone turned: the layout snaps to its new shape (Theme.resizing), and animates again once
+    // the window has kept its size for half a second
+    onWidthChanged: windowResized()
+    onHeightChanged: windowResized()
+    function windowResized() {
+        Theme.resizing = true
+        resizeSettle.restart()
+        // from the first call of a turn: width and height each call this
+        if (rotT === 0 || rotFrames >= 3) {
+            rotT = Date.now()
+            rotFrames = 0
+        }
+        console.log("BMROT resize " + width + "x" + height + " at " + (Date.now() - rotT) + " ms")
+    }
+    Timer {
+        id: resizeSettle
+        interval: 500
+        onTriggered: Theme.resizing = false
+    }
+    // TEMPORARY (rotation timing, remove after): the first frames drawn after a new size
+    property double rotT: 0
+    property int rotFrames: 0
+    onFrameSwapped: {
+        if (rotT > 0 && rotFrames < 3) {
+            rotFrames++
+            console.log("BMROT frame " + rotFrames + " after " + (Date.now() - rotT) + " ms")
+        }
+    }
     onModeChanged: applyLook()
     Connections {
         target: Theme

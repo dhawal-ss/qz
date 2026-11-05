@@ -142,7 +142,7 @@ Column {
                             radius: width / 2
                             color: Theme.light ? modelData.lightColor : modelData.color
                             Behavior on width {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 Spring { token: "fast" }
                             }
                             YouIcon {

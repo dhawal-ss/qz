@@ -98,7 +98,7 @@ Item {
                 radius: width / 2
                 color: weekRow.tint
                 Behavior on width {
-                    enabled: !Theme.reduceMotion
+                    enabled: Theme.layoutMotion
                     Spring { token: "default" }
                 }
             }

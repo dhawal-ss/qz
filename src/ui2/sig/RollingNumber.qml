@@ -55,7 +55,7 @@ Item {
                     visible: cell.digit >= 0
                     y: -Math.max(0, cell.digit) * roller.cellHeight
                     Behavior on y {
-                        enabled: !Theme.reduceMotion
+                        enabled: Theme.layoutMotion
                         Spring { token: roller.token }
                     }
                     Repeater {

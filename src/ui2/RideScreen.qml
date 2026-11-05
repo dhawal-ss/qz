@@ -1052,7 +1052,7 @@ Item {
                             height: zoneLabel.implicitHeight
                             anchors.verticalCenter: parent.verticalCenter
                             Behavior on width {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 Spring { token: "slow" }
                             }
                             Text {
@@ -1112,7 +1112,7 @@ Item {
                             radius: 1.5
                             color: Theme.text
                             Behavior on x {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 Spring { token: "slow" }
                             }
                         }
@@ -1610,7 +1610,7 @@ Item {
                              : (screen.startPhase === "go" ? qsTr("Pause ride") : qsTr("Start ride"))
             onClicked: screen.mainControl()
             Behavior on width {
-                enabled: !Theme.reduceMotion
+                enabled: Theme.layoutMotion
                 Spring { token: "fast" }
             }
             Behavior on opacity {

@@ -190,6 +190,11 @@ QtObject {
     readonly property int slow: 700
     readonly property int colorTime: 600
     property bool reduceMotion: false
+    // true for a moment while the window changes shape (the phone turned, main2.qml): the layout
+    // snaps to the new shape instead of springing there, and nothing slides through the screen
+    property bool resizing: false
+    // what a moving size or place animates with: off with reduce motion and while resizing
+    readonly property bool layoutMotion: !reduceMotion && !resizing
 
     // Motion of the Signature pass: the M3 Expressive springs, as damping ratio / stiffness
     // (mass 1): fast spatial 0.6 / 800 (presses, toggles, small moves), default spatial 0.8 / 380

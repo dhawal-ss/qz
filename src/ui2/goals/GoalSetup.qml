@@ -133,7 +133,7 @@ HabitPage {
                             Accessible.name: modelData[1] + (current ? ", " + qsTr("selected") : "")
                             onClicked: setup.pickKind(modelData[0])
                             Behavior on width {
-                                enabled: !Theme.reduceMotion
+                                enabled: Theme.layoutMotion
                                 Spring { token: "fast" }
                             }
                             contentItem: Item {
