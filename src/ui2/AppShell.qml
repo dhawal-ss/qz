@@ -27,6 +27,9 @@ Item {
     // a live ride paused and left for the app: Today shows a banner, the Ride button a dot
     property bool ridePaused: false
     property real pausedAt: 0
+    // an update from Play for Today's banner ("", "available", "downloading", "downloaded")
+    property string updateShown: ""
+    property real updateProgress: 0
 
     property int insetTop: 0
     property int insetBottom: 0
@@ -48,6 +51,8 @@ Item {
     signal pelotonConnect()
     signal intervalsConnect()
     signal refreshDevices()
+    // Today's update banner: "start", "later" or "restart"
+    signal updateAction(string what)
     // miles or kilometers picked in You; the shell already shows it, main2 may store it too
     signal unitsPicked(bool miles)
 
@@ -306,6 +311,9 @@ Item {
             initial: shell.initial
             ridePaused: shell.ridePaused
             pausedAt: shell.pausedAt
+            updateShown: shell.updateShown
+            updateProgress: shell.updateProgress
+            onUpdateAction: shell.updateAction(what)
             onRideRequested: shell.rideRequested()
             onWorkoutRequested: shell.workoutRequested(plan)
             onEndRideRequested: shell.endRideRequested()

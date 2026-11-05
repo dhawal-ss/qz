@@ -151,6 +151,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
         startSetupIfNew()
+        checkForUpdate()
         if (!firstRun.wakeLockSet) {
             qzSettings.android_wakelock = false
             qzSettings.sync()
@@ -181,6 +182,8 @@ ApplicationWindow {
         property bool reduceMotion: false
         // 0 follows the phone; another value sets the text scale (for trying large text)
         property real textScaleOverride: 0
+        // the Play version code of an update the rider said no to: Today does not offer it again
+        property int updateDismissed: 0
     }
     // the phone's own choices: Remove animations, and the font size (read again each time the
     // app comes to the front, it may have changed in Android's settings)
@@ -197,8 +200,82 @@ ApplicationWindow {
     Connections {
         target: Qt.application
         function onStateChanged() {
-            if (Qt.application.state === Qt.ApplicationActive)
+            if (Qt.application.state === Qt.ApplicationActive) {
                 window.readSystemDisplay()
+                quietInstall.stop()
+                window.checkForUpdate()
+            } else if (Qt.application.state === Qt.ApplicationSuspended) {
+                quietInstall.restart()
+            }
+        }
+    }
+
+    // Updates from Google Play, inside the app (BikemodoUpdate.kt). Play is asked when the app comes
+    // to the front with no ride open; Today's banner offers what it found, shows the download, and
+    // restarts into the new version. Nothing of it while a ride is open: a downloaded update goes in
+    // by itself a minute after the app leaves the front, or at the next restart.
+    property var appUpdate: ({ state: "none", version: 0, progress: 0 })
+    // "Later" on a downloaded update: not offered again until the app starts again
+    property bool updateLater: false
+    readonly property bool rideInProgress: rideOpen || mode === "ride" || mode === "demo"
+    // what Today shows: "", "available", "downloading" or "downloaded"
+    readonly property string updateShown: {
+        if (rideInProgress)
+            return ""
+        var u = appUpdate
+        if (u.state === "available" && u.version !== uiSettings.updateDismissed)
+            return "available"
+        if (u.state === "downloading")
+            return "downloading"
+        if (u.state === "downloaded" && !updateLater)
+            return "downloaded"
+        return ""
+    }
+    function checkForUpdate() {
+        if (!rideInProgress)
+            bikemodoBridge.updateCheck()
+    }
+    function readUpdate() {
+        var text = bikemodoBridge.updateState()
+        if (text === "")
+            return
+        try {
+            var u = JSON.parse(text)
+        } catch (e) {
+            return
+        }
+        // no thanks in Play's dialog counts as Not now
+        if (u.state === "declined" && u.version > 0)
+            uiSettings.updateDismissed = u.version
+        appUpdate = u
+    }
+    // Today's banner: "start" (Play's dialog), "later", or "restart" (into the downloaded version)
+    function updateAction(what) {
+        if (what === "start") {
+            bikemodoBridge.updateStart()
+        } else if (what === "later") {
+            if (appUpdate.state === "available")
+                uiSettings.updateDismissed = appUpdate.version
+            else
+                updateLater = true
+        } else if (what === "restart" && !rideInProgress) {
+            bikemodoBridge.updateFinish()
+        }
+    }
+    Timer {
+        interval: 1500
+        repeat: true
+        triggeredOnStart: true
+        running: window.mode === "home" && Qt.application.state === Qt.ApplicationActive
+        onTriggered: window.readUpdate()
+    }
+    Timer {
+        id: quietInstall
+        interval: 60000
+        onTriggered: {
+            window.readUpdate()
+            if (Qt.application.state === Qt.ApplicationSuspended && !window.rideInProgress && window.appUpdate.state === "downloaded")
+                bikemodoBridge.updateFinish()
         }
     }
     // the light or dark palette: You's choice (Theme.appearance), or the phone's dark theme. Not in
@@ -823,6 +900,9 @@ ApplicationWindow {
             // a ride paused and left: Today and the Ride button offer to go back to it
             ridePaused: live.paused && !live.stopped && live.elapsed > 0 && window.mode === "home"
             pausedAt: live.pausedAt
+            updateShown: window.updateShown
+            updateProgress: window.appUpdate.progress
+            onUpdateAction: window.updateAction(what)
             onRideRequested: window.requestRide()
             onWorkoutRequested: window.startWorkout(plan)
             onWorkoutFileRequested: if (window.core !== null) window.core.openAndroidDocumentPicker("training")

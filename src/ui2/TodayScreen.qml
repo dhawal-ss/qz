@@ -67,6 +67,11 @@ Item {
     property real pausedAt: 0
     // now, for "paused 12 min ago": ticks while the banner shows
     property real pauseClock: Date.now()
+    // an update from Google Play (main2.qml): "", "available", "downloading" or "downloaded"; the
+    // banner offers it, shows the download and restarts into it. "start", "later" or "restart":
+    property string updateShown: ""
+    property real updateProgress: 0
+    signal updateAction(string what)
 
     signal rideRequested()
     // Start on the idea for today: the plan (today/Coach.js plan()) as a workout
@@ -701,6 +706,19 @@ Item {
     // a ride the app was closed or killed during, from QZ's backups: the banner offers to keep it
     readonly property var unfinished: library && library.unfinished && library.unfinished.seconds > 0 ? library.unfinished : null
     readonly property bool showRecover: unfinished !== null && !ridePaused
+    // what the banner under the header is about: a paused ride first, then an unfinished one, then
+    // an update ("" for none)
+    readonly property string bannerKind: ridePaused ? "paused" : showRecover ? "recover" : updateShown !== "" ? "update" : ""
+    readonly property string bannerTitle: bannerKind === "paused" ? qsTr("Ride paused")
+        : bannerKind === "recover" ? qsTr("Unfinished ride")
+        : updateShown === "downloaded" ? qsTr("Update ready")
+        : updateShown === "downloading" ? qsTr("Updating Bikemodo")
+        : qsTr("A new Bikemodo")
+    readonly property string bannerWords: bannerKind === "paused" ? pausedAgo
+        : bannerKind === "recover" ? unfinishedWords
+        : updateShown === "downloaded" ? qsTr("Restart to finish. It takes a few seconds.")
+        : updateShown === "downloading" ? qsTr("Downloading, %1%").arg(Math.round(updateProgress * 100))
+        : qsTr("It downloads while you carry on.")
     readonly property string unfinishedWords: unfinished === null ? ""
         : qsTr("%1, %2. The app closed before it was saved.").arg(Format.hours(unfinished.seconds))
                                                                    .arg(Format.day(unfinished.start) + " " + Format.time(unfinished.start))
@@ -949,14 +967,14 @@ Item {
             }
 
             // the ride paused and left: back to it, or end it. Or a ride the app never saved: keep it,
-            // or let it go
+            // or let it go. Or a new version from Play: get it, then restart into it
             Item {
                 id: pausedBanner
                 objectName: "pausedBanner"
                 y: header.y + header.height + 4
                 width: content.leftWidth
-                height: todayPage.ridePaused || todayPage.showRecover ? bannerBody.height : 0
-                visible: todayPage.ridePaused || todayPage.showRecover
+                height: todayPage.bannerKind !== "" ? bannerBody.height : 0
+                visible: todayPage.bannerKind !== ""
                 Rectangle {
                     id: bannerBody
                     width: parent.width
@@ -977,7 +995,7 @@ Item {
                                 width: 10
                                 height: 10
                                 radius: 5
-                                color: todayPage.ridePaused ? Theme.recording : Theme.accent
+                                color: todayPage.bannerKind === "paused" ? Theme.recording : Theme.accent
                             }
                             Column {
                                 id: bannerWords
@@ -986,11 +1004,11 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 1
                                 Accessible.role: Accessible.StaticText
-                                Accessible.name: todayPage.ridePaused ? qsTr("Ride paused %1").arg(todayPage.pausedAgo.toLowerCase())
-                                                                      : qsTr("Unfinished ride. %1").arg(todayPage.unfinishedWords)
+                                Accessible.name: todayPage.bannerKind === "paused" ? qsTr("Ride paused %1").arg(todayPage.pausedAgo.toLowerCase())
+                                                                                   : todayPage.bannerTitle + ". " + todayPage.bannerWords
                                 Text {
                                     width: parent.width
-                                    text: todayPage.ridePaused ? qsTr("Ride paused") : qsTr("Unfinished ride")
+                                    text: todayPage.bannerTitle
                                     color: Theme.text
                                     font.family: Theme.bodySemibold
                                     font.pixelSize: Theme.fs(15)
@@ -999,13 +1017,13 @@ Item {
                                 }
                                 Text {
                                     width: parent.width
-                                    text: todayPage.ridePaused ? todayPage.pausedAgo : todayPage.unfinishedWords
+                                    text: todayPage.bannerWords
                                     color: Theme.text2
                                     font.family: Theme.bodyMedium
                                     font.pixelSize: Theme.fs(13)
-                                    // the paused line is short; the unfinished one says what happened
-                                    elide: todayPage.ridePaused ? Text.ElideRight : Text.ElideNone
-                                    wrapMode: todayPage.ridePaused ? Text.NoWrap : Text.WordWrap
+                                    // the paused line is short; the others say what happened
+                                    elide: todayPage.bannerKind === "paused" ? Text.ElideRight : Text.ElideNone
+                                    wrapMode: todayPage.bannerKind === "paused" ? Text.NoWrap : Text.WordWrap
                                     Accessible.ignored: true
                                 }
                             }
@@ -1022,17 +1040,29 @@ Item {
                                     bottomInset: 2
                                     pressedRadius: 14
                                     fill: pressed ? Qt.lighter(Theme.accent, 1.08) : Theme.accent
-                                    Accessible.name: todayPage.ridePaused ? qsTr("Resume your paused ride")
-                                                                          : qsTr("Keep the unfinished ride with your rides")
+                                    // the download runs by itself: nothing to press meanwhile
+                                    visible: todayPage.updateShown !== "downloading" || todayPage.bannerKind !== "update"
+                                    Accessible.name: todayPage.bannerKind === "paused" ? qsTr("Resume your paused ride")
+                                        : todayPage.bannerKind === "recover" ? qsTr("Keep the unfinished ride with your rides")
+                                        : todayPage.updateShown === "downloaded" ? qsTr("Restart Bikemodo into the new version")
+                                        : qsTr("Download the new version of Bikemodo")
                                     onClicked: {
-                                        if (todayPage.ridePaused)
+                                        if (todayPage.bannerKind === "paused")
                                             todayPage.rideRequested()
-                                        else if (todayPage.library)
-                                            todayPage.library.recoverUnfinished()
+                                        else if (todayPage.bannerKind === "recover") {
+                                            if (todayPage.library)
+                                                todayPage.library.recoverUnfinished()
+                                        } else if (todayPage.updateShown === "downloaded")
+                                            todayPage.updateAction("restart")
+                                        else
+                                            todayPage.updateAction("start")
                                     }
                                     contentItem: Text {
                                         id: resumeText
-                                        text: todayPage.ridePaused ? qsTr("Resume") : qsTr("Keep")
+                                        text: todayPage.bannerKind === "paused" ? qsTr("Resume")
+                                            : todayPage.bannerKind === "recover" ? qsTr("Keep")
+                                            : todayPage.updateShown === "downloaded" ? qsTr("Restart")
+                                            : qsTr("Update")
                                         color: Theme.accentInk
                                         font.family: Theme.bodySemibold
                                         font.pixelSize: Theme.fs(14)
@@ -1048,17 +1078,26 @@ Item {
                                     bottomInset: 2
                                     pressedRadius: 14
                                     fill: pressed ? Theme.chip : Theme.control
-                                    Accessible.name: todayPage.ridePaused ? qsTr("End the paused ride and save it")
-                                                                          : qsTr("Let the unfinished ride go")
+                                    visible: todayPage.updateShown !== "downloading" || todayPage.bannerKind !== "update"
+                                    Accessible.name: todayPage.bannerKind === "paused" ? qsTr("End the paused ride and save it")
+                                        : todayPage.bannerKind === "recover" ? qsTr("Let the unfinished ride go")
+                                        : todayPage.updateShown === "downloaded" ? qsTr("Restart later")
+                                        : qsTr("Not now, keep this version")
                                     onClicked: {
-                                        if (todayPage.ridePaused)
+                                        if (todayPage.bannerKind === "paused")
                                             todayPage.endRideRequested()
-                                        else if (todayPage.library)
-                                            todayPage.library.dismissUnfinished()
+                                        else if (todayPage.bannerKind === "recover") {
+                                            if (todayPage.library)
+                                                todayPage.library.dismissUnfinished()
+                                        } else
+                                            todayPage.updateAction("later")
                                     }
                                     contentItem: Text {
                                         id: endText
-                                        text: todayPage.ridePaused ? qsTr("End") : qsTr("Dismiss")
+                                        text: todayPage.bannerKind === "paused" ? qsTr("End")
+                                            : todayPage.bannerKind === "recover" ? qsTr("Dismiss")
+                                            : todayPage.updateShown === "downloaded" ? qsTr("Later")
+                                            : qsTr("Not now")
                                         color: Theme.text
                                         font.family: Theme.bodySemibold
                                         font.pixelSize: Theme.fs(14)

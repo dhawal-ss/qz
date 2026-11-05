@@ -179,3 +179,32 @@ bool BikemodoBridge::systemNightMode() {
     return true;
 #endif
 }
+
+void BikemodoBridge::updateCheck() {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoUpdate", "check",
+                                              "(Landroid/content/Context;)V", QtAndroid::androidContext().object());
+#endif
+}
+
+void BikemodoBridge::updateStart() {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoUpdate", "start",
+                                              "(Landroid/content/Context;)V", QtAndroid::androidActivity().object());
+#endif
+}
+
+void BikemodoBridge::updateFinish() {
+#ifdef Q_OS_ANDROID
+    QAndroidJniObject::callStaticMethod<void>("org/cagnulen/qdomyoszwift/BikemodoUpdate", "complete",
+                                              "(Landroid/content/Context;)V", QtAndroid::androidContext().object());
+#endif
+}
+
+QString BikemodoBridge::updateState() {
+#ifdef Q_OS_ANDROID
+    return QAndroidJniObject::callStaticObjectMethod<jstring>("org/cagnulen/qdomyoszwift/BikemodoUpdate", "state").toString();
+#else
+    return QString();
+#endif
+}

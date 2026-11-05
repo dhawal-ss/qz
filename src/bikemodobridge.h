@@ -51,6 +51,13 @@ class BikemodoBridge : public QObject {
     Q_INVOKABLE bool systemAnimationsOff();
     // the phone's dark theme, for Bikemodo's Look: Phone (main2.qml)
     Q_INVOKABLE bool systemNightMode();
+    // Updates from Google Play inside the app (BikemodoUpdate.kt): ask Play for a newer version,
+    // open Play's dialog for it, put a downloaded one in (the app restarts), and where it stands
+    // (JSON { state, version, progress }, "" off Android)
+    Q_INVOKABLE void updateCheck();
+    Q_INVOKABLE void updateStart();
+    Q_INVOKABLE void updateFinish();
+    Q_INVOKABLE QString updateState();
 
   private:
     RideLibrary *m_library = nullptr;

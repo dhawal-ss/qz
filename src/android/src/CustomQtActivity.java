@@ -553,6 +553,9 @@ public class CustomQtActivity extends QtActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Bikemodo: Play's update dialog closed
+        if (BikemodoUpdate.onResult(requestCode, resultCode))
+            return;
         if (isDocumentPickerRequest(requestCode)) {
             handleDocumentPickerResult(requestCode, resultCode, data);
             return;
