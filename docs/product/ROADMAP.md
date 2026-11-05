@@ -74,6 +74,10 @@ Dashboard v1
 - Step 5: one zone palette (`ThemeTokens.zoneColor`): the Watts, FTP Zone, Heart and HR
   time-in-zone tiles carry a zone band, a "Z" pill and the zone colour on their value; the hero
   cells are tinted by zone; screen readers say "zone 4".
+- The hero follows a running workout: Elapsed says when the next interval starts, Watts shows
+  the target. Details in `docs/product/dashboard.md`.
+- Open Train Program works again on builds without CHARTJS (Linux desktops): the page failed to
+  load.
 
 Records
 - Power records on the history page: the best 5 s, 1 min, 5 min and 20 min of every bike ride and
@@ -102,8 +106,8 @@ Your numbers
    pairing without a restart, live data freshness.
 4. **Zones, one definition**: one power and HR zone model and one palette for tiles, charts and
    targets.
-5. **Ride dashboard v1.1**: the hero follows a workout (time to the next interval, the target
-   power), the chart palette matches the tiles, a theme picker (OLED black, light).
+5. **Ride dashboard v1.1**: the chart palette matches the tiles, a theme picker (OLED black,
+   light), the hero for treadmills and rowers.
 6. **Trainer control you can trust** and **workout engine correctness** (ZWO elements, ramps,
    segment laps, Peloton timing).
 7. **Interval coaching**: current interval, countdown, target in range, next interval.
