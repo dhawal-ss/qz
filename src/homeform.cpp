@@ -9007,8 +9007,13 @@ void homeform::update() {
             }
 
             // while the device link is down (BLE dropout, reconnecting) the device keeps its last values:
-            // record no speed, distance, power or cadence instead of repeating them for the whole gap
-            const bool deviceConnected = bluetoothManager->device()->connected();
+            // record no speed, distance, power or cadence instead of repeating them for the whole gap.
+            // Only for a device that reports its link: the classic Bluetooth (RFCOMM) drivers (iConcept,
+            // Toorx, Technogym MyRun) never say they are connected, and recorded nothing at all
+            if (bluetoothManager->device()->connected())
+                m_linkReportingDevice = bluetoothManager->device();
+            const bool deviceConnected =
+                m_linkReportingDevice != bluetoothManager->device() || bluetoothManager->device()->connected();
             bool treadmill_direct_distance = settings.value(QZSettings::treadmill_direct_distance, QZSettings::default_treadmill_direct_distance).toBool();
             double distance1s = 0;
             if (treadmill_direct_distance) {

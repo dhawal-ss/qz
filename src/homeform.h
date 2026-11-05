@@ -1083,6 +1083,8 @@ public:
     // step (NTP sync, manual time change) is not a late or early tick; started by the first update()
     QElapsedTimer lastUpdateCall;
     qint64 currentUpdateJitter = 0;
+    // the device whose connected() has been true at least once: only its dropouts are recorded as no data
+    bluetoothdevice *m_linkReportingDevice = nullptr;
 
     peloton *pelotonHandler = nullptr;
     bool m_pelotonAskStart = false;
