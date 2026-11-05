@@ -54,6 +54,8 @@ dependencies {
         implementation 'com.google.android.gms:play-services-mlkit-text-recognition:18.0.2'
         implementation 'com.google.android.play:age-signals:0.0.3'
         implementation 'androidx.health.connect:connect-client:1.1.0-alpha11'
+        // Bikemodo's updates from Play, inside the app (BikemodoUpdate.kt)
+        implementation 'com.google.android.play:app-update:2.1.0'
     }
 
     def appcompat_version = "1.3.1"
@@ -203,14 +205,19 @@ android {
 }
 
 // Bikemodo's release on Google Play: its own app ID and version, whatever the build machine
-// passes. The ID can never change once published. Raise the version code by one for every
-// upload (Play refuses a code it has seen); the debug build keeps app.bikemodo and QZ's version.
+// passes. The ID can never change once published. Every upload needs a higher version code (Play
+// refuses a code it has seen): the release workflow (.github/workflows/bikemodo-release.yml) asks
+// Play for the next one and passes it with the version name, as -PbikemodoVersionCode and
+// -PbikemodoVersionName (or BIKEMODO_VERSION_CODE / BIKEMODO_VERSION_NAME). Without them a local
+// build is 1 / 0.1.0. The debug build keeps app.bikemodo and QZ's version.
+def bikemodoVersionCode = (project.findProperty('bikemodoVersionCode') ?: System.getenv('BIKEMODO_VERSION_CODE') ?: '1').toString().toInteger()
+def bikemodoVersionName = (project.findProperty('bikemodoVersionName') ?: System.getenv('BIKEMODO_VERSION_NAME') ?: '0.1.0').toString()
 androidComponents {
     onVariants(selector().withBuildType("release")) { variant ->
         variant.applicationId.set("org.dhawal.bikemodo")
         variant.outputs.each { output ->
-            output.versionCode.set(1)
-            output.versionName.set("0.1.0")
+            output.versionCode.set(bikemodoVersionCode)
+            output.versionName.set(bikemodoVersionName)
         }
     }
 }

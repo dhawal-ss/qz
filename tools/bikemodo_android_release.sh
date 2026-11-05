@@ -16,6 +16,9 @@
 # Without them the bundle is left unsigned, which is enough to check it.
 # BIKEMODO_SECRET_H may name a secret.h with Bikemodo's own Strava / intervals.icu keys; without it
 # the sign-ins to those services do not work in the release.
+# BIKEMODO_VERSION_CODE and BIKEMODO_VERSION_NAME set the version (the release workflow asks Play
+# for the next code); without them it is 1 / 0.1.0, fine for checking, refused by Play after the
+# first upload.
 set -euo pipefail
 
 TOOLS=/opt/bikemodo
@@ -86,7 +89,10 @@ export GRADLE_USER_HOME=$TOOLS/gradle-home
 find "$WORK/output/android" \( -name '*.properties' -o -name '*.gradle' -o -name '*.gradle.kts' \) \
   -exec sed -i '/android\.bundle\.enableUncompressedNativeLibs/d' {} +
 printf '\nqt5AndroidDir=%s/src/android/java\n' "$QT_DIR" >> "$WORK/output/android/gradle.properties"
-"$TOOLS/gradle-9.3.1/bin/gradle" -g "$GRADLE_USER_HOME" -q -p "$WORK/output/android" bundleRelease
+VERSION_ARGS=()
+[ -n "${BIKEMODO_VERSION_CODE:-}" ] && VERSION_ARGS+=("-PbikemodoVersionCode=$BIKEMODO_VERSION_CODE")
+[ -n "${BIKEMODO_VERSION_NAME:-}" ] && VERSION_ARGS+=("-PbikemodoVersionName=$BIKEMODO_VERSION_NAME")
+"$TOOLS/gradle-9.3.1/bin/gradle" -g "$GRADLE_USER_HOME" -q -p "$WORK/output/android" "${VERSION_ARGS[@]}" bundleRelease
 
 echo "== checks"
 AAB=$WORK/output/android/build/outputs/bundle/release/android-release.aab

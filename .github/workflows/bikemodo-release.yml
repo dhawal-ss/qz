@@ -1,0 +1,212 @@
+name: Bikemodo release to Google Play
+
+# Every release of Bikemodo goes through here: a tag such as bikemodo-v0.2.0 (or Run workflow by
+# hand) builds the release bundle with tools/bikemodo_android_release.sh, signs it with the upload
+# key, asks Play for the next version code and uploads it. Riders then get it from Play: by Play's
+# own auto-update, or by the banner on Today (BikemodoUpdate.kt), which downloads it in the
+# background and restarts into it.
+#
+# Before the first run (docs/bikemodo/play-release.md):
+# - The app org.dhawal.bikemodo exists in Play Console and its first bundle was uploaded there by
+#   hand (Play's API cannot make the first upload).
+# - A service account with release rights on the app, its JSON key in
+#   BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON.
+# - The upload key: BIKEMODO_UPLOAD_KEYSTORE_B64 (base64 of the .jks), BIKEMODO_UPLOAD_ALIAS,
+#   BIKEMODO_UPLOAD_STORE_PASS, BIKEMODO_UPLOAD_KEY_PASS.
+# - Optional: BIKEMODO_SECRET_H, the text of a secret.h with Bikemodo's Strava and intervals.icu
+#   keys.
+# A tag goes to the track in the repository variable BIKEMODO_RELEASE_TRACK (internal when unset;
+# set it to production once releases should reach every rider). By hand, pick the track.
+# By hand with Upload unchecked, nothing needs Play: the version code is the one given (1 when
+# empty, right for the first upload by hand), and without the upload-key secrets the bundle is
+# left unsigned, enough to prove the release builds.
+
+on:
+  push:
+    tags:
+      - 'bikemodo-v*'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name riders see, e.g. 0.2.0'
+        required: true
+      version_code:
+        description: 'Version code, only with Upload unchecked (empty: 1); an upload asks Play for the next one'
+        required: false
+      track:
+        description: 'Play track'
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+      publish:
+        description: 'Upload to Play (unchecked: build and sign only, the bundle stays in this run)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: bikemodo-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150
+    env:
+      PACKAGE: org.dhawal.bikemodo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Version name and track
+        id: what
+        env:
+          INPUT_VERSION: ${{ inputs.version_name }}
+          INPUT_TRACK: ${{ inputs.track }}
+          INPUT_PUBLISH: ${{ inputs.publish }}
+          INPUT_CODE: ${{ inputs.version_code }}
+          TAG_TRACK: ${{ vars.BIKEMODO_RELEASE_TRACK }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            NAME="${GITHUB_REF_NAME#bikemodo-v}"
+            TRACK="${TAG_TRACK:-internal}"
+            PUBLISH=true
+          else
+            NAME="$INPUT_VERSION"
+            TRACK="$INPUT_TRACK"
+            PUBLISH="$INPUT_PUBLISH"
+          fi
+          if ! echo "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "Version name '$NAME' is not like 0.2.0" >&2
+            exit 1
+          fi
+          case "$TRACK" in internal|alpha|beta|production) ;; *) echo "Unknown track '$TRACK'" >&2; exit 1 ;; esac
+          if [ -n "${INPUT_CODE:-}" ] && ! echo "$INPUT_CODE" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "Version code '$INPUT_CODE' is not a whole number" >&2
+            exit 1
+          fi
+          echo "code=${INPUT_CODE:-1}" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "track=$TRACK" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "Bikemodo $NAME to the $TRACK track (upload: $PUBLISH)"
+
+      - name: Check the secrets
+        env:
+          KEYSTORE: ${{ secrets.BIKEMODO_UPLOAD_KEYSTORE_B64 }}
+          ALIAS: ${{ secrets.BIKEMODO_UPLOAD_ALIAS }}
+          STORE_PASS: ${{ secrets.BIKEMODO_UPLOAD_STORE_PASS }}
+          KEY_PASS: ${{ secrets.BIKEMODO_UPLOAD_KEY_PASS }}
+          PLAY_JSON: ${{ secrets.BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          MISSING=""
+          [ -n "$KEYSTORE" ] || MISSING="$MISSING BIKEMODO_UPLOAD_KEYSTORE_B64"
+          [ -n "$ALIAS" ] || MISSING="$MISSING BIKEMODO_UPLOAD_ALIAS"
+          [ -n "$STORE_PASS" ] || MISSING="$MISSING BIKEMODO_UPLOAD_STORE_PASS"
+          [ -n "$KEY_PASS" ] || MISSING="$MISSING BIKEMODO_UPLOAD_KEY_PASS"
+          if [ "${{ steps.what.outputs.publish }}" = "true" ]; then
+            [ -n "$PLAY_JSON" ] || MISSING="$MISSING BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON"
+            if [ -n "$MISSING" ]; then
+              echo "Missing repository secrets:$MISSING (see the top of this workflow)" >&2
+              exit 1
+            fi
+          elif [ -n "$MISSING" ]; then
+            echo "::warning::Build only, and the bundle stays unsigned (missing:$MISSING)"
+          fi
+
+      - name: Version code
+        id: code
+        env:
+          PLAY_JSON: ${{ secrets.BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON }}
+          GIVEN: ${{ steps.what.outputs.code }}
+        run: |
+          if [ "${{ steps.what.outputs.publish }}" = "true" ]; then
+            umask 077
+            printf '%s' "$PLAY_JSON" > "$RUNNER_TEMP/play.json"
+            CODE=$(python3 scripts/play_next_version_code.py --sa-json "$RUNNER_TEMP/play.json" --package "$PACKAGE")
+            rm -f "$RUNNER_TEMP/play.json"
+            # the first bundle, uploaded by hand, was version code 1
+            [ "$CODE" -ge 2 ] || CODE=2
+          else
+            CODE="$GIVEN"
+          fi
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Version code $CODE"
+
+      # the release script brings its own SDK, NDK and Qt (/opt/bikemodo): the runner's preinstalled
+      # Android SDK only takes the room the build needs
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          df -h /
+
+      - name: Toolchain
+        run: |
+          sudo bash tools/bikemodo_android_setup.sh
+          # the release script takes the javac on the path; the runner's default is older than
+          # the 17 that Gradle 9 and AGP 9 need
+          JDK=/usr/lib/jvm/java-17-openjdk-amd64
+          sudo update-alternatives --set java "$JDK/bin/java"
+          sudo update-alternatives --set javac "$JDK/bin/javac"
+          javac -version
+
+      - name: Build and sign the bundle
+        env:
+          KEYSTORE_B64: ${{ secrets.BIKEMODO_UPLOAD_KEYSTORE_B64 }}
+          SECRET_H: ${{ secrets.BIKEMODO_SECRET_H }}
+          BIKEMODO_UPLOAD_ALIAS: ${{ secrets.BIKEMODO_UPLOAD_ALIAS }}
+          BIKEMODO_UPLOAD_STORE_PASS: ${{ secrets.BIKEMODO_UPLOAD_STORE_PASS }}
+          BIKEMODO_UPLOAD_KEY_PASS: ${{ secrets.BIKEMODO_UPLOAD_KEY_PASS }}
+          BIKEMODO_VERSION_CODE: ${{ steps.code.outputs.code }}
+          BIKEMODO_VERSION_NAME: ${{ steps.what.outputs.name }}
+        run: |
+          umask 077
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            export BIKEMODO_UPLOAD_KEYSTORE="$RUNNER_TEMP/upload.jks"
+          fi
+          if [ -n "$SECRET_H" ]; then
+            printf '%s\n' "$SECRET_H" > "$RUNNER_TEMP/secret.h"
+            export BIKEMODO_SECRET_H="$RUNNER_TEMP/secret.h"
+          fi
+          sudo --preserve-env=BIKEMODO_UPLOAD_KEYSTORE,BIKEMODO_UPLOAD_ALIAS,BIKEMODO_UPLOAD_STORE_PASS,BIKEMODO_UPLOAD_KEY_PASS,BIKEMODO_SECRET_H,BIKEMODO_VERSION_CODE,BIKEMODO_VERSION_NAME \
+            bash tools/bikemodo_android_release.sh "$RUNNER_TEMP/out/bikemodo-${BIKEMODO_VERSION_NAME}.aab"
+          rm -f "$RUNNER_TEMP/upload.jks" "$RUNNER_TEMP/secret.h"
+          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/out"
+          mkdir -p dist && mv "$RUNNER_TEMP/out/"*.aab dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bikemodo-${{ steps.what.outputs.name }}-${{ steps.code.outputs.code }}
+          path: dist/*.aab
+          retention-days: 30
+
+      # Play flips between needing and refusing changesNotSentForReview on otherwise identical
+      # uploads (QZ's release-playstore.yml found it): try one way, then the other
+      - name: Upload to Play
+        id: upload1
+        if: steps.what.outputs.publish == 'true'
+        continue-on-error: true
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.dhawal.bikemodo
+          releaseFiles: dist/*.aab
+          releaseName: ${{ steps.what.outputs.name }} (${{ steps.code.outputs.code }})
+          track: ${{ steps.what.outputs.track }}
+          status: completed
+
+      - name: Upload to Play (again, changesNotSentForReview the other way)
+        if: steps.what.outputs.publish == 'true' && steps.upload1.outcome == 'failure'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.BIKEMODO_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: org.dhawal.bikemodo
+          releaseFiles: dist/*.aab
+          releaseName: ${{ steps.what.outputs.name }} (${{ steps.code.outputs.code }})
+          track: ${{ steps.what.outputs.track }}
+          changesNotSentForReview: true
+          status: completed
